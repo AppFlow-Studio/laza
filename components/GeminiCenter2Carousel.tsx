@@ -155,9 +155,9 @@ export default function GeminiCenter2Carousel({ products }: { products: any[] })
     };
 
     return (
-        <div className="flex flex-col items-center justify-start overflow-hidden">
+        <div className="flex flex-col items-center justify-start overflow-hidden h-full">
             <div
-                className="w-full max-w-8xl relative select-none [mask-composite:intersect] sm:[mask-image:linear-gradient(to_right,transparent,black_6rem),linear-gradient(to_left,transparent,black_6rem)]"
+                className="w-full max-w-8xl relative h-fit  select-none [mask-composite:intersect] sm:[mask-image:linear-gradient(to_right,transparent,black_6rem),linear-gradient(to_left,transparent,black_6rem)]"
                 onMouseEnter={() => setIsPaused(true)}
                 onMouseLeave={handleMouseLeave}
             >

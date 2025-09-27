@@ -52,44 +52,44 @@ const categories = [
   // "Cups",
 ]
 
-const featureItem = [
-  {
-    title: "Payment Processing & Management",
-    description:
-      "Efficiently manage transactions, track payments, and streamline your financial workflows with our secure payment processing solutions.",
-    imageSrc: "/features/feature-1-payment.png",
-  },
-  {
-    title: "100% Transparent Costs",
-    description:
-      "Enjoy clear, upfront pricing with no hidden fees. We believe in honesty and building trust through transparent cost structures.",
-    imageSrc: "/features/feature-1-payment.png",
-  },
-  {
-    title: "Technical Support",
-    description:
-      "Our expert technical support team is available around the clock to assist you with any issues or questions you may have.",
-    imageSrc: "/features/feature-1-payment.png",
-  },
-  {
-    title: "Right Equipment & Software",
-    description:
-      "Get access to the latest, most secure POS terminals and software tailored to your specific business needs.",
-    imageSrc: "/features/feature-1-payment.png",
-  },
-  {
-    title: "Full Data Security & Compliance",
-    description:
-      "Rest easy knowing your data is protected with top-tier security measures and full PCI compliance, safeguarding you and your customers.",
-    imageSrc: "/features/feature-1-payment.png",
-  },
-  {
-    title: "User Friendly & reliable Options",
-    description:
-      "Choose from a range of reliable, easy-to-use payment options that provide a seamless experience for your customers.",
-    imageSrc: "/features/feature-1-payment.png",
-  },
-];
+// const featureItem = [
+//   {
+//     title: "Payment Processing & Management",
+//     description:
+//       "Efficiently manage transactions, track payments, and streamline your financial workflows with our secure payment processing solutions.",
+//     imageSrc: "/features/feature-1-payment.png",
+//   },
+//   {
+//     title: "100% Transparent Costs",
+//     description:
+//       "Enjoy clear, upfront pricing with no hidden fees. We believe in honesty and building trust through transparent cost structures.",
+//     imageSrc: "/features/feature-1-payment.png",
+//   },
+//   {
+//     title: "Technical Support",
+//     description:
+//       "Our expert technical support team is available around the clock to assist you with any issues or questions you may have.",
+//     imageSrc: "/features/feature-1-payment.png",
+//   },
+//   {
+//     title: "Right Equipment & Software",
+//     description:
+//       "Get access to the latest, most secure POS terminals and software tailored to your specific business needs.",
+//     imageSrc: "/features/feature-1-payment.png",
+//   },
+//   {
+//     title: "Full Data Security & Compliance",
+//     description:
+//       "Rest easy knowing your data is protected with top-tier security measures and full PCI compliance, safeguarding you and your customers.",
+//     imageSrc: "/features/feature-1-payment.png",
+//   },
+//   {
+//     title: "User Friendly & reliable Options",
+//     description:
+//       "Choose from a range of reliable, easy-to-use payment options that provide a seamless experience for your customers.",
+//     imageSrc: "/features/feature-1-payment.png",
+//   },
+// ];
 
 export default async function Home() {
   const reviews = await getPlaceReviews()
@@ -536,7 +536,7 @@ export default async function Home() {
         <HeroVideo />
 
         {/* Most Wanted Section */}
-        <section className="relative aspect-video h-full w-full items-center justify-start overflow-hidden sm:min-h-220 min-h-180" >
+        <section className="relative  h-full w-full items-center justify-start overflow-hidden sm:min-h-220 min-h-180" >
           {/* Gradient + Image background */}
           <FadeIn className="relative -z-10">
             <div className="absolute sm:-top-10 -top-14 md:w-225 w-70 md:h-180 h-60 -z-20 md:right-0 -right-10 "
@@ -560,7 +560,7 @@ export default async function Home() {
             </p>
           </div>
 
-          <section className="h-full  max-w-8xl w-full mx-auto">
+          <section className="h-full  max-w-8xl w-full mx-auto relative">
             {/* <SwiperComponent /> */}
             {/* <Carousel items={getRandomMenuItems(7)} /> */}
             {/* <GeminiCarousel products={getRandomMenuItems(7)} /> */}
