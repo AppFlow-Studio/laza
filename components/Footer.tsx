@@ -55,6 +55,47 @@ export default function Footer() {
                         document.body.appendChild(aioa_script_tag);
                     });
                 }
+                
+                // Add CSS overrides to prevent scrolling issues
+                const style = document.createElement('style');
+                style.textContent = \`
+                    /* Ensure body and html can always scroll */
+                    html, body {
+                        overflow-x: auto !important;
+                        overflow-y: auto !important;
+                        position: relative !important;
+                        height: auto !important;
+                        max-height: none !important;
+                    }
+                    
+                    /* Prevent accessibility widget from breaking layout */
+                    body {
+                        transform: none !important;
+                        transition: none !important;
+                    }
+                    
+                    /* Ensure main content areas remain scrollable */
+                    main, .main, #__next, [role="main"] {
+                        overflow: visible !important;
+                        position: relative !important;
+                    }
+                    
+                    /* Fix for mobile viewport issues */
+                    @media (max-width: 768px) {
+                        html, body {
+                            overflow-x: auto !important;
+                            overflow-y: auto !important;
+                            -webkit-overflow-scrolling: touch !important;
+                        }
+                        
+                        body {
+                            transform: none !important;
+                            position: relative !important;
+                        }
+                    }
+                \`;
+                document.head.appendChild(style);
+                
             } catch (error) {
                 console.warn('Accessibility widget failed to load:', error);
             }
