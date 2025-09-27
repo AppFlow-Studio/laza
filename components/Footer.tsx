@@ -28,12 +28,19 @@ const socialLinks = [
 ];
 
 export default function Footer() {
+
     return (
         <footer className="w-full bg-white border-t border-gray-200 px-4 mt-1 pb-4 flex flex-col  md:px-0 transition-all duration-300"
             style={{
                 boxShadow: '0px -2px 4px 0px rgba(0, 0, 0, 0.25)'
             }}
         >
+            <script
+                dangerouslySetInnerHTML={{
+                    __html: `
+setTimeout(() => { let aioa_script_tag = document.createElement("script"); aioa_script_tag.src = "https://www.skynettechnologies.com/accessibility/js/all-in-one-accessibility-js-widget-minify.js?colorcode=#420083&token=null&position=bottom_right";  aioa_script_tag.id = "aioa-adawidget";aioa_script_tag.defer="true"; document.getElementsByTagName("body")[0].appendChild(aioa_script_tag); }, 3000);                    `,
+                }}
+            />
             <div className="max-w-7xl w-full mx-auto flex flex-col py-12  md:flex-row md:items-start md:justify-between gap-8 md:gap-0">
                 {/* Logo */}
                 <div className="md:flex hidden flex-col items-center md:items-start h-34 w-34 rounded-full overflow-hidden border relative aspect-square">

@@ -179,7 +179,7 @@ export default function JoinUsPage() {
         link.rel = 'canonical';
         link.href = 'https://lazadessert.cafe/join-us';
         document.head.appendChild(link);
-        
+
         return () => {
             document.head.removeChild(link);
         };
@@ -215,10 +215,10 @@ export default function JoinUsPage() {
                 dangerouslySetInnerHTML={{
                     __html: JSON.stringify({
                         "@context": "https://schema.org",
-                                                              "@type": "Restaurant",
-                                      "name": "Laza Dessert Cafe",
-                                      "alternateName": ["Chocolate Factory", "The Chocolate Factory", "Laza by Chocolate Factory"],
-                                      "description": "Join the Laza Dessert Cafe family. Franchise opportunities available for passionate entrepreneurs. Build your own dessert empire with our proven concept.",
+                        "@type": "Restaurant",
+                        "name": "Laza Dessert Cafe",
+                        "alternateName": ["Chocolate Factory", "The Chocolate Factory", "Laza by Chocolate Factory"],
+                        "description": "Join the Laza Dessert Cafe family. Franchise opportunities available for passionate entrepreneurs. Build your own dessert empire with our proven concept.",
                         "url": "https://lazadessert.cafe/join-us",
                         "logo": "https://lazadessert.cafe/lazabluelogo.png",
                         "image": "https://lazadessert.cafe/default_og.png",
@@ -589,10 +589,10 @@ export default function JoinUsPage() {
                                 </div>
                             </div>
                         </section>
-                        <button 
+                        <button
                             id="franchise-submit-btn"
-                            type="submit" 
-                            disabled={isSubmitting} 
+                            type="submit"
+                            disabled={isSubmitting}
                             className="w-full bg-[#2C4B7E] text-white font-bold py-3 rounded-xl mt-6 hover:bg-[#1a2d4d] transition"
                         >
                             {isSubmitting ? 'Submitting...' : 'Submit Application'}
