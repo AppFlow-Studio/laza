@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "../components/Navbar";
 import '@/components/embla.css'
 import Footer from "@/components/Footer";
+import Script from 'next/script';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -212,7 +213,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
       </head>
       <body
-        className={`${inter.variable} ${playfair.variable} ${bebas.variable} ${roboto.variable} ${raleway.variable} antialiased w-full overflow-none`}
+        className={`${inter.variable} ${playfair.variable} ${bebas.variable} ${roboto.variable} ${raleway.variable} antialiased w-full overflow-none `}
       >
         {/* Prevent external classes from being added to HTML element - runs on every page */}
         <script
@@ -335,7 +336,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             `,
           }}
         />
-       
+        {/* <Script
+          id="aioa-adawidget"
+          src="https://www.skynettechnologies.com/accessibility/js/all-in-one-accessibility-js-widget-minify.js?colorcode=#420083&token=null&position=bottom_right"
+          strategy="lazyOnload"
+        /> */}
+
 
         {/* Google Tag Manager (noscript) */}
         <noscript>

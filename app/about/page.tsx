@@ -129,7 +129,7 @@ const AboutUs = () => {
             />
             <main className='flex flex-col items-center justify-center w-full overflow-hidden '>
                 {/* Hero Section */}
-                <section className='relative flex max-w-[1440px] border overflow-hidden flex-col items-start w-full sm:mt-0 mt-10 md:pl-0 pl-2 [mask-composite:intersect] sm:[mask-image:linear-gradient(to_right,transparent,black_6rem),linear-gradient(to_left,transparent,black_6rem),linear-gradient(to_top,transparent,black_6rem)] sm:pb-20'>
+                <section className='relative flex max-w-[1440px]  overflow-hidden flex-col items-start w-full sm:mt-0 mt-10 md:pl-0 pl-2 [mask-composite:intersect] sm:[mask-image:linear-gradient(to_right,transparent,black_6rem),linear-gradient(to_left,transparent,black_6rem),linear-gradient(to_top,transparent,black_6rem)] sm:pb-20'>
                     <div className='relative inset-0 md:w-[70%] w-[90%] md:h-160 h-80 overflow-hidden '>
                         <Image src="/bluelazaheader.png" alt="Blue Laza" fill className='object-fill object-center' />
                     </div>

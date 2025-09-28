@@ -43,7 +43,7 @@ export default function Footer() {
         setTimeout(() => {
             try {
                 let aioa_script_tag = document.createElement("script");
-                aioa_script_tag.src = "https://www.skynettechnologies.com/accessibility/js/all-in-one-accessibility-js-widget-minify.js?colorcode=#420083&token=null&position=bottom_right";
+                aioa_script_tag.src = "https://www.skynettechnologies.com/accessibility/js/all-in-one-accessibility-js-widget-minify.js?colorcode=#2C4B7E&token=null&position=bottom_right";
                 aioa_script_tag.id = "aioa-adawidget";
                 aioa_script_tag.defer = true;
                 aioa_script_tag.async = true;
@@ -64,8 +64,7 @@ export default function Footer() {
                         overflow-x: auto !important;
                         overflow-y: auto !important;
                         position: relative !important;
-                        height: auto !important;
-                        max-height: none !important;
+                       
                     }
                     
                     /* Prevent accessibility widget from breaking layout */
@@ -88,14 +87,12 @@ export default function Footer() {
                             -webkit-overflow-scrolling: touch !important;
                         }
                         
-                        body {
+                        body, #__next {
                             transform: none !important;
-                            position: relative !important;
                         }
                     }
                 \`;
-                document.head.appendChild(style);
-                
+                document.body.appendChild(style);
             } catch (error) {
                 console.warn('Accessibility widget failed to load:', error);
             }

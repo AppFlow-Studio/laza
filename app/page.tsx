@@ -528,7 +528,7 @@ export default async function Home() {
           })
         }}
       />
-      <main className="relative min-h-screen w-full">
+      <main className="relative min-h-screen w-full ">
         {/* Hidden H1 for SEO - not visible on UI */}
         <h1 className="sr-only">Laza Dessert Cafe - Premium Desserts, Crepes, Waffles, and Kunafa</h1>
 
@@ -536,7 +536,7 @@ export default async function Home() {
         <HeroVideo />
 
         {/* Most Wanted Section */}
-        <section className="relative  h-full w-full items-center justify-start overflow-hidden sm:min-h-220 min-h-180" >
+        <section className="relative h-full w-full items-center justify-start overflow-hidden sm:min-h-220 min-h-180" >
           {/* Gradient + Image background */}
           <FadeIn className="relative -z-10">
             <div className="absolute sm:-top-10 -top-14 md:w-225 w-70 md:h-180 h-60 -z-20 md:right-0 -right-10 "
