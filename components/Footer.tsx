@@ -35,73 +35,7 @@ export default function Footer() {
                 boxShadow: '0px -2px 4px 0px rgba(0, 0, 0, 0.25)'
             }}
         >
-            <script
-                dangerouslySetInnerHTML={{
-                    __html: `
-(function() {
-    if (typeof window !== 'undefined' && !document.getElementById('aioa-adawidget')) {
-        setTimeout(() => {
-            try {
-                let aioa_script_tag = document.createElement("script");
-                aioa_script_tag.src = "https://www.skynettechnologies.com/accessibility/js/all-in-one-accessibility-js-widget-minify.js?colorcode=#2C4B7E&token=null&position=bottom_right";
-                aioa_script_tag.id = "aioa-adawidget";
-                aioa_script_tag.defer = true;
-                aioa_script_tag.async = true;
-                
-                if (document.body) {
-                    document.body.appendChild(aioa_script_tag);
-                } else {
-                    document.addEventListener('DOMContentLoaded', function() {
-                        document.body.appendChild(aioa_script_tag);
-                    });
-                }
-                
-                // Add CSS overrides to prevent scrolling issues
-                const style = document.createElement('style');
-                style.textContent = \`
-                    /* Ensure body and html can always scroll */
-                    html, body {
-                        overflow-x: auto !important;
-                        overflow-y: auto !important;
-                        position: relative !important;
-                       
-                    }
-                    
-                    /* Prevent accessibility widget from breaking layout */
-                    body {
-                        transform: none !important;
-                        transition: none !important;
-                    }
-                    
-                    /* Ensure main content areas remain scrollable */
-                    main, .main, #__next, [role="main"] {
-                        overflow: visible !important;
-                        position: relative !important;
-                    }
-                    
-                    /* Fix for mobile viewport issues */
-                    @media (max-width: 768px) {
-                        html, body {
-                            overflow-x: auto !important;
-                            overflow-y: auto !important;
-                            -webkit-overflow-scrolling: touch !important;
-                        }
-                        
-                        body, #__next {
-                            transform: none !important;
-                        }
-                    }
-                \`;
-                document.body.appendChild(style);
-            } catch (error) {
-                console.warn('Accessibility widget failed to load:', error);
-            }
-        }, 3000);
-    }
-})();
-                    `,
-                }}
-            />
+            
             <div className="max-w-7xl w-full mx-auto flex flex-col py-12  md:flex-row md:items-start md:justify-between gap-8 md:gap-0">
                 {/* Logo */}
                 <div className="md:flex hidden flex-col items-center md:items-start h-34 w-34 rounded-full overflow-hidden border relative aspect-square">

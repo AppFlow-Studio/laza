@@ -184,6 +184,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="laza-theme" suppressHydrationWarning>
       <head>
+        <script src="https://cdn.userway.org/widget.js" data-account="qY0jkg6Ywf"/>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         {/* Google Tag Manager */}
         <script
