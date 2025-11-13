@@ -26,7 +26,7 @@ export const wafflesMenu = [
     title: "Kinder",
     description: "Nutella / Kinder Bueno / Kinder Stick / White Chocolate Drizzle",
     price: 11,
-    imageSrc: "/desserts/kinderwaffle.jpg",
+    imageSrc: "/desserts/kinder-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -37,7 +37,7 @@ export const wafflesMenu = [
   title : 'Strawberry Banana Waffle',
   description : 'Strawberries / Banana / White Chocolate',
   price : 11,
-  imageSrc : '/desserts/strawberrybannanawaffle.jpg',
+  imageSrc : '/desserts/strawberry-waffle.jpg',
   modifiers : [
     { name : "Chocolate & Spread's", options : ["Nutella", "White Chocolate", "Lotus"] }
   ]
@@ -46,7 +46,7 @@ export const wafflesMenu = [
     title: "Red Velvet",
     description: "Red Velvet Cake Crumbles / Nutella / White Chocolate",
     price: 13,
-    imageSrc: "/desserts/redvelvetwaffle.jpg",
+    imageSrc: "/desserts/red-velvet-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -57,7 +57,7 @@ export const wafflesMenu = [
   title : 'Ferrero Waffle',
   description : 'Nutella / Ferrero Rocher /Strawberries',
   price : 13,
-  imageSrc : '/desserts/ferrowaffle.jpg',
+  imageSrc : '/desserts/Ferrero-waffle.jpg',
   modifiers : [
     { name : "Chocolate & Spread's", options : ["Nutella", "White Chocolate", "Lotus"] }
   ]
@@ -66,7 +66,7 @@ export const wafflesMenu = [
     title: "Oreo",
     description: "Nutella / Oreo / Banana White Chocolate",
     price: 11,
-    imageSrc: "/desserts/oreawaffle.jpg",
+    imageSrc: "/desserts/oreo-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -77,7 +77,7 @@ export const wafflesMenu = [
   title : 'Laza Waffle',
   description : 'Nutella / Lotus Butter / Milk Chocolate / Pistachio / Banana',
   price : 16,
-  imageSrc : '/desserts/lazawaffle.jpg',
+  imageSrc : '/desserts/laza-special-waffle.jpg',
   modifiers : [
     { name : "Chocolate & Spread's", options : ["Nutella", "White Chocolate", "Lotus"] }
   ]
@@ -86,7 +86,7 @@ export const wafflesMenu = [
     title: "Cheesecake Melt Waffle",
     description: "Nutella / Cheesecake Bites / Strawberries",
     price: 12,
-    imageSrc: "/desserts/cheesecakewaffle.jpg",
+    imageSrc: "/desserts/cheesecake-melt-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -97,18 +97,40 @@ export const wafflesMenu = [
     title: "Lotus Waffle",
     description: "Nutella / Strawberries / Banana Lotus Butter / Biscoff",
     price: 13,
-    imageSrc: "/desserts/lotuswaffle.jpg",
+    imageSrc: "/desserts/lotusella-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
         { name: "Toppings", options: ["Strawberries", "Banana", "Oreo"] },
     ],
 },
+  {
+    title: "Dubai Chocolate Waffle",
+    description: "Nutella / Pistachio Butter / Pistachio Kunafa Filling",
+    price: 14,
+    imageSrc: "/desserts/dubai-chocolate-waffle.jpg",
+    modifiers: [
+        { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
+        { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
+        { name: "Toppings", options: ["Strawberries", "Banana", "Oreo"] },
+    ],
+  },
+  {
+    title: "Pistachio Waffle",
+    description: "Pistachio Butter / Crushed Pistachio / White Chocolate",
+    price: 13,
+    imageSrc: "/desserts/pistachio-waffle.jpg",
+    modifiers: [
+        { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
+        { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
+        { name: "Toppings", options: ["Strawberries", "Banana", "Oreo"] },
+    ],
+  },
 {
     title: "Fudgin’ Waffle",
     description: "Brownie Bites / Strawberry / Nutella",
     price: 11,
-    imageSrc: "/desserts/fudginwaffle.jpg",
+    imageSrc: "/desserts/Fudgin-Brownie-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -119,7 +141,7 @@ export const wafflesMenu = [
 
 export const kunafaMenu = [
   {
-    "imageSrc": "/desserts/ockywayspecialkunafa.png",
+    "imageSrc": "/desserts/laza-special-kunafa.jpg",
     "title": "Laza Special",
     "description": "Lotus Butter / Biscoff / Pistachio Butter Crushed Pistachio / Crushed Oreo / Chocolate",
     "price": 13,
@@ -135,7 +157,7 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/ockywaykunafaicecream.png",
+    "imageSrc": "/desserts/laza-special-kunafa-ice-cream.jpg",
     "title": "Laza Special W/ Ice Cream",
     "description": "Lotus Butter / Biscoff / Pistachio Butter Crushed Pistachio / Crushed Oreo / Chocolate with Ice Cream",
     "price": 15,
@@ -151,7 +173,7 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/pistachiokunafa.png",
+    "imageSrc": "/desserts/pistachio-kunafa.jpg",
     "title": "Pistachio",
     "description": "Pistachio Butter / Crushed Pistachio",
     "price": 12,
@@ -163,7 +185,7 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/lotuskunafa.png",
+    "imageSrc": "/desserts/biscoff-kunafa.jpg",
     "title": "Biscoff",
     "description": "Lotus Butter / Lotus Biscoff",
     "price": 11,
@@ -175,7 +197,7 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/triplechocolatekunafa.png",
+    "imageSrc": "/desserts/triple-chocolate-kunafa.jpg",
     "title": "Triple Chocolate",
     "description": "Milk Chocolate / White Chocolate Dark Chocolate",
     "price": 11,
@@ -187,7 +209,19 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/milkkunafa.jpg",
+    "imageSrc": "/desserts/nutella-kunafa.jpg",
+    "title": "Nutella Kunafa",
+    "description": "Nutella / Chocolate Drizzle / Crushed Pistachio",
+    "price": 12,
+    modifiers: [
+      {
+        name: "Toppings",
+        options: ["Extra Nutella", "Crushed Pistachio", "White Chocolate Drizzle"]
+      }
+    ]
+  },
+  {
+    "imageSrc": "/desserts/milk-kunafa.png",
     "title": "Milk Kunfa",
     "description": "Honey / Milk / Crushed Pistachio",
     "price": 11,
@@ -199,7 +233,7 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/classickunafa.jpg",
+    "imageSrc": "/desserts/classic-kunafa.jpg",
     "title": "Classic Kunafa",
     "description": "Syrup / Crushed Pistachio",
     "price": 10,
@@ -214,7 +248,7 @@ export const kunafaMenu = [
 
 export const cupsMenu = [
   {
-    "imageSrc": "/cups/strawberry chocolate.png",
+    "imageSrc": "/desserts/Strawberry-chocolate-cup.jpg",
     "title": "Strawberry Chocolate",
     "description": "Strawberry & Milk Choc & Drizzle w/ White Choc",
     "price": 11,
@@ -230,7 +264,7 @@ export const cupsMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/dubai-strawberry-cup.jpg",
+    "imageSrc": "/desserts/Dubai-Chocolate-cup.jpg",
     "title": "Dubai Chocolate",
     "description": "Strawberry W/ Dubai Kunafa Filling & Milk Choc & Drizzle with White Choc",
     "price": 16,
@@ -245,7 +279,7 @@ export const cupsMenu = [
 
 export const cakesMenu = [
   {
-    "imageSrc": "/cakes/mix lukumate.png",
+    "imageSrc": "/desserts/mix-lukumate.jpg",
     "title": "Mix Lukumate",
     "description": "Served with Cream",
     "price": 12,
@@ -257,7 +291,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/cakes/eclair.png",
+    "imageSrc": "/desserts/Eclair.jpg",
     "title": "Eclair",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -269,7 +303,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/chocolateicecreamcake.jpg",
+    "imageSrc": "/desserts/lava-cake.jpg",
     "title": "Lava Cake",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -281,7 +315,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/chocolatechipmelt.jpg",
+    "imageSrc": "/desserts/chocolate-chip-melt.jpg",
     "title": "Chocolate Chip Melt",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -293,7 +327,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/tiramisu.jpg",
+    "imageSrc": "",
     "title": "Tiramisu",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -305,7 +339,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/brownie.jpg",
+    "imageSrc": "/desserts/Brownie.jpg",
     "title": "Brownie",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -317,7 +351,19 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/chocolatecake.jpg",
+    "imageSrc": "/desserts/triple-chocolate-cheesecake.jpg",
+    "title": "Triple Chocolate Cheesecake",
+    "description": "Served with Ice Cream scoop",
+    "price": 11,
+    modifiers: [
+      {
+        name: "Toppings",
+        options: ["White Chocolate Drizzle", "Milk Chocolate Drizzle", "Dark Chocolate Drizzle"]
+      }
+    ]
+  },
+  {
+    "imageSrc": "/desserts/chocolate-cake.jpg",
     "title": "Chocolate Cake",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -329,7 +375,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/redvelvet.jpg",
+    "imageSrc": "/desserts/red-velvet-cake.jpg",
     "title": "Red Velvet Cake",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -341,7 +387,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/milkgoldencake.jpg",
+    "imageSrc": "",
     "title": "Milk Cake",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -353,7 +399,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/cheesecake.jpg",
+    "imageSrc": "",
     "title": "Cheesecake",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -368,7 +414,7 @@ export const cakesMenu = [
 
 export const cafeMenu = [
   {
-    "imageSrc": "/drinks/americano.jpg",
+    "imageSrc": "/drinks/Americano.jpg",
     "title": "Americano",
     "description": "",
     "price": 6,
@@ -384,7 +430,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/latte.jpg",
+    "imageSrc": "/drinks/latte-or-capuccino.jpg",
     "title": "Latte",
     "description": "",
     "price": 6,
@@ -400,7 +446,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/cappuccino.jpg",
+    "imageSrc": "/drinks/latte-or-capuccino.jpg",
     "title": "Cappuccino",
     "description": "",
     "price": 6,
@@ -416,7 +462,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/pistachiolatte.jpg",
+    "imageSrc": "/drinks/iced-pistachio-latte.jpg",
     "title": "Pistachio Latte",
     "description": "",
     "price": 8,
@@ -432,7 +478,23 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/spanishlatte.jpg",
+    "imageSrc": "/drinks/iced-americano.jpg",
+    "title": "Iced Americano",
+    "description": "",
+    "price": 6,
+    modifiers: [
+      {
+        name: "Size",
+        options: ["Small", "Medium", "Large"]
+      },
+      {
+        name: "Milk Type",
+        options: ["None", "Whole Milk", "Oat Milk", "Almond Milk"]
+      }
+    ]
+  },
+  {
+    "imageSrc": "",
     "title": "Spanish Latte",
     "description": "",
     "price": 7,
@@ -448,7 +510,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/whitemochalatte.jpg",
+    "imageSrc": "",
     "title": "White Mocha Latte",
     "description": "",
     "price": 7,
@@ -464,7 +526,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/lotusbiscofflatte.jpg",
+    "imageSrc": "",
     "title": "Lotus Biscoff Latte",
     "description": "",
     "price": 7,
@@ -480,7 +542,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/caramellatte.jpg",
+    "imageSrc": "/drinks/Caramel-latte.jpg",
     "title": "Caramel Latte",
     "description": "",
     "price": 7,
@@ -496,7 +558,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/matchalatte.jpg",
+    "imageSrc": "/drinks/matcha-latte.jpg",
     "title": "Matcha Latte",
     "description": "",
     "price": 7,
@@ -512,7 +574,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/adenilatte.jpg",
+    "imageSrc": "",
     "title": "Adeni",
     "description": "",
     "price": 7,
@@ -528,7 +590,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/brownsugarlatte.jpg",
+    "imageSrc": "",
     "title": "Brown Sugar",
     "description": "",
     "price": 7,
@@ -544,7 +606,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/lazalatte.jpg",
+    "imageSrc": "",
     "title": "Laza Latte",
     "description": "",
     "price": 7,
@@ -560,7 +622,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/hot.jpg",
+    "imageSrc": "",
     "title": "Hot",
     "description": "",
     "price": 7,
@@ -572,7 +634,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/iced.jpg",
+    "imageSrc": "",
     "title": "Iced",
     "description": "",
     "price": 7,
@@ -587,7 +649,7 @@ export const cafeMenu = [
 
 export const shakesMenu = [
   {
-    "imageSrc": "/drinks/ferroshake.jpg",
+    "imageSrc": "/drinks/Ferrero-Shake.jpg",
     "title": "Ferrero Shake",
     "description": "Vanilla Ice Cream / Nutella Crushed Hazelnuts / Ferrero Rocher",
     "price": 10,
@@ -599,7 +661,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/biscofflatte.jpg",
+    "imageSrc": "/drinks/Biscoff-Shake.jpg",
     "title": "Biscoff Shake",
     "description": "Vanilla Ice Cream / Lotus Butter / Lotus Cookies",
     "price": 10,
@@ -611,7 +673,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/oreoshake.jpg",
+    "imageSrc": "/drinks/Oreo-Shake.jpg",
     "title": "Oreo Shake",
     "description": "Vanilla Ice Cream / Oreos",
     "price": 11,
@@ -623,7 +685,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/dubai.jpg",
+    "imageSrc": "/drinks/Dubai-Chocolate-Shake.jpg",
     "title": "Dubai Chocolate",
     "description": "Pistachio, Kunafa",
     "price": 10,
@@ -635,7 +697,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/kinderlatte.jpg",
+    "imageSrc": "/drinks/Kinder-Shake.jpg",
     "title": "Kinder Shake",
     "description": "Vanilla Ice Cream / Nutella / Kinder",
     "price": 11,
@@ -647,7 +709,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/lazalatte.jpg",
+    "imageSrc": "/drinks/Strawberry-Shortcake-Shake.jpg",
     "title": "Strawberry Shortcake",
     "description": "Vanilla Ice Cream, Cheesecake, Strawberry Sauce",
     "price": 11,
@@ -659,7 +721,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/pistachiolatte.jpg",
+    "imageSrc": "/drinks/pistachio-shake.jpg",
     "title": "Pistachio",
     "description": "Vanilla Ice Cream / Pistachio Butter Crushed Pistachio",
     "price": 12,
@@ -671,10 +733,23 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/fudginbrownieshake.jpg",
+    "imageSrc": "/drinks/chocolate-shake.jpg",
+    "title": "Chocolate Shake",
+    "description": "Chocolate Ice Cream / Nutella / Chocolate Sauce",
+    "price": 9,
+    modifiers: [
+      {
+        name: "Toppings",
+        options: ["Whipped Cream", "Chocolate Chips", "Sprinkles"]
+      }
+    ]
+  },
+  {
+    "imageSrc": "/drinks/Fudgin-Brownie-Shake.jpg",
     "title": "Fudgin' Brownie Shake",
     "description": "Vanilla Ice Cream & Brownie Bites, Nutella",
     "price": 11,
+    "imagePosition": "top",
     modifiers: [
       {
         name: "Toppings",
@@ -683,7 +758,31 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/rubyshake.jpg",
+    "imageSrc": "/drinks/Red-Velvet-Shake.jpg",
+    "title": "Red Velvet Shake",
+    "description": "Vanilla Ice Cream / Red Velvet Cake / Cream Cheese Frosting",
+    "price": 11,
+    modifiers: [
+      {
+        name: "Toppings",
+        options: ["Extra Red Velvet", "Cream Cheese Frosting", "White Chocolate Drizzle"]
+      }
+    ]
+  },
+  {
+    "imageSrc": "/drinks/Strawberry-Shake.jpg",
+    "title": "Strawberry Shake",
+    "description": "Vanilla Ice Cream / Strawberries / Strawberry Sauce",
+    "price": 9,
+    modifiers: [
+      {
+        name: "Toppings",
+        options: ["Whipped Cream", "Fresh Strawberries", "Sprinkles"]
+      }
+    ]
+  },
+  {
+    "imageSrc": "",
     "title": "Ruby Shake",
     "description": "Vanilla Ice Cream, Red Velvet Cake & Sprinkles",
     "price": 11,
@@ -695,7 +794,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/shakes/classic shake.png",
+    "imageSrc": "",
     "title": "Classic Shake",
     "description": "Vanilla / Chocolate / Strawberry",
     "price": 7,
@@ -713,7 +812,7 @@ export const shakesMenu = [
 ];
 export const refreshersMenu = [
   {
-    "imageSrc": "/drinks/redberryrefresher.jpg",
+    "imageSrc": "",
     "title": "Redberry Refresher",
     "description": "Strawberry / Raspberry",
     "price": 7,
@@ -729,7 +828,7 @@ export const refreshersMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/pinacoladarefresher.jpg",
+    "imageSrc": "/drinks/pina-colada-refresher.jpg",
     "title": "Piña Colada Refresher",
     "description": "Coconut / Pineapple",
     "price": 7,
@@ -745,7 +844,7 @@ export const refreshersMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/summerrefresher.jpg",
+    "imageSrc": "",
     "title": "Summer Refresher",
     "description": "Peach / Watermelon",
     "price": 7,
@@ -761,7 +860,7 @@ export const refreshersMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/passionfruitrefresher.jpg",
+    "imageSrc": "/drinks/passion-fruit-refresher.jpg",
     "title": "Passion Fruit Refresher",
     "description": "Passion Fruit / Strawberry / Mango",
     "price": 7,
@@ -777,7 +876,7 @@ export const refreshersMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/blueraspberry.jpg",
+    "imageSrc": "/drinks/Blue-Raspberry-Refresher.jpg",
     "title": "Blue Raspberry",
     "description": "Blue Raspberry",
     "price": 7,
@@ -793,7 +892,7 @@ export const refreshersMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/dragonfruitrefresher.jpg",
+    "imageSrc": "/drinks/dragon-fruit-refresher.jpg",
     "title": "Dragon Fruit",
     "description": "Dragon Fruit",
     "price": 7,
@@ -822,7 +921,7 @@ const allCategories = [
   { title: "Refreshers / Mojitos", imageSrc: "/RefreshersCat.png" },
 ];
 
-const menuData: Record<string, { title: string; imageSrc?: string; price: number; description: string; modifiers: Modifier[] }[]> = {
+const menuData: Record<string, { title: string; imageSrc?: string; price: number; description: string; modifiers: Modifier[]; imagePosition?: string }[]> = {
   Crepes: crepesMenu,
   Waffles: wafflesMenu,
   Kunafa: kunafaMenu,
@@ -872,7 +971,7 @@ const MenuCategories: React.FC = () => {
           selected !== "Categories" &&
           <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 md:grid-cols-2 gap-8">
             {menuData[selected].map((item, idx) => (
-              <MenuItemCard key={idx} title={item.title} price={item.price} description={item.description} imageSrc={item.imageSrc || ""} modifiers={item.modifiers} />
+              <MenuItemCard key={idx} title={item.title} price={item.price} description={item.description} imageSrc={item.imageSrc || ""} modifiers={item.modifiers} imagePosition={item.imagePosition} />
             ))}
           </main>
         }
