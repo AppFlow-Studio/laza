@@ -13,14 +13,15 @@ interface MenuItemCardProps {
         name: string;
         options: string[]
     }[];
+    imagePosition?: string;
 }
 const link = `https://order.toasttab.com/online/locations/e4e3218e-7ad2-411f-a156-ec157a00652f/default`
 
-const MenuItemCard: React.FC<MenuItemCardProps> = ({ imageSrc, title, description, price, modifiers }) => {
+const MenuItemCard: React.FC<MenuItemCardProps> = ({ imageSrc, title, description, price, modifiers, imagePosition }) => {
     
     return (
        <Link href={link} className="w-full flex items-center justify-center">
-           <MenuItemDialog imageSrc={imageSrc} title={title} description={description} price={price} modifiers={modifiers}>
+           <MenuItemDialog imageSrc={imageSrc} title={title} description={description} price={price} modifiers={modifiers} imagePosition={imagePosition}>
                 <div className="w-full max-w-xs h-110 self-center bg-transparent rounded-[40px] overflow-hidden hover:cursor-pointer shadow-none drop-shadow-sm hover:drop-shadow-lg flex flex-col transition-all duration-200 hover:scale-105 will-change-transform isolate">
                     {/* Image */}
                     <div className="relative w-full sm:h-56 h-90 bg-[#1B3A6B]" style={{ borderTopLeftRadius: 40, borderTopRightRadius: 40 }}>
@@ -29,7 +30,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ imageSrc, title, descriptio
                             alt={title}
                             fill
                             className="object-cover"
-                            style={{ borderTopLeftRadius: 40, borderTopRightRadius: 40 }}
+                            style={{ borderTopLeftRadius: 40, borderTopRightRadius: 40, objectPosition: imagePosition || 'center' }}
                         />
                     </div>
                     {/* Info Section */}

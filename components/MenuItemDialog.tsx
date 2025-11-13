@@ -25,9 +25,10 @@ interface MenuItemDialogProps {
     modifiers: Modifier[];
     externalOpen?: boolean;
     setExternalOpen?: (open: boolean) => void;
+    imagePosition?: string;
 }
 
-const MenuItemDialog: React.FC<MenuItemDialogProps> = ({ children, imageSrc, title, description, price, modifiers, externalOpen, setExternalOpen }) => {
+const MenuItemDialog: React.FC<MenuItemDialogProps> = ({ children, imageSrc, title, description, price, modifiers, externalOpen, setExternalOpen, imagePosition }) => {
     const [quantity, setQuantity] = useState(1);
     const [selectedAddons, setSelectedAddons] = useState<Record<string, string>>({});
     const [comments, setComments] = useState("");
@@ -71,7 +72,7 @@ const MenuItemDialog: React.FC<MenuItemDialogProps> = ({ children, imageSrc, tit
                 )}
                 {/* Image */}
                 <div className="relative w-full lg:h-130 bg-[#1B3A6B] aspect-video">
-                    <Image src={imageSrc} alt={title} fill quality={100} className="object-cover" />
+                    <Image src={imageSrc} alt={title} fill quality={100} className="object-cover" style={{ objectPosition: imagePosition || 'center' }} />
                 </div>
                 <div className="flex flex-col gap-6 px-10 py-4">
                     <DialogHeader className="items-start">
