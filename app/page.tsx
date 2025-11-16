@@ -25,6 +25,7 @@ import { locations } from "@/lib/locations";
 import Link from "next/link";
 import getPlaceReviews from "./actions/get-google-reviews";
 import HeroVideo from "@/components/HeroVideo";
+import SlideScale from "@/components/customized/carousel/carousel-11";
 
 // Get the base URL for metadata (works both locally and in production)
 const getBaseUrl = () => {
@@ -535,13 +536,15 @@ export default async function Home() {
         {/* Hero Section */}
         <HeroVideo />
 
+        {/* <SlideScale products={getRandomMenuItems(7)} /> */}
+
         {/* Most Wanted Section */}
         <section className="relative h-full w-full items-center justify-start overflow-hidden sm:min-h-220 min-h-180" >
           {/* Gradient + Image background */}
           <FadeIn className="relative -z-10">
             <div className="absolute sm:-top-10 -top-14 md:w-225 w-70 md:h-180 h-60 -z-20 md:right-0 -right-10 "
             >
-              <Image src="/lazablack1.png" alt="Blue Laza" fill className='object-cover object-center' />
+              <Image src="https://laza-dessert-cafe.b-cdn.net/lazablack1.png" alt="Blue Laza" fill className='object-cover object-center' />
             </div>
           </FadeIn>
 
@@ -560,13 +563,15 @@ export default async function Home() {
             </p>
           </div>
 
-          <section className="h-full  max-w-8xl w-full mx-auto relative">
+          <section className="h-full  max-w-8xl w-full py-8 mx-auto relative">
             {/* <SwiperComponent /> */}
             {/* <Carousel items={getRandomMenuItems(7)} /> */}
             {/* <GeminiCarousel products={getRandomMenuItems(7)} /> */}
             {/* <GeminiCarouselSlide products={getRandomMenuItems(7)} /> */}
             {/* <GeminiCenterCarousel products={getRandomMenuItems(7)} /> */}
-            <GeminiCenter2Carousel products={getRandomMenuItems(7)} />
+            {/* <GeminiCenter2Carousel products={getRandomMenuItems(7)} /> */}
+            <SlideScale products={getRandomMenuItems(7)} />
+
           </section>
         </section>
 
@@ -589,7 +594,7 @@ export default async function Home() {
             style={{
             }}
           >
-            <Image src={'/bgwave.jpg'} alt="bg wave" fill className="" />
+            <Image src={'https://laza-dessert-cafe.b-cdn.net/bgwave.jpg'} alt="bg wave" fill className="" />
           </div>
           {/* Signature Kunafa Section */}
           <section className=" max-w-[1440px]  overflow-hidden  mx-auto flex flex-col lg:flex-row xl:space-y-0 space-y-10 items-center justify-center xl:gap-x-10 w-full xl:mt-40 sm:mt-30 py-24 xl:px-12 px-4 relative">
@@ -597,11 +602,11 @@ export default async function Home() {
             {/* Left: Large circle image with overlapping logo */}
             <div className="relative flex-shrink-0 flex items-center justify-center lg:w-[50%] sm:w-[70%] w-full h-fit aspect-square" >
               <div className="rounded-full relative overflow-hidden w-full h-full border bg-gray-200 flex items-center justify-center">
-                <Image src="/sigkunafa.png" alt="Signature Kunafa" fill className="object-cover object-center" />
+                <Image src="https://laza-dessert-cafe.b-cdn.net/sigkunafa.png" alt="Signature Kunafa" fill className="object-cover object-center" />
               </div>
               {/* Overlapping logo circle */}
               <div className="absolute -bottom-10 left-0 rounded-full overflow-hidden lg:w-55 lg:h-55 sm:w-50 sm:h-50 w-40 h-40 border-4 border-white bg-white flex items-center justify-center shadow-lg">
-                <Image src="/lazabluelogo.png" alt="Laza Logo" fill className="object-cover" />
+                <Image src="https://laza-dessert-cafe.b-cdn.net/lazabluelogo.png" alt="Laza Logo" fill className="object-cover" />
               </div>
             </div>
 
@@ -659,7 +664,7 @@ export default async function Home() {
             style={{
             }}
           >
-            <Image src={'/bgwave.jpg'} alt="bg wave" fill className="" />
+            <Image src={'https://laza-dessert-cafe.b-cdn.net/bgwave.jpg'} alt="bg wave" fill className="" />
           </div>
 
 
@@ -694,7 +699,7 @@ export default async function Home() {
             style={{
             }}
           >
-            <Image src={'/bgwave.jpg'} alt="bg wave" fill className="" />
+            <Image src={'https://laza-dessert-cafe.b-cdn.net/bgwave.jpg'} alt="bg wave" fill className="" />
           </div>
 
 
@@ -726,10 +731,10 @@ export default async function Home() {
 
 
                 <div className="flex flex-row items-start aspect-2/3 xl:h-250 lg:h-200 sm:h-120 h-60  relative px-4">
-                  <Image src="/drinks/brownieshake.png" alt="brownie shake" fill className="object-contain object-center" />
+                  <Image src="https://laza-dessert-cafe.b-cdn.net/Canva%20Image%20(4).png" alt="brownie shake" fill className="object-contain object-center" />
                   {/* Overlapping logo circle */}
                   <div className="absolute sm:top-10 top-3 sm:left-15 left-0 rounded-full overflow-hidden lg:w-55 lg:h-55 sm:w-30 sm:h-30 w-18 h-18 border-4 border-white bg-white flex items-center justify-center shadow-lg">
-                    <Image src="/lazabluelogo.png" alt="Laza Logo" fill className="object-cover" />
+                    <Image src="https://laza-dessert-cafe.b-cdn.net/lazabluelogo.png" alt="Laza Logo" fill className="object-cover" />
                   </div>
                 </div>
               </div>
@@ -741,7 +746,7 @@ export default async function Home() {
                 <div className="sm:flex hidden flex-row items-center justify-center sm:aspect-[456.77/700.00] aspect-2/3 lg:w-50 w-full sm:h-fit h-60 relative rounded-full overflow-hidden"
 
                 >
-                  <Image src="/drinks/matcha.jpg" alt="Matcha Latte" fill className="object-cover object-center" />
+                  <Image src="https://laza-dessert-cafe.b-cdn.net/matcha-latte.jpg" alt="Matcha Latte" fill className="object-cover object-center" />
                 </div>
 
 
@@ -784,20 +789,20 @@ export default async function Home() {
             style={{
             }}
           >
-            <Image src={'/bgwave.jpg'} alt="bg wave" fill className="" />
+            <Image src={'https://laza-dessert-cafe.b-cdn.net/bgwave.jpg'} alt="bg wave" fill className="" />
           </div>
           {/* Dubai Chocolate Image */}
           <div className="flex absolute items-end justify-end right-0 xl:top-50 top-20 w-full md:h-120 h-60 z-10">
             <div className="w-50 sm:top-0 -top-10 flex h-full absolute sm:relative sm:w-100 right-0">
-              <Image src="/dubaichocalate.png" alt="Dubai Chocolate" fill className="object-cover object-center self-end flex " />
+              <Image src="https://laza-dessert-cafe.b-cdn.net/dubaichocalate.png" alt="Dubai Chocolate" fill className="object-cover object-center self-end flex " />
             </div>
           </div>
           {/* Ice Cream Image */}
           <div className="flex-row lg:flex hidden  absolute left-0 -bottom-5 items-start justify-start w-full h-144">
             <div className="w-[50%] h-full relative mt-20">
-              <Image src="/icecream.png" alt="Dubai Chocolate" fill className="object-cover object-center" />
+              <Image src="https://laza-dessert-cafe.b-cdn.net/icecream.png" alt="Dubai Chocolate" fill className="object-cover object-center" />
               <div className="absolute -top-20 right-1/5 rounded-full overflow-hidden w-55 h-55 border-4 border-white bg-white flex items-center justify-center shadow-lg">
-                <Image src="/lazabluelogo.png" alt="Laza Logo" fill className="object-cover" />
+                <Image src="https://laza-dessert-cafe.b-cdn.net/lazabluelogo.png" alt="Laza Logo" fill className="object-cover" />
               </div>
             </div>
           </div>
@@ -883,7 +888,7 @@ export default async function Home() {
           <div className="z-10 sm:mt-10 "><TestimonialsCarousel reviews={reviews || []} /></div>
           {/* Waffle image on the right */}
           <div className="absolute lg:-bottom-20 md:-bottom-40 -bottom-5 right-0 sm:w-100 w-60 h-60 sm:h-100  pointer-events-none select-none ">
-            <Image src="/waffle1.png" alt="Waffle" fill className="object-contain object-bottom" />
+            <Image src="https://laza-dessert-cafe.b-cdn.net/waffle1.png" alt="Waffle" fill className="object-contain object-bottom" />
           </div>
         </section>
 

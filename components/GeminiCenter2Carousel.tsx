@@ -154,6 +154,9 @@ export default function GeminiCenter2Carousel({ products }: { products: any[] })
         setTimeout(() => setIsPaused(false), 2000);
     };
 
+    // [mask-composite:intersect] [mask-image:linear-gradient(to_right,transparent,black_6rem),linear-gradient(to_left,transparent,black_6rem),linear-gradient(to_bottom,transparent,black_6rem),linear-gradient(to_top,transparent,black_6rem)]
+
+
     return (
         <div className="flex flex-col items-center justify-start overflow-hidden h-full">
             <div
@@ -200,7 +203,10 @@ export default function GeminiCenter2Carousel({ products }: { products: any[] })
                                             }}
                                         />
                                         {/* Details section - animates width and opacity */}
-                                        <div className={`transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] flex-1 ml-4 md:ml-6 flex flex-col justify-center text-left overflow-hidden ${isActive ? 'max-w-sm opacity-100 translate-x-0' : 'max-w-0 opacity-0 translate-x-4'}`}>
+                                        <div className={`transition-all duration-700 h-40 md:h-54 ease-[cubic-bezier(0.34,1.56,0.64,1)] flex-1 ml-4 md:ml-6 flex flex-col justify-center text-left overflow-hidden 
+                                            ${isActive ? 'max-w-sm opacity-100 translate-x-0' : 'max-w-0 opacity-0 translate-x-4'}
+                                            [mask-composite:intersect] [mask-image:linear-gradient(to_bottom,transparent,black_1rem),linear-gradient(to_top,transparent,black_1rem)]
+                                            `}>
                                             <h3
                                                 className={`text-xl md:text-3xl font-bold text-gray-800 transition-all w-full duration-500 ease-out ${isActive
                                                     ? 'opacity-100 translate-y-0 delay-150'

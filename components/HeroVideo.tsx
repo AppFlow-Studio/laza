@@ -16,7 +16,7 @@ export default function HeroVideo() {
                     muted
                     loop
                     playsInline
-                    src="/herovideo.mp4"
+                    src="https://laza-dessert-cafe.b-cdn.net/herovideo.mp4"
                     className="w-full sm:h-full h-[85vh] object-cover sm:object-center object-left"
                     id="hero-video"
                 />
@@ -25,7 +25,7 @@ export default function HeroVideo() {
 
             <div className="relative z-10 flex flex-col sm:items-start items-center lg:px-20 px-4 sm:space-y-8 space-y-4 sm:pb-0 sm:justify-center justify-center sm:h-full h-[85vh] py-4">
                 <FadeIn className="sm:w-fit sm:h-fit w-80">
-                    <Image src="/lazacafehero.png" alt="Laza Desserts" width={400} height={400} />
+                    <Image src="https://laza-dessert-cafe.b-cdn.net/lazacafehero.png" alt="Laza Desserts" width={400} height={400} />
                 </FadeIn>
                 <FadeIn className="sm:w-fit w-full h-fit sm:text-start text-center">
                     <p className="text-white ml-3 sm:text-3xl text-2xl">

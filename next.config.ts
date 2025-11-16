@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'laza-dessert-cafe.b-cdn.net',
+        pathname: '/**',
+      }
     ],
   },
   async redirects() {

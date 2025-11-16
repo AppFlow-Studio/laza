@@ -9,7 +9,11 @@
   "orientation": "portrait-primary",
   "scope": "/",
   "lang": "en",
-  "categories": ["food", "lifestyle", "shopping"],
+  "categories": [
+    "food",
+    "lifestyle",
+    "shopping"
+  ],
   "icons": [
     {
       "src": "/lazabluelogo.png",
@@ -44,14 +48,14 @@
   ],
   "screenshots": [
     {
-      "src": "/lazacafehero.png",
+      "src": "https://laza-dessert-cafe.b-cdn.net/lazacafehero.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Laza Dessert Cafe - Homepage"
     },
     {
-      "src": "/lazacafehero.png",
+      "src": "https://laza-dessert-cafe.b-cdn.net/lazacafehero.png",
       "sizes": "750x1334",
       "type": "image/png",
       "form_factor": "narrow",
@@ -111,4 +115,4 @@
       "url": "/checkout?order=%s"
     }
   ]
-} 
+}

@@ -26,7 +26,7 @@ export const wafflesMenu = [
     title: "Kinder",
     description: "Nutella / Kinder Bueno / Kinder Stick / White Chocolate Drizzle",
     price: 11,
-    imageSrc: "/desserts/kinder-waffle.jpg",
+    imageSrc: "https://laza-dessert-cafe.b-cdn.net/kinder-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -37,7 +37,7 @@ export const wafflesMenu = [
   title : 'Strawberry Banana Waffle',
   description : 'Strawberries / Banana / White Chocolate',
   price : 11,
-  imageSrc : '/desserts/strawberry-waffle.jpg',
+  imageSrc : 'https://laza-dessert-cafe.b-cdn.net/strawberry-waffle.jpg',
   modifiers : [
     { name : "Chocolate & Spread's", options : ["Nutella", "White Chocolate", "Lotus"] }
   ]
@@ -46,7 +46,7 @@ export const wafflesMenu = [
     title: "Red Velvet",
     description: "Red Velvet Cake Crumbles / Nutella / White Chocolate",
     price: 13,
-    imageSrc: "/desserts/red-velvet-waffle.jpg",
+    imageSrc: "https://laza-dessert-cafe.b-cdn.net/red-velvet-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -57,7 +57,7 @@ export const wafflesMenu = [
   title : 'Ferrero Waffle',
   description : 'Nutella / Ferrero Rocher /Strawberries',
   price : 13,
-  imageSrc : '/desserts/Ferrero-waffle.jpg',
+  imageSrc : 'https://laza-dessert-cafe.b-cdn.net/Ferrero-waffle.jpg',
   modifiers : [
     { name : "Chocolate & Spread's", options : ["Nutella", "White Chocolate", "Lotus"] }
   ]
@@ -66,7 +66,7 @@ export const wafflesMenu = [
     title: "Oreo",
     description: "Nutella / Oreo / Banana White Chocolate",
     price: 11,
-    imageSrc: "/desserts/oreo-waffle.jpg",
+    imageSrc: "https://laza-dessert-cafe.b-cdn.net/oreo-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -77,7 +77,7 @@ export const wafflesMenu = [
   title : 'Laza Waffle',
   description : 'Nutella / Lotus Butter / Milk Chocolate / Pistachio / Banana',
   price : 16,
-  imageSrc : '/desserts/laza-special-waffle.jpg',
+  imageSrc : 'https://laza-dessert-cafe.b-cdn.net/laza-special-waffle.jpg',
   modifiers : [
     { name : "Chocolate & Spread's", options : ["Nutella", "White Chocolate", "Lotus"] }
   ]
@@ -86,7 +86,7 @@ export const wafflesMenu = [
     title: "Cheesecake Melt Waffle",
     description: "Nutella / Cheesecake Bites / Strawberries",
     price: 12,
-    imageSrc: "/desserts/cheesecake-melt-waffle.jpg",
+    imageSrc: "https://laza-dessert-cafe.b-cdn.net/cheesecake-melt-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -97,7 +97,7 @@ export const wafflesMenu = [
     title: "Lotus Waffle",
     description: "Nutella / Strawberries / Banana Lotus Butter / Biscoff",
     price: 13,
-    imageSrc: "/desserts/lotusella-waffle.jpg",
+    imageSrc: "https://laza-dessert-cafe.b-cdn.net/lotusella-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -108,7 +108,7 @@ export const wafflesMenu = [
     title: "Dubai Chocolate Waffle",
     description: "Nutella / Pistachio Butter / Pistachio Kunafa Filling",
     price: 14,
-    imageSrc: "/desserts/dubai-chocolate-waffle.jpg",
+    imageSrc: "https://laza-dessert-cafe.b-cdn.net/dubai-chocolate-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -119,7 +119,7 @@ export const wafflesMenu = [
     title: "Pistachio Waffle",
     description: "Pistachio Butter / Crushed Pistachio / White Chocolate",
     price: 13,
-    imageSrc: "/desserts/pistachio-waffle.jpg",
+    imageSrc: "https://laza-dessert-cafe.b-cdn.net/pistachio-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -130,7 +130,7 @@ export const wafflesMenu = [
     title: "Fudgin’ Waffle",
     description: "Brownie Bites / Strawberry / Nutella",
     price: 11,
-    imageSrc: "/desserts/Fudgin-Brownie-waffle.jpg",
+    imageSrc: "https://laza-dessert-cafe.b-cdn.net/Fudgin-Brownie-waffle.jpg",
     modifiers: [
         { name: "Chocolate & Spread's", options: ["Nutella", "White Chocolate", "Lotus"] },
         { name: "Nuts", options: ["Pistachio", "Almonds", "Hazelnuts"] },
@@ -141,7 +141,7 @@ export const wafflesMenu = [
 
 export const kunafaMenu = [
   {
-    "imageSrc": "/desserts/laza-special-kunafa.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/laza-special-kunafa.jpg",
     "title": "Laza Special",
     "description": "Lotus Butter / Biscoff / Pistachio Butter Crushed Pistachio / Crushed Oreo / Chocolate",
     "price": 13,
@@ -157,7 +157,7 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/laza-special-kunafa-ice-cream.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/laza-special-kunafa-ice-cream.jpg",
     "title": "Laza Special W/ Ice Cream",
     "description": "Lotus Butter / Biscoff / Pistachio Butter Crushed Pistachio / Crushed Oreo / Chocolate with Ice Cream",
     "price": 15,
@@ -173,7 +173,7 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/pistachio-kunafa.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/pistachio-kunafa.jpg",
     "title": "Pistachio",
     "description": "Pistachio Butter / Crushed Pistachio",
     "price": 12,
@@ -185,7 +185,7 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/biscoff-kunafa.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/biscoff-kunafa.jpg",
     "title": "Biscoff",
     "description": "Lotus Butter / Lotus Biscoff",
     "price": 11,
@@ -197,7 +197,7 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/triple-chocolate-kunafa.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/triple-chocolate-kunafa.jpg",
     "title": "Triple Chocolate",
     "description": "Milk Chocolate / White Chocolate Dark Chocolate",
     "price": 11,
@@ -209,7 +209,7 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/nutella-kunafa.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/nutella-kunafa.jpg",
     "title": "Nutella Kunafa",
     "description": "Nutella / Chocolate Drizzle / Crushed Pistachio",
     "price": 12,
@@ -221,7 +221,7 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/milk-kunafa.png",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/milk-kunafa.png",
     "title": "Milk Kunfa",
     "description": "Honey / Milk / Crushed Pistachio",
     "price": 11,
@@ -233,7 +233,7 @@ export const kunafaMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/classic-kunafa.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/classic-kunafa.jpg",
     "title": "Classic Kunafa",
     "description": "Syrup / Crushed Pistachio",
     "price": 10,
@@ -248,7 +248,7 @@ export const kunafaMenu = [
 
 export const cupsMenu = [
   {
-    "imageSrc": "/desserts/Strawberry-chocolate-cup.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Strawberry-chocolate-cup.jpg",
     "title": "Strawberry Chocolate",
     "description": "Strawberry & Milk Choc & Drizzle w/ White Choc",
     "price": 11,
@@ -264,7 +264,7 @@ export const cupsMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/Dubai-Chocolate-cup.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Dubai-Chocolate-cup.jpg",
     "title": "Dubai Chocolate",
     "description": "Strawberry W/ Dubai Kunafa Filling & Milk Choc & Drizzle with White Choc",
     "price": 16,
@@ -279,7 +279,7 @@ export const cupsMenu = [
 
 export const cakesMenu = [
   {
-    "imageSrc": "/desserts/mix-lukumate.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/mix-lukumate.jpg",
     "title": "Mix Lukumate",
     "description": "Served with Cream",
     "price": 12,
@@ -291,7 +291,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/Eclair.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Eclair.jpg",
     "title": "Eclair",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -303,7 +303,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/lava-cake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/lava-cake.jpg",
     "title": "Lava Cake",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -315,7 +315,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/chocolate-chip-melt.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/chocolate-chip-melt.jpg",
     "title": "Chocolate Chip Melt",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -339,7 +339,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/Brownie.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Brownie.jpg",
     "title": "Brownie",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -351,7 +351,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/triple-chocolate-cheesecake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/triple-chocolate-cheesecake.jpg",
     "title": "Triple Chocolate Cheesecake",
     "description": "Served with Ice Cream scoop",
     "price": 11,
@@ -363,7 +363,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/chocolate-cake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/chocolate-cake.jpg",
     "title": "Chocolate Cake",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -375,7 +375,7 @@ export const cakesMenu = [
     ]
   },
   {
-    "imageSrc": "/desserts/red-velvet-cake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/red-velvet-cake.jpg",
     "title": "Red Velvet Cake",
     "description": "Served with Ice Cream scoop",
     "price": 10,
@@ -414,7 +414,7 @@ export const cakesMenu = [
 
 export const cafeMenu = [
   {
-    "imageSrc": "/drinks/Americano.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Americano.jpg",
     "title": "Americano",
     "description": "",
     "price": 6,
@@ -430,7 +430,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/latte-or-capuccino.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/latte-or-capuccino.jpg",
     "title": "Latte",
     "description": "",
     "price": 6,
@@ -446,7 +446,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/latte-or-capuccino.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/latte-or-capuccino.jpg",
     "title": "Cappuccino",
     "description": "",
     "price": 6,
@@ -462,7 +462,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/iced-pistachio-latte.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/iced-pistachio-latte.jpg",
     "title": "Pistachio Latte",
     "description": "",
     "price": 8,
@@ -478,7 +478,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/iced-americano.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/iced-americano.jpg",
     "title": "Iced Americano",
     "description": "",
     "price": 6,
@@ -542,7 +542,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/Caramel-latte.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Caramel-latte.jpg",
     "title": "Caramel Latte",
     "description": "",
     "price": 7,
@@ -558,7 +558,7 @@ export const cafeMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/matcha-latte.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/matcha-latte.jpg",
     "title": "Matcha Latte",
     "description": "",
     "price": 7,
@@ -649,7 +649,7 @@ export const cafeMenu = [
 
 export const shakesMenu = [
   {
-    "imageSrc": "/drinks/Ferrero-Shake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Ferrero-Shake.jpg",
     "title": "Ferrero Shake",
     "description": "Vanilla Ice Cream / Nutella Crushed Hazelnuts / Ferrero Rocher",
     "price": 10,
@@ -661,7 +661,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/Biscoff-Shake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Biscoff-Shake.jpg",
     "title": "Biscoff Shake",
     "description": "Vanilla Ice Cream / Lotus Butter / Lotus Cookies",
     "price": 10,
@@ -673,7 +673,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/Oreo-Shake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Oreo-Shake.jpg",
     "title": "Oreo Shake",
     "description": "Vanilla Ice Cream / Oreos",
     "price": 11,
@@ -685,7 +685,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/Dubai-Chocolate-Shake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Dubai-Chocolate-Shake.jpg",
     "title": "Dubai Chocolate",
     "description": "Pistachio, Kunafa",
     "price": 10,
@@ -697,7 +697,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/Kinder-Shake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Kinder-Shake.jpg",
     "title": "Kinder Shake",
     "description": "Vanilla Ice Cream / Nutella / Kinder",
     "price": 11,
@@ -709,7 +709,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/Strawberry-Shortcake-Shake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Strawberry-Shortcake-Shake.jpg",
     "title": "Strawberry Shortcake",
     "description": "Vanilla Ice Cream, Cheesecake, Strawberry Sauce",
     "price": 11,
@@ -721,7 +721,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/pistachio-shake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/pistachio-shake.jpg",
     "title": "Pistachio",
     "description": "Vanilla Ice Cream / Pistachio Butter Crushed Pistachio",
     "price": 12,
@@ -733,7 +733,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/chocolate-shake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/chocolate-shake.jpg",
     "title": "Chocolate Shake",
     "description": "Chocolate Ice Cream / Nutella / Chocolate Sauce",
     "price": 9,
@@ -745,7 +745,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/Fudgin-Brownie-Shake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Fudgin-Brownie-Shake.jpg",
     "title": "Fudgin' Brownie Shake",
     "description": "Vanilla Ice Cream & Brownie Bites, Nutella",
     "price": 11,
@@ -758,7 +758,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/Red-Velvet-Shake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Red-Velvet-Shake.jpg",
     "title": "Red Velvet Shake",
     "description": "Vanilla Ice Cream / Red Velvet Cake / Cream Cheese Frosting",
     "price": 11,
@@ -770,7 +770,7 @@ export const shakesMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/Strawberry-Shake.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Strawberry-Shake.jpg",
     "title": "Strawberry Shake",
     "description": "Vanilla Ice Cream / Strawberries / Strawberry Sauce",
     "price": 9,
@@ -828,7 +828,7 @@ export const refreshersMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/pina-colada-refresher.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/pina-colada-refresher.jpg",
     "title": "Piña Colada Refresher",
     "description": "Coconut / Pineapple",
     "price": 7,
@@ -860,7 +860,7 @@ export const refreshersMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/passion-fruit-refresher.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/passion-fruit-refresher.jpg",
     "title": "Passion Fruit Refresher",
     "description": "Passion Fruit / Strawberry / Mango",
     "price": 7,
@@ -876,7 +876,7 @@ export const refreshersMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/Blue-Raspberry-Refresher.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/Blue-Raspberry-Refresher.jpg",
     "title": "Blue Raspberry",
     "description": "Blue Raspberry",
     "price": 7,
@@ -892,7 +892,7 @@ export const refreshersMenu = [
     ]
   },
   {
-    "imageSrc": "/drinks/dragon-fruit-refresher.jpg",
+    "imageSrc": "https://laza-dessert-cafe.b-cdn.net/dragon-fruit-refresher.jpg",
     "title": "Dragon Fruit",
     "description": "Dragon Fruit",
     "price": 7,
