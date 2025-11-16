@@ -105,7 +105,7 @@ export default function SlideScale({ products }: { products: any[] }) {
     <div className="mx-auto max-w-8xl h-full [mask-composite:intersect] sm:[mask-image:linear-gradient(to_right,transparent,black_6rem),linear-gradient(to_left,transparent,black_6rem),linear-gradient(to_top,transparent,black_0.5rem)]">
       <Carousel
         setApi={setApi}
-        className="w-full max-w-8xl xl:h-120 h-full border "
+        className="w-full max-w-8xl xl:h-120 h-full  "
         opts={{
           loop: true,
           align: "center",
