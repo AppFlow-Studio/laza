@@ -44,7 +44,7 @@ export default function SlideScale({ products }: { products: any[] }) {
     pauseAutoplay();
     autoplayIntervalRef.current = setInterval(() => {
       api.scrollNext();
-    }, 4000); // 4 seconds
+    }, 2000); // 4 seconds
   }, [api, pauseAutoplay]);
 
   const resumeAutoplay = React.useCallback(() => {
@@ -53,7 +53,7 @@ export default function SlideScale({ products }: { products: any[] }) {
     }
     pauseTimeoutRef.current = setTimeout(() => {
       startAutoplay();
-    }, 6000); // Resume after 6 seconds of inactivity
+    }, 2000); // Resume after 6 seconds of inactivity
   }, [startAutoplay]);
 
   const handleUserInteraction = React.useCallback(() => {
