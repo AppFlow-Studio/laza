@@ -4,7 +4,7 @@ import { Resend } from 'resend';
 import React from 'react';
 import LazaCateringConfirmation from './LazaCateringConfirmation';
 import { CateringFormType } from '@/components/OrderForm';
-import { JoinUsForm } from '@/app/join-us/page';
+import { JoinUsForm } from '@/app/(home)/join-us/page';
 
 const resend = new Resend(process.env.RESEND_KEY);
 import LazaFranchiseInquiry from './LazaFranchiseInquiry';

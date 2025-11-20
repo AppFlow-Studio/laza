@@ -14,7 +14,7 @@ import {
     Row,
     Column,
 } from '@react-email/components';
-import { JoinUsForm } from '@/app/join-us/page';
+import { JoinUsForm } from '@/app/(home)/join-us/page';
 
 interface FranchiseInquiryData {
     // Contact & Basics

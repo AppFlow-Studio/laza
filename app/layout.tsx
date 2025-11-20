@@ -5,7 +5,8 @@ import Navbar from "../components/Navbar";
 import '@/components/embla.css'
 import Footer from "@/components/Footer";
 import Script from 'next/script';
-
+import { ClerkProvider } from '@clerk/nextjs';
+import TanstackProvider from "@/utils/tanstack-provider";
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -182,182 +183,184 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="laza-theme" suppressHydrationWarning>
-      <head>
-        <script async src="https://cdn.userway.org/widget.js" data-account="qY0jkg6Ywf"/>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        {/* Google Tag Manager */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-K3WGVNK8');`,
-          }}
-        />
-        {/* End Google Tag Manager */}
+    <ClerkProvider>
+      <html lang="en" className="laza-theme" suppressHydrationWarning>
+        <head>
+          <script async src="https://cdn.userway.org/widget.js" data-account="qY0jkg6Ywf" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          {/* Google Tag Manager */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-K3WGVNK8');`,
+            }}
+          />
+          {/* End Google Tag Manager */}
 
-        {/* Google tag (gtag.js) */}
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7S7ESYHH6J" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', 'G-7S7ESYHH6J');
-            `,
-          }}
-        />
-        {/* End Google tag (gtag.js) */}
+          {/* Google tag (gtag.js) */}
+          <script async src="https://www.googletagmanager.com/gtag/js?id=G-7S7ESYHH6J" />
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', 'G-7S7ESYHH6J');
+              `,
+            }}
+          />
+          {/* End Google tag (gtag.js) */}
 
-      </head>
-      <body
-        className={`${inter.variable} ${playfair.variable} ${bebas.variable} ${roboto.variable} ${raleway.variable} antialiased w-full overflow-none `}
-      >
-        {/* Prevent external classes from being added to HTML element - runs on every page */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                // Function to force the correct className
-                function forceCorrectClassName() {
-                  if (document.documentElement.className !== 'laza-theme') {
-                    document.documentElement.className = 'laza-theme';
+        </head>
+        <body
+          className={`${inter.variable} ${playfair.variable} ${bebas.variable} ${roboto.variable} ${raleway.variable} antialiased w-full overflow-none `}
+        >
+          {/* Prevent external classes from being added to HTML element - runs on every page */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function() {
+                  // Function to force the correct className
+                  function forceCorrectClassName() {
+                    if (document.documentElement.className !== 'laza-theme') {
+                      document.documentElement.className = 'laza-theme';
+                    }
                   }
-                }
-                
-                // Run immediately
-                forceCorrectClassName();
-                
-                // Run after a short delay to catch late additions
-                setTimeout(forceCorrectClassName, 0);
-                setTimeout(forceCorrectClassName, 10);
-                setTimeout(forceCorrectClassName, 50);
-                setTimeout(forceCorrectClassName, 100);
-                
-                // Override setAttribute method
-                const htmlElement = document.documentElement;
-                const originalSetAttribute = htmlElement.setAttribute;
-                
-                htmlElement.setAttribute = function(name, value) {
-                  if (name === 'class' && value.includes('chromane-sonic-dark')) {
-                    // Block the external class
-                    return;
-                  }
-                  return originalSetAttribute.call(this, name, value);
-                };
-                
-                // Override className property
-                Object.defineProperty(htmlElement, 'className', {
-                  set: function(value) {
-                    if (value.includes('chromane-sonic-dark')) {
+                  
+                  // Run immediately
+                  forceCorrectClassName();
+                  
+                  // Run after a short delay to catch late additions
+                  setTimeout(forceCorrectClassName, 0);
+                  setTimeout(forceCorrectClassName, 10);
+                  setTimeout(forceCorrectClassName, 50);
+                  setTimeout(forceCorrectClassName, 100);
+                  
+                  // Override setAttribute method
+                  const htmlElement = document.documentElement;
+                  const originalSetAttribute = htmlElement.setAttribute;
+                  
+                  htmlElement.setAttribute = function(name, value) {
+                    if (name === 'class' && value.includes('chromane-sonic-dark')) {
                       // Block the external class
                       return;
                     }
-                    this.setAttribute('class', value);
-                  },
-                  get: function() {
-                    return this.getAttribute('class') || 'laza-theme';
-                  }
-                });
-                
-                // Override classList.add method
-                const originalClassListAdd = htmlElement.classList.add;
-                htmlElement.classList.add = function(...classes) {
-                  const filteredClasses = classes.filter(cls => !cls.includes('chromane-sonic-dark'));
-                  if (filteredClasses.length > 0) {
-                    return originalClassListAdd.apply(this, filteredClasses);
-                  }
-                };
-                
-                // Override classList.remove method
-                const originalClassListRemove = htmlElement.classList.remove;
-                htmlElement.classList.remove = function(...classes) {
-                  // Always ensure laza-theme stays
-                  const result = originalClassListRemove.apply(this, classes);
-                  if (!this.className.includes('laza-theme')) {
-                    this.className = 'laza-theme';
-                  }
-                  return result;
-                };
-                
-                // Create a MutationObserver with aggressive monitoring
-                const observer = new MutationObserver(function(mutations) {
-                  let needsFix = false;
-                  mutations.forEach(function(mutation) {
-                    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                      const currentClass = htmlElement.className;
-                      if (currentClass.includes('chromane-sonic-dark') || currentClass !== 'laza-theme') {
-                        needsFix = true;
+                    return originalSetAttribute.call(this, name, value);
+                  };
+                  
+                  // Override className property
+                  Object.defineProperty(htmlElement, 'className', {
+                    set: function(value) {
+                      if (value.includes('chromane-sonic-dark')) {
+                        // Block the external class
+                        return;
                       }
+                      this.setAttribute('class', value);
+                    },
+                    get: function() {
+                      return this.getAttribute('class') || 'laza-theme';
                     }
                   });
                   
-                  if (needsFix) {
-                    forceCorrectClassName();
-                  }
-                });
-                
-                // Start observing with aggressive settings
-                observer.observe(htmlElement, {
-                  attributes: true,
-                  attributeFilter: ['class'],
-                  attributeOldValue: true
-                });
-                
-                // Also monitor for any DOM changes
-                observer.observe(document, {
-                  childList: true,
-                  subtree: true
-                });
-                
-                // Periodic check as backup
-                setInterval(forceCorrectClassName, 1000);
-                
-                // Listen for any focus/blur events that might trigger class changes
-                document.addEventListener('focusin', forceCorrectClassName);
-                document.addEventListener('focusout', forceCorrectClassName);
-                
-                // Listen for scroll events that might trigger class changes
-                document.addEventListener('scroll', forceCorrectClassName, { passive: true });
-                
-                // Override any global functions that might modify classes
-                if (window.document && window.document.documentElement) {
-                  const originalSetAttributeGlobal = window.document.documentElement.setAttribute;
-                  window.document.documentElement.setAttribute = function(name, value) {
-                    if (name === 'class' && value.includes('chromane-sonic-dark')) {
-                      return;
+                  // Override classList.add method
+                  const originalClassListAdd = htmlElement.classList.add;
+                  htmlElement.classList.add = function(...classes) {
+                    const filteredClasses = classes.filter(cls => !cls.includes('chromane-sonic-dark'));
+                    if (filteredClasses.length > 0) {
+                      return originalClassListAdd.apply(this, filteredClasses);
                     }
-                    return originalSetAttributeGlobal.call(this, name, value);
                   };
-                }
-              })();
-            `,
-          }}
-        />
-        {/* <Script
-          id="aioa-adawidget"
-          src="https://www.skynettechnologies.com/accessibility/js/all-in-one-accessibility-js-widget-minify.js?colorcode=#420083&token=null&position=bottom_right"
-          strategy="lazyOnload"
-        /> */}
-
-
-        {/* Google Tag Manager (noscript) */}
-        <noscript>
-          <iframe
-            src="https://www.googletagmanager.com/ns.html?id=GTM-K3WGVNK8"
-            height="0"
-            width="0"
-            style={{ display: 'none', visibility: 'hidden' }}
+                  
+                  // Override classList.remove method
+                  const originalClassListRemove = htmlElement.classList.remove;
+                  htmlElement.classList.remove = function(...classes) {
+                    // Always ensure laza-theme stays
+                    const result = originalClassListRemove.apply(this, classes);
+                    if (!this.className.includes('laza-theme')) {
+                      this.className = 'laza-theme';
+                    }
+                    return result;
+                  };
+                  
+                  // Create a MutationObserver with aggressive monitoring
+                  const observer = new MutationObserver(function(mutations) {
+                    let needsFix = false;
+                    mutations.forEach(function(mutation) {
+                      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                        const currentClass = htmlElement.className;
+                        if (currentClass.includes('chromane-sonic-dark') || currentClass !== 'laza-theme') {
+                          needsFix = true;
+                        }
+                      }
+                    });
+                    
+                    if (needsFix) {
+                      forceCorrectClassName();
+                    }
+                  });
+                  
+                  // Start observing with aggressive settings
+                  observer.observe(htmlElement, {
+                    attributes: true,
+                    attributeFilter: ['class'],
+                    attributeOldValue: true
+                  });
+                  
+                  // Also monitor for any DOM changes
+                  observer.observe(document, {
+                    childList: true,
+                    subtree: true
+                  });
+                  
+                  // Periodic check as backup
+                  setInterval(forceCorrectClassName, 1000);
+                  
+                  // Listen for any focus/blur events that might trigger class changes
+                  document.addEventListener('focusin', forceCorrectClassName);
+                  document.addEventListener('focusout', forceCorrectClassName);
+                  
+                  // Listen for scroll events that might trigger class changes
+                  document.addEventListener('scroll', forceCorrectClassName, { passive: true });
+                  
+                  // Override any global functions that might modify classes
+                  if (window.document && window.document.documentElement) {
+                    const originalSetAttributeGlobal = window.document.documentElement.setAttribute;
+                    window.document.documentElement.setAttribute = function(name, value) {
+                      if (name === 'class' && value.includes('chromane-sonic-dark')) {
+                        return;
+                      }
+                      return originalSetAttributeGlobal.call(this, name, value);
+                    };
+                  }
+                })();
+              `,
+            }}
           />
-        </noscript>
-        {/* End Google Tag Manager (noscript) */}
-        <Navbar />
-        {children}
-        <Footer />
-      </body>
-    </html>
+          {/* <Script
+            id="aioa-adawidget"
+            src="https://www.skynettechnologies.com/accessibility/js/all-in-one-accessibility-js-widget-minify.js?colorcode=#420083&token=null&position=bottom_right"
+            strategy="lazyOnload"
+          /> */}
+
+
+          {/* Google Tag Manager (noscript) */}
+          <noscript>
+            <iframe
+              src="https://www.googletagmanager.com/ns.html?id=GTM-K3WGVNK8"
+              height="0"
+              width="0"
+              style={{ display: 'none', visibility: 'hidden' }}
+            />
+          </noscript>
+          {/* End Google Tag Manager (noscript) */}
+          <TanstackProvider>
+            {children}
+          </TanstackProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
