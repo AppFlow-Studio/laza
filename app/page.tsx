@@ -26,6 +26,8 @@ import Link from "next/link";
 import getPlaceReviews from "./actions/get-google-reviews";
 import HeroVideo from "@/components/HeroVideo";
 import SlideScale from "@/components/customized/carousel/carousel-11";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 // Get the base URL for metadata (works both locally and in production)
 const getBaseUrl = () => {
@@ -530,6 +532,7 @@ export default async function Home() {
         }}
       />
       <main className="relative min-h-screen w-full ">
+        <Navbar />
         {/* Hidden H1 for SEO - not visible on UI */}
         <h1 className="sr-only">Laza Dessert Cafe - Premium Desserts, Crepes, Waffles, and Kunafa</h1>
 
@@ -938,6 +941,7 @@ export default async function Home() {
             </div>
           </div>
         </section>
+        <Footer />
       </main>
     </>
   );

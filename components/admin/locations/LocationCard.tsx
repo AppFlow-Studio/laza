@@ -8,8 +8,8 @@ import Link from 'next/link';
 
 interface LocationCardProps {
     location: Location & {
-        employee_count?: number;
-        storage_spaces_count?: number;
+        employees?: { id: string }[];
+        storage_spaces?: { id: string }[];
         total_inventory_value?: number;
     };
     onEdit?: () => void;
@@ -48,14 +48,14 @@ export default function LocationCard({ location, onEdit, onDelete }: LocationCar
                     <Users className="w-4 h-4 text-zinc-400" />
                     <div>
                         <p className="text-xs text-zinc-500">Employees</p>
-                        <p className="text-sm font-semibold text-zinc-900">{location.employee_count || 0}</p>
+                        <p className="text-sm font-semibold text-zinc-900">{location.employees?.length || 0}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <Box className="w-4 h-4 text-zinc-400" />
                     <div>
                         <p className="text-xs text-zinc-500">Storage</p>
-                        <p className="text-sm font-semibold text-zinc-900">{location.storage_spaces_count || 0}</p>
+                        <p className="text-sm font-semibold text-zinc-900">{location.storage_spaces?.length || 0}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">

@@ -13,9 +13,11 @@ import { useAdminStore } from '@/lib/stores/adminStore';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import toast from 'react-hot-toast';
 import { useDeleteLocation } from '@/lib/hooks/queries/useLocations';
+import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 
 export default function LocationsPage() {
     const { data: locations, isLoading } = useLocations();
+    const { data: userInfo } = useUserInfo();
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingLocation, setEditingLocation] = useState<any>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -23,6 +25,7 @@ export default function LocationsPage() {
     const { viewMode, setViewMode } = useAdminStore();
     const deleteMutation = useDeleteLocation();
 
+    console.log(locations);
     const filteredLocations = locations?.filter((location) => {
         if (!debouncedSearch) return true;
         const searchLower = debouncedSearch.toLowerCase();
@@ -44,8 +47,7 @@ export default function LocationsPage() {
         }
     };
 
-    // TODO: Get organization ID from user context
-    const organizationId = 'default-org-id';
+    const organizationId = userInfo?.members.organization_id;
 
     return (
         <div className="space-y-6">

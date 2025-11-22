@@ -1,3 +1,5 @@
+"use server";
+
 import { createServerSupabaseClient } from '../server';
 import { User } from '../types';
 

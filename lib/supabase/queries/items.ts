@@ -1,19 +1,22 @@
+"use server";
+
 import { createServerSupabaseClient } from '../server';
 import { Item } from '../types';
-
+import { auth } from '@clerk/nextjs/server';
 export async function getAllItems() {
-    const supabase =  createServerSupabaseClient();
-    console.log('supabase', supabase);
+    const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
         .from('items')
-        .select('*')
+        .select(
+            `
+            *,
+            category(*)
+            `
+        )
         .order('created_at', { ascending: false });
-
     if (error) {
-        console.error('getAllItems error', error);
         throw error
     };
-    console.log(data)
     return data as Item[];
 }
 
@@ -32,12 +35,12 @@ export async function getItemById(id: string) {
     return data as Item;
 }
 
-export async function getItemsByCategory(category: 'desserts' | 'ingredients' | 'supplies') {
+export async function getItemsByCategory(category: string) {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
         .from('items')
         .select('*')
-        .eq('category', category)
+        .eq('category_id', category)
         .order('name', { ascending: true });
 
     if (error) throw error;
@@ -60,7 +63,7 @@ export async function createItem(item: {
     organization_id: string;
     name: string;
     sku?: string | null;
-    category: 'desserts' | 'ingredients' | 'supplies';
+    category_id: string;
     unit_of_measure: 'pcs' | 'kg' | 'liters' | 'lbs' | 'oz';
     min_quantity: number;
 }) {
@@ -76,16 +79,17 @@ export async function createItem(item: {
 }
 
 export async function updateItem(id: string, updates: Partial<Item>) {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServerSupabaseClient();
+
     const { data, error } = await supabase
         .from('items')
         .update(updates)
         .eq('id', id)
         .select()
-        .single();
 
     if (error) throw error;
-    return data as Item;
+
+    return data;
 }
 
 export async function deleteItem(id: string) {
@@ -94,6 +98,43 @@ export async function deleteItem(id: string) {
         .from('items')
         .delete()
         .eq('id', id);
+
+    if (error) throw error;
+}
+
+export async function bulkUpdateItems(itemIds: string[], updates: Partial<Item>) {
+    const supabase = await createServerSupabaseClient();
+
+    // Only allow updating specific fields for bulk operations
+    const allowedFields: (keyof Item)[] = ['min_quantity', 'category_id', 'unit_of_measure'];
+    const filteredUpdates: Partial<Item> = {};
+
+    for (const key of allowedFields) {
+        if (updates[key] !== undefined) {
+            filteredUpdates[key] = updates[key];
+        }
+    }
+
+    if (Object.keys(filteredUpdates).length === 0) {
+        throw new Error('No valid fields to update');
+    }
+
+    const { data, error } = await supabase
+        .from('items')
+        .update(filteredUpdates)
+        .in('id', itemIds)
+        .select();
+
+    if (error) throw error;
+    return data as Item[];
+}
+
+export async function bulkDeleteItems(itemIds: string[]) {
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase
+        .from('items')
+        .delete()
+        .in('id', itemIds);
 
     if (error) throw error;
 }

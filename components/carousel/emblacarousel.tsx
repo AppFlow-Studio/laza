@@ -29,7 +29,6 @@ const EmblaCarousel: React.FC<PropType> = (props) => {
         onPrevButtonClick,
         onNextButtonClick
     } = usePrevNextButtons(emblaApi)
-    console.log(selectedIndex)
     return (
         <section className="embla w-full ">
             <div className={"embla__viewport w-full "} ref={emblaRef}>

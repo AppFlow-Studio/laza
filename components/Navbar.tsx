@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ShoppingCart, Menu, X, LogIn, User, LayoutDashboard } from "lucide-react";
 import { useCartStore } from "@/utils/cart";
 import { useUser } from "@clerk/nextjs";
+import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 const navLinks = [
     { label: "Home", href: "/" },
     { label: "Menu", href: "/menu" },
@@ -42,10 +43,12 @@ export default function Navbar() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const pathname = usePathname();
     const { user, isLoaded } = useUser();
+    const { data: userInfo } = useUserInfo();
     const { items } = useCartStore();
 
     // Get user role from public metadata
-    const userRole = user?.publicMetadata?.role as string | undefined;
+    const userRole = userInfo?.role;
+    console.log('userRole', userRole);
     const dashboardPath = userRole === 'admin' ? '/admin' : userRole === 'employee' ? '/employee' : '/sign-in';
     const isLoggedIn = !!user && isLoaded;
 

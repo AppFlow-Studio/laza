@@ -18,6 +18,7 @@ const isPublicRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, req) => {
     const { userId, sessionClaims } = await auth();
     const role = (sessionClaims as any)?.o?.rol as string | undefined;
+    // console.log('sessionClaims', sessionClaims);
     // Protect admin routes - only admins can access
     if (isAdminRoute(req)) {
         if (!userId || role !== 'admin') {
@@ -28,7 +29,7 @@ export default clerkMiddleware(async (auth, req) => {
 
     // Protect employee routes - employees and admins can access
     if (isEmployeeRoute(req)) {
-        if (!userId || (role !== 'employee' && role !== 'admin')) {
+        if (!userId || (role !== 'member' && role !== 'admin')) {
             return new Response('Unauthorized', { status: 403 })
         }
         return NextResponse.next();
@@ -41,7 +42,7 @@ export default clerkMiddleware(async (auth, req) => {
         if (role === 'admin') {
             return NextResponse.redirect(new URL('/admin', req.url));
         }
-        if (role === 'employee') {
+        if (role === 'member') {
             return NextResponse.redirect(new URL('/employee', req.url));
         }
     }

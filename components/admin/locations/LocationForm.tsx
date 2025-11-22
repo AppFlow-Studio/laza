@@ -86,7 +86,7 @@ export default function LocationForm({ location, organizationId, onSuccess }: Lo
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-                <Label htmlFor="name">Location Name</Label>
+                <Label className='my-2' htmlFor="name">Location Name</Label>
                 <Input
                     id="name"
                     {...register('name')}
@@ -98,7 +98,7 @@ export default function LocationForm({ location, organizationId, onSuccess }: Lo
             </div>
 
             <div>
-                <Label htmlFor="street">Street Address</Label>
+                <Label className='my-2' htmlFor="street">Street Address</Label>
                 <Input
                     id="street"
                     {...register('address.street')}
@@ -111,7 +111,7 @@ export default function LocationForm({ location, organizationId, onSuccess }: Lo
 
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <Label htmlFor="city">City</Label>
+                    <Label className='my-2' htmlFor="city">City</Label>
                     <Input
                         id="city"
                         {...register('address.city')}
@@ -122,7 +122,7 @@ export default function LocationForm({ location, organizationId, onSuccess }: Lo
                     )}
                 </div>
                 <div>
-                    <Label htmlFor="state">State</Label>
+                    <Label className='my-2' htmlFor="state">State</Label>
                     <Input
                         id="state"
                         {...register('address.state')}
@@ -135,7 +135,7 @@ export default function LocationForm({ location, organizationId, onSuccess }: Lo
             </div>
 
             <div>
-                <Label htmlFor="zip">ZIP Code</Label>
+                <Label className='my-2' htmlFor="zip">ZIP Code</Label>
                 <Input
                     id="zip"
                     {...register('address.zip')}
@@ -153,7 +153,7 @@ export default function LocationForm({ location, organizationId, onSuccess }: Lo
                     {...register('is_active')}
                     className="w-4 h-4 rounded border-zinc-300"
                 />
-                <Label htmlFor="is_active">Active</Label>
+                <Label className='my-2' htmlFor="is_active">Active</Label>
             </div>
 
             <div className="flex gap-2 pt-4">

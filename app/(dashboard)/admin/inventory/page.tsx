@@ -11,7 +11,7 @@ import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import { useLocationWithDetails } from '@/lib/hooks/queries/useLocations';
 import { useAdminStore } from '@/lib/stores/adminStore';
 import FilterDropdown from '@/components/admin/shared/FilterDropdown';
-import { useInventorySubscription } from '@/lib/supabase/subscriptions';
+// import { useInventorySubscription } from '@/lib/supabase/subscriptions';
 
 export default function InventoryPage() {
     const { selectedLocationId, setSelectedLocationId } = useAdminStore();
@@ -21,7 +21,7 @@ export default function InventoryPage() {
     const { data: items } = useItems();
 
     // Real-time subscription
-    useInventorySubscription(selectedLocationId);
+    // useInventorySubscription(selectedLocationId);
 
     const [updatingCell, setUpdatingCell] = useState<{
         itemId: string;
@@ -114,6 +114,10 @@ export default function InventoryPage() {
                         locationId={selectedLocationId}
                         storageSpaceId={updatingCell.storageSpaceId}
                         currentQuantity={getCurrentQuantity(updatingCell.itemId, updatingCell.storageSpaceId)}
+                        currentMinQuantityOverride={inventory?.find(
+                            (i: any) => i.item_id === updatingCell.itemId && i.storage_space_id === updatingCell.storageSpaceId
+                        )?.min_quantity_override ?? null}
+                        itemMinQuantity={items?.find((item: any) => item.id === updatingCell.itemId)?.min_quantity}
                         onSuccess={() => setUpdatingCell(null)}
                     />
                 </MobileSheet>

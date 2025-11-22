@@ -9,6 +9,8 @@ import {
     createItem,
     updateItem,
     deleteItem,
+    bulkUpdateItems,
+    bulkDeleteItems,
 } from '@/lib/supabase/queries/items';
 
 export function useItems() {
@@ -26,7 +28,7 @@ export function useItem(id: string | null) {
     });
 }
 
-export function useItemsByCategory(category: 'desserts' | 'ingredients' | 'supplies' | null) {
+export function useItemsByCategory(category: string | null) {
     return useQuery({
         queryKey: ['items', 'category', category],
         queryFn: () => getItemsByCategory(category!),
@@ -67,6 +69,27 @@ export function useDeleteItem() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: deleteItem,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['items'] });
+        },
+    });
+}
+
+export function useBulkUpdateItems() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ itemIds, updates }: { itemIds: string[]; updates: Partial<Item> }) =>
+            bulkUpdateItems(itemIds, updates),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['items'] });
+        },
+    });
+}
+
+export function useBulkDeleteItems() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (itemIds: string[]) => bulkDeleteItems(itemIds),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['items'] });
         },

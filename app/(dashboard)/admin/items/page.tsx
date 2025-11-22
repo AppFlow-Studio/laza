@@ -1,28 +1,44 @@
 "use client";
 
-import { useState } from 'react';
-import { useItems, useItemsByCategory } from '@/lib/hooks/queries/useItems';
+import { useState, useEffect } from 'react';
+import { useItems } from '@/lib/hooks/queries/useItems';
 import ItemGrid from '@/components/admin/items/ItemGrid';
 import SearchBar from '@/components/admin/shared/SearchBar';
 import FilterDropdown from '@/components/admin/shared/FilterDropdown';
 import { LoadingSkeleton, CardSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Grid, List } from 'lucide-react';
+import BulkActionsToolbar from '@/components/admin/items/BulkActionsToolbar';
+import BulkUpdateModal from '@/components/admin/items/BulkUpdateModal';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useAdminStore } from '@/lib/stores/adminStore';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useCreateItem, useUpdateItem, useDeleteItem } from '@/lib/hooks/queries/useItems';
+import { useCreateItem, useUpdateItem, useDeleteItem, useBulkUpdateItems, useBulkDeleteItems } from '@/lib/hooks/queries/useItems';
 import toast from 'react-hot-toast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useSearchItems } from '@/lib/hooks/queries/useItems';
+import { useCategories } from '@/lib/hooks/queries/useCategories';
+import { useUser } from '@clerk/nextjs';
+import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 
 const itemSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     sku: z.string().optional().nullable(),
-    category: z.enum(['desserts', 'ingredients', 'supplies']),
+    category: z.string().optional().nullable(),
     unit_of_measure: z.enum(['pcs', 'kg', 'liters', 'lbs', 'oz']),
     min_quantity: z.number().min(0),
 });
@@ -30,27 +46,39 @@ const itemSchema = z.object({
 type ItemFormData = z.infer<typeof itemSchema>;
 
 export default function ItemsPage() {
+    const { data: userInfo } = useUserInfo();
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingItem, setEditingItem] = useState<any>(null);
     const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+    const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
+    const [bulkUpdateField, setBulkUpdateField] = useState<'min_quantity' | 'category' | 'unit' | 'all'>('all');
+    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
     const debouncedSearch = useDebounce(searchQuery, 300);
+    const { viewMode, setViewMode } = useAdminStore();
 
     const { data: allItems, isLoading: allItemsLoading, isError: allItemsError } = useItems();
-    const { data: categoryItems, isLoading: categoryLoading } = useItemsByCategory(
-        categoryFilter as any
-    );
+    const { data: categories, isLoading: categoriesLoading, isError: categoriesError } = useCategories();
     const { data: searchResults, isLoading: searchLoading } = useSearchItems(debouncedSearch);
 
     const createMutation = useCreateItem();
     const updateMutation = useUpdateItem();
     const deleteMutation = useDeleteItem();
+    const bulkUpdateMutation = useBulkUpdateItems();
+    const bulkDeleteMutation = useBulkDeleteItems();
 
-    const isLoading = allItemsLoading || categoryLoading || searchLoading;
+    const isLoading = allItemsLoading || categoriesLoading || searchLoading;
 
     let items = allItems || [];
-    if (categoryFilter) {
-        items = categoryItems || [];
+    // Filter by category if selected
+    if (categoryFilter && items.length > 0) {
+        items = items.filter((item: any) => {
+            const itemCategoryId = typeof item.category === 'object' && item.category !== null
+                ? item.category.id
+                : item.category;
+            return itemCategoryId === categoryFilter;
+        });
     }
     if (debouncedSearch) {
         items = searchResults || [];
@@ -63,30 +91,81 @@ export default function ItemsPage() {
         reset,
     } = useForm<ItemFormData>({
         resolver: zodResolver(itemSchema),
-        defaultValues: editingItem || {
+        defaultValues: {
             name: '',
             sku: '',
-            category: 'desserts',
+            category: '',
             unit_of_measure: 'pcs',
             min_quantity: 0,
         },
     });
 
+    // Reset form when editingItem changes
+    useEffect(() => {
+        if (editingItem && categories) {
+            // Extract category ID - handle both object and string formats
+            let categoryId = '';
+            if (typeof editingItem.category === 'object' && editingItem.category !== null && 'id' in editingItem.category) {
+                // Category is an object with id
+                categoryId = editingItem.category.id;
+            } else if (typeof editingItem.category === 'string') {
+                // Category is stored as enum string, find matching category by name
+                const matchingCategory = categories.find(cat =>
+                    cat.name.toLowerCase() === editingItem.category.toLowerCase()
+                );
+                categoryId = matchingCategory?.id || '';
+            }
+
+            reset({
+                name: editingItem.name || '',
+                sku: editingItem.sku || '',
+                category: categoryId,
+                unit_of_measure: editingItem.unit_of_measure || 'pcs',
+                min_quantity: editingItem.min_quantity || 0,
+            });
+        } else if (!editingItem) {
+            reset({
+                name: '',
+                sku: '',
+                category: '',
+                unit_of_measure: 'pcs',
+                min_quantity: 0,
+            });
+        }
+    }, [editingItem, categories, reset]);
+
     const onSubmit = async (data: ItemFormData) => {
         try {
-            // TODO: Get organization ID from user context
-            const organizationId = 'default-org-id';
+            const organizationId = userInfo?.members.organization_id;
+            console.log(userInfo);
+            if (!organizationId) {
+                toast.error('Organization not found');
+                return;
+            }
+            console.log(organizationId);
+
+
 
             if (editingItem) {
                 await updateMutation.mutateAsync({
                     id: editingItem.id,
-                    updates: data,
+                    updates: {
+                        name: data.name,
+                        sku: data.sku || null,
+                        category_id: data.category || null,
+                        unit_of_measure: data.unit_of_measure,
+                        min_quantity: data.min_quantity,
+                    },
                 });
                 toast.success('Item updated successfully');
             } else {
                 await createMutation.mutateAsync({
                     organization_id: organizationId,
-                    ...data,
+                    name: data.name,
+                    sku: data.sku || null,
+                    category_id: data.category || '',
+                    unit_of_measure: data.unit_of_measure,
+                    min_quantity: data.min_quantity,
                 });
                 toast.success('Item created successfully');
             }
@@ -108,6 +187,41 @@ export default function ItemsPage() {
         }
     };
 
+    const handleItemToggle = (itemId: string) => {
+        const newSelected = new Set(selectedItems);
+        if (newSelected.has(itemId)) {
+            newSelected.delete(itemId);
+        } else {
+            newSelected.add(itemId);
+        }
+        setSelectedItems(newSelected);
+    };
+
+    const handleSelectAll = (select: boolean) => {
+        if (select) {
+            const allItemIds = new Set(items.map((item: any) => item.id));
+            setSelectedItems(allItemIds);
+        } else {
+            setSelectedItems(new Set());
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        try {
+            await bulkDeleteMutation.mutateAsync(Array.from(selectedItems));
+            toast.success(`Successfully deleted ${selectedItems.size} item${selectedItems.size !== 1 ? 's' : ''}`);
+            setSelectedItems(new Set());
+            setShowBulkDeleteDialog(false);
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to delete items');
+        }
+    };
+
+    const handleBulkUpdateSuccess = () => {
+        setShowBulkUpdateModal(false);
+        setSelectedItems(new Set());
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -116,10 +230,26 @@ export default function ItemsPage() {
                     <h1 className="text-2xl font-semibold text-zinc-900">Items</h1>
                     <p className="text-sm text-zinc-600 mt-1">Manage your inventory items</p>
                 </div>
-                <Button onClick={() => setShowAddForm(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Item
-                </Button>
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 bg-white border border-zinc-200 rounded-lg p-1">
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-2 rounded ${viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'text-zinc-600'}`}
+                        >
+                            <Grid className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`p-2 rounded ${viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-zinc-600'}`}
+                        >
+                            <List className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <Button onClick={() => setShowAddForm(true)}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Item
+                    </Button>
+                </div>
             </div>
 
             {/* Filters */}
@@ -132,15 +262,35 @@ export default function ItemsPage() {
                 </div>
                 <FilterDropdown
                     label="Category"
-                    options={[
-                        { value: 'desserts', label: 'Desserts' },
-                        { value: 'ingredients', label: 'Ingredients' },
-                        { value: 'supplies', label: 'Supplies' },
-                    ]}
+                    options={categories?.map((category) => ({ value: category.id, label: category.name })) || []}
                     value={categoryFilter}
-                    onChange={setCategoryFilter}
+                    onChange={(value) => setCategoryFilter(value)}
                 />
             </div>
+
+            {/* Bulk Actions Toolbar - Always visible to show selection hint */}
+            <BulkActionsToolbar
+                selectedCount={selectedItems.size}
+                onUpdateMinQuantity={() => {
+                    setBulkUpdateField('min_quantity');
+                    setShowBulkUpdateModal(true);
+                }}
+                onUpdateCategory={() => {
+                    setBulkUpdateField('category');
+                    setShowBulkUpdateModal(true);
+                }}
+                onUpdateUnit={() => {
+                    setBulkUpdateField('unit');
+                    setShowBulkUpdateModal(true);
+                }}
+                onBulkUpdate={() => {
+                    setBulkUpdateField('all');
+                    setShowBulkUpdateModal(true);
+                }}
+                onDelete={() => setShowBulkDeleteDialog(true)}
+                onClearSelection={() => setSelectedItems(new Set())}
+                isLoading={bulkUpdateMutation.isPending || bulkDeleteMutation.isPending}
+            />
 
             {/* Items Grid */}
             {isLoading ? (
@@ -157,6 +307,10 @@ export default function ItemsPage() {
             ) : (
                 <ItemGrid
                     items={items}
+                    viewMode={viewMode}
+                    selectedItems={selectedItems}
+                    onItemToggle={handleItemToggle}
+                    onSelectAll={handleSelectAll}
                     onEdit={(item) => {
                         setEditingItem(item);
                         setShowAddForm(true);
@@ -202,11 +356,18 @@ export default function ItemsPage() {
                             id="category"
                             {...register('category')}
                             className="w-full px-3 py-2 border border-zinc-200 rounded-lg"
+                            disabled={categoriesLoading}
                         >
-                            <option value="desserts">Desserts</option>
-                            <option value="ingredients">Ingredients</option>
-                            <option value="supplies">Supplies</option>
+                            <option value="">Select a category</option>
+                            {categories?.map((category) => (
+                                <option key={category.id} value={category.id as string}>
+                                    {category.name}
+                                </option>
+                            ))}
                         </select>
+                        {errors.category && (
+                            <p className="text-sm text-red-500 mt-1">{errors.category.message}</p>
+                        )}
                     </div>
 
                     <div>
@@ -251,6 +412,48 @@ export default function ItemsPage() {
                     </Button>
                 </form>
             </MobileSheet>
+
+            {/* Bulk Update Modal */}
+            {showBulkUpdateModal && selectedItems.size > 0 && (
+                <MobileSheet
+                    isOpen={showBulkUpdateModal}
+                    onClose={() => setShowBulkUpdateModal(false)}
+                    title="Bulk Update Items"
+                    snapPoints={[0, 0.5, 0.7]}
+                >
+                    <BulkUpdateModal
+                        itemIds={Array.from(selectedItems)}
+                        selectedCount={selectedItems.size}
+                        updateField={bulkUpdateField}
+                        onSuccess={handleBulkUpdateSuccess}
+                        onCancel={() => setShowBulkUpdateModal(false)}
+                    />
+                </MobileSheet>
+            )}
+
+            {/* Bulk Delete Confirmation Dialog */}
+            <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Selected Items</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete <strong>{selectedItems.size}</strong> item{selectedItems.size !== 1 ? 's' : ''}? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={bulkDeleteMutation.isPending}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleBulkDelete}
+                            className="bg-red-600 hover:bg-red-700"
+                            disabled={bulkDeleteMutation.isPending}
+                        >
+                            {bulkDeleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

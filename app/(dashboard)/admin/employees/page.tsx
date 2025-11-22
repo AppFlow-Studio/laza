@@ -15,10 +15,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLocations } from '@/lib/hooks/queries/useLocations';
 import { useForm } from 'react-hook-form';
+import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 
 export default function EmployeesPage() {
     const { data: employees, isLoading } = useEmployees();
     const { data: locations } = useLocations();
+    const { data: userInfo } = useUserInfo();
     const [searchQuery, setSearchQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<string | null>(null);

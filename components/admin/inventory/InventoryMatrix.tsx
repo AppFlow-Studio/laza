@@ -43,7 +43,7 @@ export default function InventoryMatrix({ items, storageSpaces, inventory, onCel
                 <table className="w-full border-collapse">
                     <thead>
                         <tr>
-                            <th className="sticky left-0 z-10 bg-white border border-zinc-200 px-4 py-3 text-left text-sm font-semibold text-zinc-900">
+                            <th className=" left-0 z-10 bg-white border border-zinc-200 px-4 py-3 text-left text-sm font-semibold text-zinc-900">
                                 Item
                             </th>
                             {storageSpaces.map((space) => (
@@ -70,7 +70,7 @@ export default function InventoryMatrix({ items, storageSpaces, inventory, onCel
                             );
                             return (
                                 <tr key={item.id}>
-                                    <td className="sticky left-0 z-10 bg-white border border-zinc-200 px-4 py-3 text-sm font-medium text-zinc-900">
+                                    <td className=" left-0 z-10 bg-white border border-zinc-200 px-4 py-3 text-sm font-medium text-zinc-900">
                                         <div className="flex items-center gap-2">
                                             <Package className="w-4 h-4 text-zinc-400" />
                                             <span className="truncate">{item.name}</span>

@@ -35,7 +35,7 @@ import { Button } from '@/components/ui/button';
 const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Locations', href: '/admin/locations', icon: MapPin },
-    { name: 'Employees', href: '/admin/employees', icon: Users },
+    { name: 'Users', href: '/admin/users', icon: Users },
     { name: 'Items', href: '/admin/items', icon: Package },
     { name: 'Inventory', href: '/admin/inventory', icon: BarChart3 },
 ];
@@ -92,7 +92,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </SidebarContent>
 
                         <SidebarFooter>
+
                             <SidebarMenu>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild tooltip="Go to Homepage">
+                                        <Link href="/">
+                                            <Home className="w-4 h-4" />
+                                            <span>Home</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <div className="flex items-center gap-2 px-2 py-2 mb-2">
                                         <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-semibold">
@@ -133,17 +142,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                         {navigation.find(item => pathname === item.href || pathname?.startsWith(item.href + '/'))?.name || 'Dashboard'}
                                     </h2>
                                 </div>
-                                {/* Link to Home Page */}
-                                <Link href="/">
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        title="Go to Homepage"
-                                        aria-label="Go to Homepage"
-                                    >
-                                        <Home className="w-5 h-5" />
-                                    </Button>
-                                </Link>
+
                                 <div className="flex items-center gap-4">
                                     <button className="p-2 hover:bg-zinc-100 rounded-lg transition-colors relative">
                                         <Bell className="w-5 h-5 text-zinc-600" />

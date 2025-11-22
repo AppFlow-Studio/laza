@@ -1,13 +1,17 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useUser } from '@clerk/nextjs';
 import {
     getInventoryByLocation,
     getInventoryByItemAndLocation,
     updateQuantity,
     getInventoryLogs,
     getAlerts,
+    getLowStockItems,
     resolveAlert,
+    bulkUpdateInventory,
+    bulkRemoveItemsFromStorage,
 } from '@/lib/supabase/queries/inventory';
 
 export function useInventoryByLocation(locationId: string | null) {
@@ -25,10 +29,18 @@ export function useInventoryLogs(filters?: { itemId?: string; locationId?: strin
     });
 }
 
-export function useAlerts(filters?: { locationId?: string; resolved?: boolean }) {
+export function useAlerts(filters?: { locationId?: string; storageSpaceId?: string; resolved?: boolean }) {
     return useQuery({
         queryKey: ['alerts', filters],
         queryFn: () => getAlerts(filters),
+    });
+}
+
+export function useLowStockItems(groupBy: 'location' | 'item' = 'location') {
+    return useQuery({
+        queryKey: ['low-stock-items', groupBy],
+        queryFn: () => getLowStockItems(groupBy),
+        staleTime: 30 * 1000, // 30 seconds
     });
 }
 
@@ -43,6 +55,7 @@ export function useUpdateQuantity() {
             userId,
             actionType,
             notes,
+            minQuantityOverride,
         }: {
             itemId: string;
             locationId: string;
@@ -51,7 +64,8 @@ export function useUpdateQuantity() {
             userId: string;
             actionType: 'count' | 'adjustment' | 'received' | 'used';
             notes?: string;
-        }) => updateQuantity(itemId, locationId, storageSpaceId, newQuantity, userId, actionType, notes),
+            minQuantityOverride?: number | null;
+        }) => updateQuantity(itemId, locationId, storageSpaceId, newQuantity, userId, actionType, notes, minQuantityOverride),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['inventory'] });
             queryClient.invalidateQueries({ queryKey: ['inventory-logs'] });
@@ -66,6 +80,52 @@ export function useResolveAlert() {
         mutationFn: resolveAlert,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['alerts'] });
+        },
+    });
+}
+
+export function useBulkUpdateInventory() {
+    const queryClient = useQueryClient();
+    const { user } = useUser();
+    return useMutation({
+        mutationFn: (data: {
+            itemLocations: Array<{
+                itemId: string;
+                locationId: string;
+                storageSpaceId: string;
+                quantity?: number;
+                minQuantityOverride?: number | null;
+                actionType: 'count' | 'adjustment' | 'received' | 'used';
+                notes?: string;
+            }>;
+        }) => {
+            if (!user?.id) throw new Error('User not authenticated');
+            return bulkUpdateInventory(data.itemLocations, user.id);
+        },
+        onSuccess: (_, variables) => {
+            const firstItem = variables.itemLocations[0];
+            queryClient.invalidateQueries({ queryKey: ['inventory'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory-logs'] });
+            queryClient.invalidateQueries({ queryKey: ['alerts'] });
+            queryClient.invalidateQueries({ queryKey: ['low-stock-items'] });
+            if (firstItem) {
+                queryClient.invalidateQueries({ queryKey: ['inventory', 'storage-space', firstItem.storageSpaceId] });
+            }
+        },
+    });
+}
+
+export function useBulkRemoveItems() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: {
+            itemIds: string[];
+            locationId: string;
+            storageSpaceId: string;
+        }) => bulkRemoveItemsFromStorage(data.itemIds, data.locationId, data.storageSpaceId),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['inventory'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory', 'storage-space', variables.storageSpaceId] });
         },
     });
 }

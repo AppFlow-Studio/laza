@@ -11,7 +11,8 @@ import { MapPin, Users, Package, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
 import toast from 'react-hot-toast';
-import { useInventoryLogsSubscription, useAlertsSubscription, useEmployeesSubscription } from '@/lib/supabase/subscriptions';
+import ImmediateActions from '@/components/admin/dashboard/ImmediateActions';
+// import { useInventoryLogsSubscription, useAlertsSubscription, useEmployeesSubscription } from '@/lib/supabase/subscriptions';
 
 export default function AdminDashboard() {
     const { data: locations, isLoading: locationsLoading } = useLocations();
@@ -24,9 +25,9 @@ export default function AdminDashboard() {
     const [showAddItem, setShowAddItem] = useState(false);
 
     // Real-time subscriptions
-    useInventoryLogsSubscription();
-    useAlertsSubscription();
-    useEmployeesSubscription();
+    // useInventoryLogsSubscription();
+    // useAlertsSubscription();
+    // useEmployeesSubscription();
 
     const stats = [
         {
@@ -66,7 +67,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Quick Actions */}
-            <div>
+            {/* <div>
                 <h2 className="text-lg font-semibold text-zinc-900 mb-4">Quick Actions</h2>
                 <QuickActions
                     onAddLocation={() => {
@@ -82,6 +83,14 @@ export default function AdminDashboard() {
                         setShowAddItem(true);
                     }}
                 />
+            </div> */}
+
+            {/* Immediate Actions */}
+            <div>
+                <h2 className="text-lg font-semibold text-zinc-900 mb-4">Immediate Actions</h2>
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-zinc-200">
+                    <ImmediateActions />
+                </div>
             </div>
 
             {/* Activity Feed */}

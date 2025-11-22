@@ -242,6 +242,7 @@ export type Database = {
                     id: string;
                     item_id: string;
                     location_id: string;
+                    storage_space_id: string | null;
                     alert_type: 'low_stock';
                     triggered_at: string;
                     resolved_at: string | null;
@@ -251,6 +252,7 @@ export type Database = {
                     id?: string;
                     item_id: string;
                     location_id: string;
+                    storage_space_id?: string | null;
                     alert_type: 'low_stock';
                     triggered_at?: string;
                     resolved_at?: string | null;
@@ -260,10 +262,52 @@ export type Database = {
                     id?: string;
                     item_id?: string;
                     location_id?: string;
+                    storage_space_id?: string | null;
                     alert_type?: 'low_stock';
                     triggered_at?: string;
                     resolved_at?: string | null;
                     notified_users?: string[];
+                };
+            };
+            org_invites: {
+                Row: {
+                    id: string;
+                    clerk_invite_id: string;
+                    organization_id: string;
+                    email: string;
+                    status: 'pending' | 'accepted' | 'expired' | 'cancelled';
+                    role: 'admin' | 'employee';
+                    clerk_user_id: string | null;
+                    assigned_location_id: string | null;
+                    accepted_at: string | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    clerk_invite_id: string;
+                    organization_id: string;
+                    email: string;
+                    status?: 'pending' | 'accepted' | 'expired' | 'cancelled';
+                    role: 'admin' | 'employee';
+                    clerk_user_id?: string | null;
+                    assigned_location_id?: string | null;
+                    accepted_at?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    clerk_invite_id?: string;
+                    organization_id?: string;
+                    email?: string;
+                    status?: 'pending' | 'accepted' | 'expired' | 'cancelled';
+                    role?: 'admin' | 'employee';
+                    clerk_user_id?: string | null;
+                    assigned_location_id?: string | null;
+                    accepted_at?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
                 };
             };
         };
@@ -279,6 +323,7 @@ export type ItemLocation = Database['public']['Tables']['item_locations']['Row']
 export type User = Database['public']['Tables']['users']['Row'];
 export type InventoryLog = Database['public']['Tables']['inventory_logs']['Row'];
 export type Alert = Database['public']['Tables']['alerts']['Row'];
+export type OrgInvite = Database['public']['Tables']['org_invites']['Row'];
 
 // Extended types with relations
 export type LocationWithDetails = Location & {

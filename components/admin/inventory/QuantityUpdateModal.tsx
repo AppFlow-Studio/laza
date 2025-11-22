@@ -11,11 +11,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { useUpdateQuantity } from '@/lib/hooks/queries/useInventory';
 import { useUser } from '@clerk/nextjs';
 import toast from 'react-hot-toast';
+import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
+import { User2 } from 'lucide-react';
 
 const quantitySchema = z.object({
     new_quantity: z.number().min(0),
     action_type: z.enum(['count', 'adjustment', 'received', 'used']),
     notes: z.string().optional(),
+    min_quantity_override: z.number().optional().nullable(),
 });
 
 type QuantityFormData = z.infer<typeof quantitySchema>;
@@ -25,6 +28,8 @@ interface QuantityUpdateModalProps {
     locationId: string;
     storageSpaceId: string | null;
     currentQuantity: number;
+    currentMinQuantityOverride?: number | null;
+    itemMinQuantity?: number;
     onSuccess: () => void;
 }
 
@@ -33,22 +38,29 @@ export default function QuantityUpdateModal({
     locationId,
     storageSpaceId,
     currentQuantity,
+    currentMinQuantityOverride,
+    itemMinQuantity,
     onSuccess,
 }: QuantityUpdateModalProps) {
-    const { user } = useUser();
+    const { data: userInfo } = useUserInfo();
     const updateMutation = useUpdateQuantity();
     const {
         register,
         handleSubmit,
         formState: { errors },
+        watch,
     } = useForm<QuantityFormData>({
         resolver: zodResolver(quantitySchema),
         defaultValues: {
             new_quantity: currentQuantity,
             action_type: 'count',
             notes: '',
+            min_quantity_override: currentMinQuantityOverride || null,
         },
     });
+
+
+    const minQuantityOverride = watch('min_quantity_override');
 
     const onSubmit = async (data: QuantityFormData) => {
         try {
@@ -57,9 +69,10 @@ export default function QuantityUpdateModal({
                 locationId,
                 storageSpaceId,
                 newQuantity: data.new_quantity,
-                userId: user?.id || '',
+                userId: userInfo?.id || '',
                 actionType: data.action_type,
                 notes: data.notes,
+                minQuantityOverride: data.min_quantity_override ?? null,
             });
             toast.success('Quantity updated successfully');
             onSuccess();
@@ -71,7 +84,7 @@ export default function QuantityUpdateModal({
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-                <Label htmlFor="new_quantity">New Quantity</Label>
+                <Label className='my-2' htmlFor="new_quantity">New Quantity</Label>
                 <Input
                     id="new_quantity"
                     type="number"
@@ -86,7 +99,7 @@ export default function QuantityUpdateModal({
             </div>
 
             <div>
-                <Label htmlFor="action_type">Action Type</Label>
+                <Label className='my-2' htmlFor="action_type">Action Type</Label>
                 <select
                     id="action_type"
                     {...register('action_type')}
@@ -100,12 +113,44 @@ export default function QuantityUpdateModal({
             </div>
 
             <div>
-                <Label htmlFor="notes">Notes (Optional)</Label>
+                <Label className='my-2' htmlFor="min_quantity_override">
+                    Min Quantity Override (Optional)
+                </Label>
+                <Input
+                    id="min_quantity_override"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...register('min_quantity_override', {
+                        valueAsNumber: true,
+                        setValueAs: (v) => v === '' || v === null || v === undefined ? null : Number(v)
+                    })}
+                    placeholder={itemMinQuantity ? `Default: ${itemMinQuantity}` : 'Leave empty to use item default'}
+                    className={errors.min_quantity_override ? 'border-red-500' : ''}
+                />
+                {errors.min_quantity_override && (
+                    <p className="text-sm text-red-500 mt-1">{errors.min_quantity_override.message}</p>
+                )}
+                <p className="text-xs text-zinc-500 mt-1">
+                    {itemMinQuantity && (
+                        <>Item default: {itemMinQuantity || 0}. </>
+                    )}
+                    {minQuantityOverride !== null && minQuantityOverride !== undefined
+                        ? `Override set to: ${minQuantityOverride}`
+                        : 'No override (using item default)'}
+                </p>
+            </div>
+
+            <div className='flex items-start gap-2 flex-col justify-center'>
+                <Label className='my-2' htmlFor="notes">Notes (Optional)</Label>
                 <Textarea
                     id="notes"
                     {...register('notes')}
                     rows={3}
                 />
+                <p className="text-xs text-zinc-500 mt-1 flex items-center gap-2 ">
+                    <User2 className='w-4 h-4' />: {userInfo?.first_name} | {userInfo?.email}
+                </p>
             </div>
 
             <Button

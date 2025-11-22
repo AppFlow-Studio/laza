@@ -1,6 +1,27 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Safe area padding for iOS */
+@supports (padding: max(0px)) {
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .pt-safe {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -65,7 +86,7 @@
   --card-foreground: rgb(229, 229, 229);
   --popover: rgb(38, 38, 38);
   --popover-foreground: rgb(229, 229, 229);
-  --primary:  #2C4B7E;
+  --primary: #2C4B7E;
   --primary-foreground: rgb(255, 255, 255);
   --secondary: rgb(241, 241, 241);
   --secondary-foreground: rgb(38, 38, 38);

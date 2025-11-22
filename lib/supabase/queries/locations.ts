@@ -1,3 +1,5 @@
+"use server";
+
 import { createServerSupabaseClient } from '../server';
 import { Location, StorageSpace } from '../types';
 
@@ -5,7 +7,16 @@ export async function getAllLocations() {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
         .from('locations')
-        .select('*')
+        .select(
+            `
+            *,
+            storage_spaces (id),
+            employees:users (
+                id,
+                assigned_location:locations (id)
+            )
+            `
+        )
         .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -16,7 +27,16 @@ export async function getLocationById(id: string) {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
         .from('locations')
-        .select('*')
+        .select(
+            `
+            *,
+            storage_spaces (id),
+            employees:users (
+                id,
+                assigned_location:locations (id)
+            )
+            `
+        )
         .eq('id', id)
         .single();
 
@@ -28,7 +48,16 @@ export async function getLocationWithDetails(id: string) {
     const supabase = await createServerSupabaseClient();
     const { data: location, error: locationError } = await supabase
         .from('locations')
-        .select('*')
+        .select(
+            `
+            *,
+            storage_spaces (id),
+            employees:users (
+                id,
+                assigned_location:locations (id)
+            )
+            `
+        )
         .eq('id', id)
         .single();
 
@@ -151,5 +180,29 @@ export async function deleteStorageSpace(id: string) {
         .eq('id', id);
 
     if (error) throw error;
+}
+
+export async function getStorageSpaceById(id: string) {
+    const supabase = await createServerSupabaseClient();
+    const { data: storageSpace, error: storageError } = await supabase
+        .from('storage_spaces')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+    if (storageError) throw storageError;
+
+    const { data: location, error: locationError } = await supabase
+        .from('locations')
+        .select('*')
+        .eq('id', storageSpace.location_id)
+        .single();
+
+    if (locationError) throw locationError;
+
+    return {
+        ...storageSpace,
+        location: location as Location,
+    };
 }
 
