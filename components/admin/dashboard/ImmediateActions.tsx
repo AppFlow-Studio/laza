@@ -1,15 +1,27 @@
 "use client";
 
 import { useAlerts } from '@/lib/hooks/queries/useInventory';
-import { useMemo } from 'react';
-import Link from 'next/link';
-import { AlertTriangle, Package, MapPin, Warehouse, ArrowRight } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { AlertTriangle, Package, MapPin, Warehouse } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import { motion } from 'framer-motion';
+import MobileSheet from '@/components/admin/shared/MobileSheet';
+import QuantityUpdateModal from '@/components/admin/inventory/QuantityUpdateModal';
+import EditStorageSpaceModal from '../locations/EditStorageSpaceModal';
 
 export default function ImmediateActions() {
     const { data: alerts, isLoading } = useAlerts({ resolved: false });
+    const [editingAlert, setEditingAlert] = useState<{
+        alertId: string;
+        itemId: string;
+        locationId: string;
+        storageSpaceId: string;
+        currentQuantity: number;
+        itemName: string;
+        minQuantityOverride?: number | null;
+        itemMinQuantity?: number;
+    } | null>(null);
 
     // Group alerts by location
     const groupedAlerts = useMemo(() => {
@@ -92,10 +104,21 @@ export default function ImmediateActions() {
                                     const deficit = effectiveMin - currentQty;
 
                                     return (
-                                        <Link
+                                        <div
                                             key={alert.id}
-                                            href={`/admin/locations/${locationId}/storage-spaces/${alert.storage_space_id}`}
-                                            className="block hover:bg-zinc-50 transition-colors"
+                                            onClick={() => {
+                                                setEditingAlert({
+                                                    alertId: alert.id,
+                                                    itemId: alert.item_id,
+                                                    locationId: alert.location_id,
+                                                    storageSpaceId: alert.storage_space_id || '',
+                                                    currentQuantity: currentQty,
+                                                    itemName: item?.name || 'Unknown Item',
+                                                    minQuantityOverride: alert.item_locations?.min_quantity_override ?? null,
+                                                    itemMinQuantity: item?.min_quantity,
+                                                });
+                                            }}
+                                            className="block hover:bg-zinc-50 transition-colors cursor-pointer"
                                         >
                                             <div className="px-4 py-3">
                                                 <div className="flex items-start justify-between gap-4">
@@ -120,7 +143,7 @@ export default function ImmediateActions() {
                                                                 <span className="text-zinc-500">Current: </span>
                                                                 <span className={cn(
                                                                     "font-semibold",
-                                                                    currentQty < effectiveMin ? "text-red-600" : "text-zinc-900"
+                                                                    currentQty <= effectiveMin ? "text-red-600" : "text-zinc-900"
                                                                 )}>
                                                                     {currentQty.toFixed(2)}
                                                                 </span>
@@ -140,10 +163,9 @@ export default function ImmediateActions() {
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <ArrowRight className="w-5 h-5 text-zinc-400 flex-shrink-0" />
                                                 </div>
                                             </div>
-                                        </Link>
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -151,6 +173,29 @@ export default function ImmediateActions() {
                     );
                 })}
             </div>
+
+            {/* Quantity Update Sheet */}
+            {editingAlert && (
+                <MobileSheet
+                    isOpen={!!editingAlert}
+                    onClose={() => setEditingAlert(null)}
+                    title={`Update Quantity: ${editingAlert.itemName}`}
+                    snapPoints={[0, 0.7, 0.95, 1]}
+                >
+                    <QuantityUpdateModal
+                        itemId={editingAlert.itemId}
+                        locationId={editingAlert.locationId}
+                        storageSpaceId={editingAlert.storageSpaceId}
+                        currentQuantity={editingAlert.currentQuantity}
+                        currentMinQuantityOverride={editingAlert.minQuantityOverride || null}
+                        itemMinQuantity={editingAlert.itemMinQuantity}
+                        onSuccess={() => {
+                            setEditingAlert(null);
+                            // Refetch will happen automatically via query invalidation
+                        }}
+                    />
+                </MobileSheet>
+            )}
         </div>
     );
 }

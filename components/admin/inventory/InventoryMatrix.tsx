@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Package, Snowflake, Droplets, Box } from 'lucide-react';
+import SearchBar from '@/components/admin/shared/SearchBar';
 
 interface InventoryMatrixProps {
     items: any[];
@@ -12,6 +13,19 @@ interface InventoryMatrixProps {
 }
 
 export default function InventoryMatrix({ items, storageSpaces, inventory, onCellClick }: InventoryMatrixProps) {
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Filter items based on search query
+    const filteredItems = useMemo(() => {
+        if (!searchQuery) return items;
+        const queryLower = searchQuery.toLowerCase();
+        return items.filter((item) => {
+            const name = item.name?.toLowerCase() || '';
+            const sku = item.sku?.toLowerCase() || '';
+            return name.includes(queryLower) || sku.includes(queryLower);
+        });
+    }, [items, searchQuery]);
+
     const getQuantity = (itemId: string, storageSpaceId: string | null) => {
         const inv = inventory.find(
             (i) => i.item_id === itemId && i.storage_space_id === storageSpaceId
@@ -38,70 +52,89 @@ export default function InventoryMatrix({ items, storageSpaces, inventory, onCel
     };
 
     return (
-        <div className="overflow-x-auto">
-            <div className="inline-block min-w-full">
-                <table className="w-full border-collapse">
-                    <thead>
-                        <tr>
-                            <th className=" left-0 z-10 bg-white border border-zinc-200 px-4 py-3 text-left text-sm font-semibold text-zinc-900">
-                                Item
-                            </th>
-                            {storageSpaces.map((space) => (
-                                <th
-                                    key={space.id}
-                                    className="border border-zinc-200 px-4 py-3 text-center text-sm font-semibold text-zinc-900 min-w-[120px]"
-                                >
-                                    <div className="flex items-center justify-center gap-2">
-                                        {getTemperatureIcon(space.temperature_type)}
-                                        <span className="truncate">{space.name}</span>
-                                    </div>
+        <div className="space-y-4">
+            {/* Search Bar */}
+            <div className="max-w-md">
+                <SearchBar
+                    placeholder="Search items by name or SKU..."
+                    onSearch={setSearchQuery}
+                />
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+                <div className="inline-block min-w-full">
+                    <table className="w-full border-collapse">
+                        <thead>
+                            <tr>
+                                <th className=" left-0 z-10 bg-white border border-zinc-200 px-4 py-3 text-left text-sm font-semibold text-zinc-900">
+                                    Item
                                 </th>
-                            ))}
-                            <th className="border border-zinc-200 px-4 py-3 text-center text-sm font-semibold text-zinc-900">
-                                Total
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {items.map((item) => {
-                            const total = storageSpaces.reduce(
-                                (sum, space) => sum + getQuantity(item.id, space.id),
-                                0
-                            );
-                            return (
-                                <tr key={item.id}>
-                                    <td className=" left-0 z-10 bg-white border border-zinc-200 px-4 py-3 text-sm font-medium text-zinc-900">
-                                        <div className="flex items-center gap-2">
-                                            <Package className="w-4 h-4 text-zinc-400" />
-                                            <span className="truncate">{item.name}</span>
+                                {storageSpaces.map((space) => (
+                                    <th
+                                        key={space.id}
+                                        className="border border-zinc-200 px-4 py-3 text-center text-sm font-semibold text-zinc-900 min-w-[120px]"
+                                    >
+                                        <div className="flex items-center justify-center gap-2">
+                                            {getTemperatureIcon(space.temperature_type)}
+                                            <span className="truncate">{space.name}</span>
                                         </div>
-                                        <div className="text-xs text-zinc-500 mt-1">
-                                            Min: {item.min_quantity} {item.unit_of_measure}
-                                        </div>
-                                    </td>
-                                    {storageSpaces.map((space) => {
-                                        const quantity = getQuantity(item.id, space.id);
-                                        return (
-                                            <td
-                                                key={space.id}
-                                                onClick={() => onCellClick(item.id, space.id)}
-                                                className={cn(
-                                                    "border border-zinc-200 px-4 py-3 text-center text-sm cursor-pointer transition-colors hover:bg-zinc-50",
-                                                    getStatusColor(item, quantity)
-                                                )}
-                                            >
-                                                {quantity.toFixed(2)}
-                                            </td>
-                                        );
-                                    })}
-                                    <td className="border border-zinc-200 px-4 py-3 text-center text-sm font-semibold bg-zinc-50">
-                                        {total.toFixed(2)}
+                                    </th>
+                                ))}
+                                <th className="border border-zinc-200 px-4 py-3 text-center text-sm font-semibold text-zinc-900">
+                                    Total
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredItems.length === 0 ? (
+                                <tr>
+                                    <td colSpan={storageSpaces.length + 2} className="border border-zinc-200 px-4 py-8 text-center text-zinc-500">
+                                        {searchQuery ? `No items found matching "${searchQuery}"` : 'No items available'}
                                     </td>
                                 </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                            ) : (
+                                filteredItems.map((item) => {
+                                    const total = storageSpaces.reduce(
+                                        (sum, space) => sum + getQuantity(item.id, space.id),
+                                        0
+                                    );
+                                    return (
+                                        <tr key={item.id}>
+                                            <td className=" left-0 z-10 bg-white border border-zinc-200 px-4 py-3 text-sm font-medium text-zinc-900">
+                                                <div className="flex items-center gap-2">
+                                                    <Package className="w-4 h-4 text-zinc-400" />
+                                                    <span className="truncate">{item.name}</span>
+                                                </div>
+                                                <div className="text-xs text-zinc-500 mt-1">
+                                                    Min: {item.min_quantity} {item.unit_of_measure}
+                                                </div>
+                                            </td>
+                                            {storageSpaces.map((space) => {
+                                                const quantity = getQuantity(item.id, space.id);
+                                                return (
+                                                    <td
+                                                        key={space.id}
+                                                        onClick={() => onCellClick(item.id, space.id)}
+                                                        className={cn(
+                                                            "border border-zinc-200 px-4 py-3 text-center text-sm cursor-pointer transition-colors hover:bg-zinc-50",
+                                                            getStatusColor(item, quantity)
+                                                        )}
+                                                    >
+                                                        {quantity.toFixed(2)}
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="border border-zinc-200 px-4 py-3 text-center text-sm font-semibold bg-zinc-50">
+                                                {total.toFixed(2)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
