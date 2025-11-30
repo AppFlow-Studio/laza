@@ -6,18 +6,15 @@ import { motion } from 'framer-motion';
 import { Package, AlertTriangle, Clock, Warehouse } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
-import StorageSpaceSheet from '@/components/employee/dashboard/StorageSpaceSheet';
-import { StorageSpace } from '@/lib/supabase/types';
+import { useRouter } from 'next/navigation';
 import { LoadingSkeleton, CardSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 
 export default function EmployeeDashboard() {
     const { user } = useUser();
+    const router = useRouter();
     const { data: location, isLoading: locationLoading } = useEmployeeLocation();
-    const { data: storageSpaces, isLoading: spacesLoading, refetch: refetchSpaces } = useEmployeeStorageSpaces(location?.id || null);
+    const { data: storageSpaces, isLoading: spacesLoading } = useEmployeeStorageSpaces(location?.id || null);
     const { data: stats } = useEmployeeStats(user?.id || null, location?.id || null);
-    const [selectedSpace, setSelectedSpace] = useState<StorageSpace | null>(null);
-
     if (locationLoading || spacesLoading) {
         return (
             <div className="p-4 space-y-4">
@@ -68,6 +65,9 @@ export default function EmployeeDashboard() {
         }
     };
 
+    const handleStorageSpaceClick = (spaceId: string) => {
+        router.push(`/employee/storage-spaces/${spaceId}`);
+    };
     return (
         <div className="p-4 space-y-6 pb-24">
             {/* Header */}
@@ -104,7 +104,7 @@ export default function EmployeeDashboard() {
                     <p className="text-xs opacity-90 mb-1">Items Managed</p>
                     <p className="text-2xl font-bold">{stats?.itemsManaged || 0}</p>
                 </motion.div>
-                <motion.div
+                {/* <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2 }}
@@ -113,7 +113,7 @@ export default function EmployeeDashboard() {
                     <Clock className="w-6 h-6 mb-2 opacity-90" />
                     <p className="text-xs opacity-90 mb-1">This Week</p>
                     <p className="text-2xl font-bold">{stats?.weeklyUpdates || 0}</p>
-                </motion.div>
+                </motion.div> */}
             </div>
 
             {/* Storage Spaces Grid */}
@@ -133,7 +133,7 @@ export default function EmployeeDashboard() {
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ delay: index * 0.05 }}
                                 whileTap={{ scale: 0.97 }}
-                                onClick={() => setSelectedSpace(space)}
+                                onClick={() => handleStorageSpaceClick(space.id)}
                                 className={cn(
                                     "bg-white rounded-xl p-4 border-2 border-zinc-200",
                                     "cursor-pointer transition-all",
@@ -161,17 +161,6 @@ export default function EmployeeDashboard() {
                     </div>
                 )}
             </div>
-
-            {/* Storage Space Sheet */}
-            {selectedSpace && (
-                <StorageSpaceSheet
-                    storageSpace={selectedSpace}
-                    locationId={location.id}
-                    isOpen={!!selectedSpace}
-                    onClose={() => setSelectedSpace(null)}
-                    onRefresh={refetchSpaces}
-                />
-            )}
         </div>
     );
 }

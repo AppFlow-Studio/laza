@@ -35,7 +35,7 @@ export default function Footer() {
                 boxShadow: '0px -2px 4px 0px rgba(0, 0, 0, 0.25)'
             }}
         >
-            
+
             <div className="max-w-7xl w-full mx-auto flex flex-col py-12  md:flex-row md:items-start md:justify-between gap-8 md:gap-0">
                 {/* Logo */}
                 <div className="md:flex hidden flex-col items-center md:items-start h-34 w-34 rounded-full overflow-hidden border relative aspect-square">
@@ -88,6 +88,7 @@ export default function Footer() {
                 <div className="flex gap-12">
                     <Link href="/privacy-policy" className="hover:underline">Privacy Policy</Link>
                     <Link href="/terms-conditions" className="hover:underline">Terms & Conditions</Link>
+                    <Link href="/sign-in" className="hover:underline">Employee Login</Link>
                 </div>
             </div>
         </footer>

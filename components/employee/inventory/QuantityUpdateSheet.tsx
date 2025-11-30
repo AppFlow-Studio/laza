@@ -1,112 +1,172 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useState, useEffect, useRef } from 'react';
 import { Sheet } from 'react-modal-sheet';
 import { useUser } from '@clerk/nextjs';
 import { useUpdateQuantity } from '@/lib/hooks/queries/useEmployee';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Package, ArrowUp, ArrowDown, Minus, CheckCircle2 } from 'lucide-react';
+import { Minus, Plus, X, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-
-const quantitySchema = z.object({
-    new_quantity: z.number().min(0, 'Quantity must be 0 or greater'),
-    action_type: z.enum(['count', 'adjustment', 'received', 'used']),
-    notes: z.string().max(200, 'Notes must be 200 characters or less').optional(),
-});
-
-type QuantityFormData = z.infer<typeof quantitySchema>;
+import NumericKeypad from './NumericKeypad';
 
 interface QuantityUpdateSheetProps {
+    id: string;
     item: any;
     currentQuantity: number;
     locationId: string;
     storageSpaceId: string;
+    storageSpaceName: string;
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
 }
 
+const reasonOptions = [
+    { value: 'correction', label: 'Correction (default)' },
+    { value: 'damaged', label: 'Damaged' },
+    { value: 'expired', label: 'Expired' },
+    { value: 'found', label: 'Found' },
+    { value: 'other', label: 'Other' },
+];
+
 const actionTypes = [
-    { value: 'received', label: 'Received', icon: ArrowUp, color: 'bg-green-50 text-green-600 border-green-200' },
-    { value: 'used', label: 'Used', icon: ArrowDown, color: 'bg-red-50 text-red-600 border-red-200' },
-    { value: 'adjustment', label: 'Adjustment', icon: Minus, color: 'bg-blue-50 text-blue-600 border-blue-200' },
-    { value: 'count', label: 'Count', icon: CheckCircle2, color: 'bg-purple-50 text-purple-600 border-purple-200' },
+    { value: 'count', label: 'Count' },
+    { value: 'adjustment', label: 'Adjustment' },
+    { value: 'received', label: 'Received' },
+    { value: 'used', label: 'Used' },
 ];
 
 export default function QuantityUpdateSheet({
+    id,
     item,
     currentQuantity,
     locationId,
     storageSpaceId,
+    storageSpaceName,
     isOpen,
     onClose,
     onSuccess,
 }: QuantityUpdateSheetProps) {
     const { user } = useUser();
     const updateMutation = useUpdateQuantity();
-    const [quantityChange, setQuantityChange] = useState<number>(0);
 
-    const {
-        register,
-        handleSubmit,
-        formState: { errors },
-        watch,
-        setValue,
-        reset,
-    } = useForm<QuantityFormData>({
-        resolver: zodResolver(quantitySchema),
-        defaultValues: {
-            new_quantity: currentQuantity,
-            action_type: 'count',
-            notes: '',
-        },
-    });
+    // Track original quantity (never changes)
+    const [originalQuantity, setOriginalQuantity] = useState(currentQuantity);
 
-    const newQuantity = watch('new_quantity');
-    const actionType = watch('action_type');
+    // Current quantity being edited
+    const [quantity, setQuantity] = useState<string>(currentQuantity.toString());
+    const [showKeypad, setShowKeypad] = useState(false);
+    const [reason, setReason] = useState('correction');
+    const [actionType, setActionType] = useState<'count' | 'adjustment' | 'received' | 'used'>('count');
+    const [showReasonDropdown, setShowReasonDropdown] = useState(false);
+    const [showActionDropdown, setShowActionDropdown] = useState(false);
+    const reasonDropdownRef = useRef<HTMLDivElement>(null);
+    const actionDropdownRef = useRef<HTMLDivElement>(null);
 
+    // Close dropdowns when clicking outside
     useEffect(() => {
-        if (newQuantity !== undefined && !isNaN(newQuantity)) {
-            const change = newQuantity - currentQuantity;
-            setQuantityChange(change);
-        }
-    }, [newQuantity, currentQuantity]);
+        const handleClickOutside = (event: MouseEvent) => {
+            if (reasonDropdownRef.current && !reasonDropdownRef.current.contains(event.target as Node)) {
+                setShowReasonDropdown(false);
+            }
+            if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target as Node)) {
+                setShowActionDropdown(false);
+            }
+        };
 
+        if (showReasonDropdown || showActionDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [showReasonDropdown, showActionDropdown]);
+
+    // Reset when sheet opens
     useEffect(() => {
         if (isOpen) {
-            reset({
-                new_quantity: currentQuantity,
-                action_type: 'count',
-                notes: '',
-            });
+            setQuantity(currentQuantity.toString());
+            setOriginalQuantity(currentQuantity);
+            setReason('correction');
+            setActionType('count');
+            setShowKeypad(false);
         }
-    }, [isOpen, currentQuantity, reset]);
+    }, [isOpen, currentQuantity]);
 
-    const onSubmit = async (data: QuantityFormData) => {
-        if (data.new_quantity === currentQuantity) {
-            toast.error('New quantity must be different from current quantity');
+    const numericQuantity = parseFloat(quantity) || 0;
+    const quantityChange = numericQuantity - originalQuantity;
+
+    const handleIncrement = () => {
+        const newValue = numericQuantity + 1;
+        setQuantity(newValue.toString());
+    };
+
+    const handleDecrement = () => {
+        const newValue = Math.max(0, numericQuantity - 1);
+        setQuantity(newValue.toString());
+    };
+
+    const handleKeypadInput = (char: string) => {
+        if (quantity === '0' && char !== '.') {
+            setQuantity(char);
+        } else {
+            setQuantity(quantity + char);
+        }
+    };
+
+    const handleKeypadBackspace = () => {
+        if (quantity.length > 1) {
+            setQuantity(quantity.slice(0, -1));
+        } else {
+            setQuantity('0');
+        }
+    };
+
+    const handleKeypadEnter = () => {
+        setShowKeypad(false);
+    };
+
+    const handleSave = async () => {
+        if (numericQuantity === originalQuantity) {
+            toast.error('Quantity unchanged');
+            return;
+        }
+
+        if (numericQuantity < 0) {
+            toast.error('Quantity cannot be negative');
             return;
         }
 
         try {
             await updateMutation.mutateAsync({
+                id: id,
                 itemId: item.id,
                 locationId,
                 storageSpaceId,
-                newQuantity: data.new_quantity,
+                newQuantity: numericQuantity,
                 userId: user?.id || '',
-                actionType: data.action_type,
-                notes: data.notes,
+                actionType: actionType,
+                notes: reason !== 'correction' ? `Reason: ${reasonOptions.find(r => r.value === reason)?.label}` : undefined,
             });
-            toast.success('Quantity updated successfully');
+
+            // Enhanced toast notification
+            const changeText = quantityChange > 0
+                ? `+${quantityChange.toFixed(2)}`
+                : quantityChange.toFixed(2);
+
+            toast.success(
+                <div className="space-y-1">
+                    <p className="font-semibold">{item?.name || 'Item'}</p>
+                    <p className="text-sm">
+                        {originalQuantity.toFixed(2)} → {numericQuantity.toFixed(2)} ({changeText})
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                        {actionTypes.find(a => a.value === actionType)?.label}
+                    </p>
+                </div>,
+                { duration: 4000 }
+            );
+
             onSuccess();
         } catch (error: any) {
             toast.error(error.message || 'Failed to update quantity');
@@ -114,148 +174,255 @@ export default function QuantityUpdateSheet({
     };
 
     return (
-        <Sheet isOpen={isOpen} onClose={onClose} snapPoints={[0, 0.5, 1]} initialSnap={0}>
-            <Sheet.Container>
-                <Sheet.Header />
-                <Sheet.Content>
-                    <div className="flex flex-col h-full bg-white rounded-t-2xl">
-                        <div className="px-4 pt-4 pb-3 border-b border-zinc-200 flex-shrink-0">
-                            <h2 className="text-xl font-bold text-zinc-900 mb-1">{item?.name || 'Update Quantity'}</h2>
-                            {item?.sku && (
-                                <p className="text-sm text-zinc-500">SKU: {item.sku}</p>
-                            )}
-                        </div>
+        <>
+            <Sheet isOpen={isOpen} onClose={onClose} snapPoints={[0, 0.7, 0.95, 1]} initialSnap={2} className=' z-50'>
+                <Sheet.Container className=''>
+                    <Sheet.Header />
+                    <Sheet.Content>
+                        <div className="flex flex-col h-full bg-white rounded-t-2xl">
+                            {/* Header with Cancel and Save */}
+                            <div className="px-4 pt-4 pb-3 border-b border-zinc-200 flex-shrink-0 flex items-center justify-between">
+                                <Button
+                                    variant="secondary"
+                                    onClick={onClose}
+                                    disabled={updateMutation.isPending}
+                                    className="text-zinc-600"
+                                >
+                                    <X className="w-5 h-5" /> Cancel
+                                </Button>
+                                <Button
+                                    onClick={handleSave}
+                                    disabled={updateMutation.isPending || quantityChange === 0 || numericQuantity < 0}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6"
+                                >
+                                    {updateMutation.isPending ? 'Saving...' : 'Save'}
+                                </Button>
+                            </div>
 
-                        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col min-h-0">
                             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-                                {/* Current Quantity Display */}
-                                <div className="bg-zinc-50 rounded-xl p-4 text-center">
-                                    <p className="text-sm text-zinc-600 mb-1">Current Quantity</p>
-                                    <p className="text-3xl font-bold text-zinc-900">{currentQuantity.toFixed(2)}</p>
-                                    <p className="text-sm text-zinc-500 mt-1">{item?.unit_of_measure || ''}</p>
-                                </div>
-
-                                {/* New Quantity Input */}
+                                {/* Item Name */}
                                 <div>
-                                    <Label htmlFor="new_quantity" className="mb-2">New Quantity *</Label>
-                                    <Input
-                                        id="new_quantity"
-                                        type="number"
-                                        step="0.01"
-                                        {...register('new_quantity', { valueAsNumber: true })}
-                                        className={cn(
-                                            "text-lg",
-                                            errors.new_quantity ? 'border-red-500' : ''
-                                        )}
-                                        autoFocus
-                                    />
-                                    {errors.new_quantity && (
-                                        <p className="text-sm text-red-500 mt-1">{errors.new_quantity.message}</p>
+                                    <h2 className="text-xl font-bold text-zinc-900 mb-1">
+                                        {item?.name || 'Update Quantity'}
+                                    </h2>
+                                    {item?.sku && (
+                                        <p className="text-sm text-zinc-500">SKU: {item.sku}</p>
                                     )}
                                 </div>
 
-                                {/* Quantity Change Preview */}
-                                <AnimatePresence>
-                                    {quantityChange !== 0 && (
-                                        <motion.div
-                                            initial={{ opacity: 0, scale: 0.9 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.9 }}
+                                {/* Location Indicator */}
+                                <div className="text-sm text-zinc-600">
+                                    📍 {storageSpaceName}
+                                </div>
+
+                                {/* Available Quantity Section */}
+                                <div >
+                                    <p className="text-sm text-zinc-600 mb-2">Available</p>
+
+                                    {/* Quantity Adjustment Controls */}
+                                    <div className="flex items-center gap-3 mb-2 mx-auto justify-center">
+                                        {/* Minus Button */}
+                                        <motion.button
+                                            whileTap={{ scale: 0.9 }}
+                                            onClick={handleDecrement}
+                                            disabled={updateMutation.isPending}
                                             className={cn(
-                                                "rounded-xl p-4 text-center",
-                                                quantityChange > 0
-                                                    ? "bg-green-50 border-2 border-green-200"
-                                                    : "bg-red-50 border-2 border-red-200"
+                                                "w-12 h-12 rounded-full border-2 border-zinc-300",
+                                                "bg-white flex items-center justify-center",
+                                                "hover:bg-zinc-50 active:bg-zinc-100",
+                                                "disabled:opacity-50 disabled:cursor-not-allowed",
+                                                "transition-colors"
                                             )}
                                         >
-                                            <p className="text-sm text-zinc-600 mb-1">Change</p>
-                                            <p className={cn(
-                                                "text-2xl font-bold",
-                                                quantityChange > 0 ? "text-green-600" : "text-red-600"
-                                            )}>
-                                                {quantityChange > 0 ? '+' : ''}{quantityChange.toFixed(2)}
-                                            </p>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
+                                            <Minus className="w-5 h-5 text-zinc-700" />
+                                        </motion.button>
 
-                                {/* Action Type Selector */}
-                                <div>
-                                    <Label className="mb-3 block">Action Type *</Label>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {actionTypes.map((action) => {
-                                            const Icon = action.icon;
-                                            const isSelected = actionType === action.value;
-                                            return (
-                                                <motion.button
-                                                    key={action.value}
-                                                    type="button"
-                                                    whileTap={{ scale: 0.97 }}
-                                                    onClick={() => setValue('action_type', action.value as any)}
-                                                    className={cn(
-                                                        "p-4 rounded-xl border-2 transition-all text-left",
-                                                        isSelected
-                                                            ? `${action.color} border-current`
-                                                            : "bg-white border-zinc-200 hover:border-zinc-300"
-                                                    )}
-                                                >
-                                                    <Icon className="w-5 h-5 mb-2" />
-                                                    <p className="font-semibold text-sm">{action.label}</p>
-                                                </motion.button>
-                                            );
-                                        })}
+                                        {/* Center Number Display (Tappable) */}
+                                        <motion.button
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={() => setShowKeypad(true)}
+                                            disabled={updateMutation.isPending}
+                                            className={cn(
+                                                "w-1/2 h-16 bg-white border-2 border-zinc-200 rounded-xl",
+                                                "flex items-center justify-center",
+                                                "hover:border-blue-300 active:bg-zinc-50",
+                                                "disabled:opacity-50 disabled:cursor-not-allowed",
+                                                "transition-colors"
+                                            )}
+                                        >
+                                            <span className="text-3xl font-bold text-zinc-900">
+                                                {numericQuantity.toFixed(0)}
+                                            </span>
+                                        </motion.button>
+
+                                        {/* Plus Button */}
+                                        <motion.button
+                                            whileTap={{ scale: 0.9 }}
+                                            onClick={handleIncrement}
+                                            disabled={updateMutation.isPending}
+                                            className={cn(
+                                                "w-16 h-12 rounded-xl border-2 border-blue-300",
+                                                "bg-blue-50 flex items-center justify-center",
+                                                "hover:bg-blue-100 active:bg-blue-200",
+                                                "disabled:opacity-50 disabled:cursor-not-allowed",
+                                                "transition-colors shadow-sm"
+                                            )}
+                                        >
+                                            <Plus className="w-5 h-5 text-blue-700" />
+                                        </motion.button>
                                     </div>
-                                    {errors.action_type && (
-                                        <p className="text-sm text-red-500 mt-1">{errors.action_type.message}</p>
-                                    )}
-                                </div>
 
-                                {/* Notes */}
-                                <div>
-                                    <Label htmlFor="notes" className="mb-2">Notes (Optional)</Label>
-                                    <Textarea
-                                        id="notes"
-                                        {...register('notes')}
-                                        rows={3}
-                                        placeholder="Add a note (optional)"
-                                        maxLength={200}
-                                        className={errors.notes ? 'border-red-500' : ''}
-                                    />
-                                    {errors.notes && (
-                                        <p className="text-sm text-red-500 mt-1">{errors.notes.message}</p>
-                                    )}
-                                    <p className="text-xs text-zinc-500 mt-1">
-                                        {watch('notes')?.length || 0}/200 characters
+                                    {/* Original Quantity */}
+                                    <p className="text-sm text-zinc-500 mt-2">
+                                        Original: {originalQuantity.toFixed(2)}
                                     </p>
+
+                                    {/* Edit On hand Button */}
+                                    <button
+                                        onClick={() => setShowKeypad(true)}
+                                        className="text-sm text-blue-600 mt-2 hover:underline"
+                                    >
+                                        Edit On hand
+                                    </button>
+                                </div>
+
+                                {/* Reason Field */}
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700 mb-2 block">
+                                        Reason
+                                    </label>
+                                    <div className="relative" ref={reasonDropdownRef}>
+                                        <button
+                                            onClick={() => {
+                                                setShowReasonDropdown(!showReasonDropdown);
+                                                setShowActionDropdown(false);
+                                            }}
+                                            className={cn(
+                                                "w-full px-4 py-3 bg-white border-2 border-zinc-200 rounded-xl",
+                                                "flex items-center justify-between",
+                                                "hover:border-zinc-300 transition-colors"
+                                            )}
+                                        >
+                                            <span className="text-zinc-700">
+                                                {reasonOptions.find(r => r.value === reason)?.label || 'Select reason'}
+                                            </span>
+                                            <ChevronRight className={cn(
+                                                "w-5 h-5 text-zinc-400 transition-transform",
+                                                showReasonDropdown && "rotate-90"
+                                            )} />
+                                        </button>
+
+                                        <AnimatePresence>
+                                            {showReasonDropdown && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -10 }}
+                                                    className="absolute z-10 w-full mt-2 bg-white border-2 border-zinc-200 rounded-xl shadow-lg overflow-hidden"
+                                                >
+                                                    {reasonOptions.map((option) => (
+                                                        <button
+                                                            key={option.value}
+                                                            onClick={() => {
+                                                                setReason(option.value);
+                                                                setShowReasonDropdown(false);
+                                                            }}
+                                                            className={cn(
+                                                                "w-full px-4 py-3 text-left hover:bg-zinc-50 transition-colors",
+                                                                reason === option.value && "bg-blue-50"
+                                                            )}
+                                                        >
+                                                            {option.label}
+                                                        </button>
+                                                    ))}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                </div>
+
+                                {/* Action Type Field */}
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700 mb-2 block">
+                                        Action Type
+                                    </label>
+                                    <div className="relative" ref={actionDropdownRef}>
+                                        <button
+                                            onClick={() => {
+                                                setShowActionDropdown(!showActionDropdown);
+                                                setShowReasonDropdown(false);
+                                            }}
+                                            className={cn(
+                                                "w-full px-4 py-3 bg-white border-2 border-zinc-200 rounded-xl",
+                                                "flex items-center justify-between",
+                                                "hover:border-zinc-300 transition-colors"
+                                            )}
+                                        >
+                                            <span className="text-zinc-700">
+                                                {actionTypes.find(a => a.value === actionType)?.label || 'Select action'}
+                                            </span>
+                                            <ChevronRight className={cn(
+                                                "w-5 h-5 text-zinc-400 transition-transform",
+                                                showActionDropdown && "rotate-90"
+                                            )} />
+                                        </button>
+
+                                        <AnimatePresence>
+                                            {showActionDropdown && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -10 }}
+                                                    className="absolute z-10 w-full mt-2 bg-white border-2 border-zinc-200 rounded-xl shadow-lg overflow-hidden"
+                                                >
+                                                    {actionTypes.map((option) => (
+                                                        <button
+                                                            key={option.value}
+                                                            onClick={() => {
+                                                                setActionType(option.value as any);
+                                                                setShowActionDropdown(false);
+                                                            }}
+                                                            className={cn(
+                                                                "w-full px-4 py-3 text-left hover:bg-zinc-50 transition-colors",
+                                                                actionType === option.value && "bg-blue-50"
+                                                            )}
+                                                        >
+                                                            {option.label}
+                                                        </button>
+                                                    ))}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                </div>
+
+                                {/* Summary Card */}
+                                <div className="bg-zinc-50 rounded-xl p-4 border border-zinc-200">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-zinc-600">Available</span>
+                                            <span className="text-lg font-semibold text-zinc-900">
+                                                {numericQuantity.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
+                    </Sheet.Content>
+                </Sheet.Container>
+                <Sheet.Backdrop onTap={onClose} />
+            </Sheet>
 
-                            {/* Action Buttons */}
-                            <div className="px-4 pt-4 pb-6 border-t border-zinc-200 space-y-2 flex-shrink-0">
-                                <Button
-                                    type="submit"
-                                    className="w-full"
-                                    disabled={updateMutation.isPending || quantityChange === 0}
-                                    size="lg"
-                                >
-                                    {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={onClose}
-                                    className="w-full"
-                                    disabled={updateMutation.isPending}
-                                >
-                                    Cancel
-                                </Button>
-                            </div>
-                        </form>
-                    </div>
-                </Sheet.Content>
-            </Sheet.Container>
-            <Sheet.Backdrop onTap={onClose} />
-        </Sheet>
+            {/* Numeric Keypad */}
+            <NumericKeypad
+                isOpen={showKeypad}
+                value={quantity}
+                onClose={() => setShowKeypad(false)}
+                onInput={handleKeypadInput}
+                onBackspace={handleKeypadBackspace}
+                onEnter={handleKeypadEnter}
+            />
+        </>
     );
 }
-

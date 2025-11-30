@@ -42,15 +42,15 @@ export default function Navbar() {
     const [scrolled, setScrolled] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const pathname = usePathname();
-    const { user, isLoaded } = useUser();
-    const { data: userInfo } = useUserInfo();
-    const { items } = useCartStore();
+    // const { user, isLoaded } = useUser();
+    // const { data: userInfo } = useUserInfo();
+    // const { items } = useCartStore();
 
-    // Get user role from public metadata
-    const userRole = userInfo?.role;
-    console.log('userRole', userRole);
-    const dashboardPath = userRole === 'admin' ? '/admin' : userRole === 'employee' ? '/employee' : '/sign-in';
-    const isLoggedIn = !!user && isLoaded;
+    // // Get user role from public metadata
+    // const userRole = userInfo?.role;
+    // console.log('userRole', userRole);
+    // const dashboardPath = userRole === 'admin' ? '/admin' : userRole === 'employee' ? '/employee' : '/sign-in';
+    // const isLoggedIn = !!user && isLoaded;
 
     // Determine navbar style
     const isSolidNavbar = shouldUseSolidNavbar(scrolled, pathname);
@@ -118,12 +118,9 @@ export default function Navbar() {
                         <ShoppingCart className={`${scrolled || pathname === "/menu" || pathname === "/about" || pathname == '/checkout' || pathname == '/join-us' ? "text-[#2C4B7E]" : "text-white"} w-6 h-6`} />
                         {items.length > 0 && <span className={` rounded-full w-4 h-4 flex items-center justify-center text-sm ${scrolled || pathname === "/menu" || pathname === "/about" || pathname == '/checkout' ? "bg-[#2C4B7E] text-white" : "bg-white text-[#2C4B7E]"}`}>{(items.map(item => item.quantity).reduce((acc, curr) => acc + curr, 0))}</span>}
                     </Link> */}
-                    {isLoggedIn ? (
+                    {/* {isLoggedIn ? (
                         <>
-                            {/* <div className={`flex items-center gap-2 text-sm font-medium ${scrolled || pathname === "/menu" || pathname === "/about" || pathname === "/checkout" || pathname === "/join-us" || pathname === "/privacy-policy" || pathname === "/terms-conditions" ? "text-[#2C4B7E]" : "text-white"}`}>
-                                <User className="w-4 h-4" />
-                                <span className="hidden lg:inline">Signed in as {user.firstName || user.emailAddresses[0]?.emailAddress || 'User'}</span>
-                            </div> */}
+                            
                             <Link
                                 href={dashboardPath}
                                 className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base transition-all duration-300 hover:scale-105 active:scale-95 ${isSolidNavbar
@@ -146,7 +143,7 @@ export default function Navbar() {
                             <LogIn className="w-5 h-5" />
                             Sign In
                         </Link>
-                    )}
+                    )} */}
                 </div>
 
                 {/* Sidebar overlay */}
@@ -194,7 +191,7 @@ export default function Navbar() {
                                     {items.length > 0 && <span className="rounded-full w-5 h-5 flex items-center justify-center text-xs bg-[#2C4B7E] text-white">{(items.map(item => item.quantity).reduce((acc, curr) => acc + curr, 0))}</span>}
                                     Checkout
                                 </Link> */}
-                                {isLoggedIn ? (
+                                {/* {isLoggedIn ? (
                                     <>
                                         <div className="flex items-center gap-3 text-base font-medium text-[#2C4B7E] px-2">
                                             <User className="w-5 h-5" />
@@ -218,7 +215,7 @@ export default function Navbar() {
                                         <LogIn className="w-5 h-5" />
                                         Sign In
                                     </Link>
-                                )}
+                                )} */}
                             </div>
                         </aside>
                     </>

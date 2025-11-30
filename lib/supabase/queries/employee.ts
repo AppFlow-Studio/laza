@@ -45,6 +45,18 @@ export async function getEmployeeStorageSpaces(locationId: string) {
     return data as StorageSpace[];
 }
 
+export async function getStorageSpaceById(storageSpaceId: string) {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase
+        .from('storage_spaces')
+        .select('*')
+        .eq('id', storageSpaceId)
+        .single();
+
+    if (error) throw error;
+    return data as StorageSpace;
+}
+
 export async function getStorageSpaceItems(storageSpaceId: string) {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase

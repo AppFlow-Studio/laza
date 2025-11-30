@@ -41,7 +41,7 @@ export async function updateQuantity(
     notes?: string,
     minQuantityOverride?: number | null
 ) {
-    const supabase = await createServerSupabaseClient();
+    const supabase =  createServerSupabaseClient();
 
     // Get current quantity
     const { data: current } = await supabase

@@ -29,6 +29,7 @@ export default function StorageSpaceSheet({
     onClose,
     onRefresh,
 }: StorageSpaceSheetProps) {
+    console.log(isOpen);
     const [activeTab, setActiveTab] = useState<'items' | 'logs'>('items');
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 300);
@@ -58,11 +59,11 @@ export default function StorageSpaceSheet({
     };
 
     return (
-        <Sheet isOpen={isOpen} onClose={onClose} snapPoints={[0, 0.45, 0.75, 0.95, 1]} initialSnap={0}>
+        <Sheet isOpen={isOpen} onClose={onClose} snapPoints={[0, 0.45, 0.75, 0.95, 1]} initialSnap={3}>
             <Sheet.Container>
                 <Sheet.Header />
                 <Sheet.Content>
-                    <div className="flex flex-col h-full bg-white rounded-t-2xl">
+                    <div className="flex flex-col h-full bg-white rounded-t-2xl ">
                         {/* Header */}
                         <div className="px-4 pt-4 pb-3 border-b border-zinc-200 flex-shrink-0">
                             <div className="flex items-start justify-between mb-2">

@@ -5,6 +5,7 @@ import { useUser } from '@clerk/nextjs';
 import {
     getEmployeeLocation,
     getEmployeeStorageSpaces,
+    getStorageSpaceById,
     getStorageSpaceItems,
     getEmployeeInventoryLogs,
     getStorageSpaceLogs,
@@ -28,6 +29,15 @@ export function useEmployeeStorageSpaces(locationId: string | null) {
         queryFn: () => getEmployeeStorageSpaces(locationId!),
         enabled: !!locationId,
         staleTime: 30 * 1000, // 30 seconds
+    });
+}
+
+export function useStorageSpace(storageSpaceId: string | null) {
+    return useQuery({
+        queryKey: ['employee-storage-space', storageSpaceId],
+        queryFn: () => getStorageSpaceById(storageSpaceId!),
+        enabled: !!storageSpaceId,
+        staleTime: 5 * 60 * 1000, // 5 minutes
     });
 }
 
@@ -71,6 +81,7 @@ export function useUpdateQuantity() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({
+            id,
             itemId,
             locationId,
             storageSpaceId,
@@ -80,6 +91,7 @@ export function useUpdateQuantity() {
             notes,
             minQuantityOverride,
         }: {
+            id: string;
             itemId: string;
             locationId: string;
             storageSpaceId: string | null;

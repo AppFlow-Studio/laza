@@ -10,7 +10,8 @@ import {
     BarChart3,
     Bell,
     LogOut,
-    Home
+    Home,
+    Tags
 } from 'lucide-react';
 import Link from 'next/link';
 import { SignOutButton } from '@clerk/nextjs';
@@ -37,6 +38,7 @@ const navigation = [
     { name: 'Locations', href: '/admin/locations', icon: MapPin },
     { name: 'Users', href: '/admin/users', icon: Users },
     { name: 'Items', href: '/admin/items', icon: Package },
+    { name: 'Categories', href: '/admin/categories', icon: Tags },
     { name: 'Inventory', href: '/admin/inventory', icon: BarChart3 },
 ];
 
