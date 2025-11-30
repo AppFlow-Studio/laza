@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Sheet } from 'react-modal-sheet';
 import { useUser } from '@clerk/nextjs';
 import { useUpdateQuantity } from '@/lib/hooks/queries/useEmployee';
+import { useCheckUpdateAllowed } from '@/lib/hooks/queries/useUpdateLimits';
 import { Button } from '@/components/ui/button';
-import { Minus, Plus, X, ChevronRight } from 'lucide-react';
+import { Minus, Plus, X, ChevronRight, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -52,7 +53,16 @@ export default function QuantityUpdateSheet({
     const { user } = useUser();
     const updateMutation = useUpdateQuantity();
 
+    // Check update limits
+    const { data: limitCheck, isLoading: limitCheckLoading } = useCheckUpdateAllowed(
+        item?.id || null,
+        locationId || null,
+        storageSpaceId || null,
+        user?.id || null
+    );
+
     // Track original quantity (never changes)
+
     const [originalQuantity, setOriginalQuantity] = useState(currentQuantity);
 
     // Current quantity being edited
@@ -137,6 +147,16 @@ export default function QuantityUpdateSheet({
             return;
         }
 
+        // Check if update is allowed
+        if (limitCheck && !limitCheck.allowed) {
+            toast.error(
+                limitCheck.reason === 'limit_reached'
+                    ? `Update limit reached. This item has been updated ${limitCheck.currentCount}/${limitCheck.limit} updates for this item today. Please contact an admin to override.`
+                    : 'Update not allowed. Please contact an admin.'
+            );
+            return;
+        }
+
         try {
             await updateMutation.mutateAsync({
                 id: id,
@@ -192,8 +212,14 @@ export default function QuantityUpdateSheet({
                                 </Button>
                                 <Button
                                     onClick={handleSave}
-                                    disabled={updateMutation.isPending || quantityChange === 0 || numericQuantity < 0}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6"
+                                    disabled={
+                                        updateMutation.isPending ||
+                                        quantityChange === 0 ||
+                                        numericQuantity < 0 ||
+                                        (limitCheck && !limitCheck.allowed) ||
+                                        limitCheckLoading
+                                    }
+                                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {updateMutation.isPending ? 'Saving...' : 'Save'}
                                 </Button>
@@ -214,6 +240,51 @@ export default function QuantityUpdateSheet({
                                 <div className="text-sm text-zinc-600">
                                     📍 {storageSpaceName}
                                 </div>
+
+                                {/* Update Limit Status */}
+                                {!limitCheckLoading && limitCheck && (
+                                    <div className={cn(
+                                        "p-3 rounded-lg border-2",
+                                        limitCheck.allowed
+                                            ? limitCheck.remaining !== undefined && limitCheck.remaining <= 1
+                                                ? "bg-amber-50 border-amber-200"
+                                                : "bg-blue-50 border-blue-200"
+                                            : "bg-red-50 border-red-200"
+                                    )}>
+                                        {limitCheck.allowed ? (
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-medium text-zinc-900">
+                                                        Update Limit Status
+                                                    </p>
+                                                    <p className="text-xs text-zinc-600 mt-0.5">
+                                                        {limitCheck.remaining !== undefined && limitCheck.limit !== undefined
+                                                            ? `${limitCheck.remaining} of ${limitCheck.limit} updates remaining today`
+                                                            : 'No limit configured'}
+                                                    </p>
+                                                </div>
+                                                {limitCheck.remaining !== undefined && limitCheck.remaining <= 1 && (
+                                                    <AlertCircle className="w-5 h-5 text-amber-600" />
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-start gap-2">
+                                                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-semibold text-red-900">
+                                                        Update Limit Reached
+                                                    </p>
+                                                    <p className="text-xs text-red-700 mt-1">
+                                                        There was {limitCheck.currentCount}/{limitCheck.limit} updates for this item today.
+                                                    </p>
+                                                    <p className="text-xs text-red-600 mt-1">
+                                                        Please contact an admin to override this limit.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Available Quantity Section */}
                                 <div >

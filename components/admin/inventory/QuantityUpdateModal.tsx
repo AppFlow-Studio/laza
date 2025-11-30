@@ -19,6 +19,8 @@ const quantitySchema = z.object({
     action_type: z.enum(['count', 'adjustment', 'received', 'used']),
     notes: z.string().optional(),
     min_quantity_override: z.number().optional().nullable(),
+    is_override: z.boolean().optional(),
+    override_reason: z.string().optional(),
 });
 
 type QuantityFormData = z.infer<typeof quantitySchema>;
@@ -56,11 +58,14 @@ export default function QuantityUpdateModal({
             action_type: 'count',
             notes: '',
             min_quantity_override: currentMinQuantityOverride || null,
+            is_override: false,
+            override_reason: '',
         },
     });
 
 
     const minQuantityOverride = watch('min_quantity_override');
+    const isOverride = watch('is_override');
 
     const onSubmit = async (data: QuantityFormData) => {
         try {
@@ -73,8 +78,15 @@ export default function QuantityUpdateModal({
                 actionType: data.action_type,
                 notes: data.notes,
                 minQuantityOverride: data.min_quantity_override ?? null,
+                isOverride: data.is_override || false,
+                overrideReason: data.override_reason || null,
+                overrideAdminId: data.is_override ? userInfo?.id || '' : null,
             });
-            toast.success('Quantity updated successfully');
+            toast.success(
+                data.is_override
+                    ? 'Quantity updated with admin override'
+                    : 'Quantity updated successfully'
+            );
             onSuccess();
         } catch (error: any) {
             toast.error(error.message || 'Failed to update quantity');
@@ -151,6 +163,37 @@ export default function QuantityUpdateModal({
                 <p className="text-xs text-zinc-500 mt-1 flex items-center gap-2 ">
                     <User2 className='w-4 h-4' />: {userInfo?.first_name} | {userInfo?.email}
                 </p>
+            </div>
+
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <input
+                    type="checkbox"
+                    id="is_override"
+                    {...register('is_override')}
+                    className="mt-1"
+                />
+                <div className="flex-1">
+                    <Label htmlFor="is_override" className="font-medium text-amber-900">
+                        Override Update Limit
+                    </Label>
+                    <p className="text-xs text-amber-700 mt-1">
+                        Check this to bypass employee update limits. This action will be logged for audit purposes.
+                    </p>
+                    {isOverride && (
+                        <div className="mt-2">
+                            <Label htmlFor="override_reason" className="text-sm">
+                                Override Reason (Optional)
+                            </Label>
+                            <Textarea
+                                id="override_reason"
+                                {...register('override_reason')}
+                                rows={2}
+                                placeholder="Explain why you're overriding the limit..."
+                                className="mt-1"
+                            />
+                        </div>
+                    )}
+                </div>
             </div>
 
             <Button

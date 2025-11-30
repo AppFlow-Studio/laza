@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useParams } from 'next/navigation';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
 import StorageSetupWizard from '@/components/admin/locations/StorageSetupWizard';
+import UpdateLimitsManager from '@/components/admin/locations/UpdateLimitsManager';
 import { StorageSpace } from '@/lib/supabase/types';
 import SearchBar from '@/components/admin/shared/SearchBar';
 
@@ -170,6 +171,12 @@ export default function LocationDetailPage() {
                     )}
                 </div>
             </div>
+
+            {/* Update Limits Section */}
+            <UpdateLimitsManager
+                locationId={locationId}
+                storageSpaces={location.storage_spaces || []}
+            />
 
             {/* Storage Setup Wizard */}
             <MobileSheet

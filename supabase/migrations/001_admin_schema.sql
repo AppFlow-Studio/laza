@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Organizations table
 CREATE TABLE IF NOT EXISTS organizations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS storage_spaces (
 
 -- Items table
 CREATE TABLE IF NOT EXISTS items (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id bigint PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   sku TEXT UNIQUE,
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS items (
 -- Item locations junction table
 CREATE TABLE IF NOT EXISTS item_locations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  item_id UUID REFERENCES items(id) ON DELETE CASCADE,
+  item_id bigint REFERENCES items(id) ON DELETE CASCADE,
   location_id UUID REFERENCES locations(id) ON DELETE CASCADE,
   storage_space_id UUID REFERENCES storage_spaces(id) ON DELETE SET NULL,
   current_quantity NUMERIC(10, 2) DEFAULT 0,
@@ -64,7 +64,7 @@ ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 -- Inventory logs table
 CREATE TABLE IF NOT EXISTS inventory_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  item_id UUID REFERENCES items(id) ON DELETE CASCADE,
+  item_id bigint REFERENCES items(id) ON DELETE CASCADE,
   location_id UUID REFERENCES locations(id) ON DELETE CASCADE,
   storage_space_id UUID REFERENCES storage_spaces(id) ON DELETE SET NULL,
   user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS inventory_logs (
 -- Alerts table
 CREATE TABLE IF NOT EXISTS alerts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  item_id UUID REFERENCES items(id) ON DELETE CASCADE,
+  item_id bigint REFERENCES items(id) ON DELETE CASCADE,
   location_id UUID REFERENCES locations(id) ON DELETE CASCADE,
   alert_type TEXT NOT NULL CHECK (alert_type IN ('low_stock')),
   triggered_at TIMESTAMPTZ DEFAULT NOW(),

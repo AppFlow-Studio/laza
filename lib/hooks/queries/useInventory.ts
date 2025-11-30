@@ -56,6 +56,9 @@ export function useUpdateQuantity() {
             actionType,
             notes,
             minQuantityOverride,
+            isOverride,
+            overrideReason,
+            overrideAdminId,
         }: {
             itemId: string;
             locationId: string;
@@ -65,7 +68,22 @@ export function useUpdateQuantity() {
             actionType: 'count' | 'adjustment' | 'received' | 'used';
             notes?: string;
             minQuantityOverride?: number | null;
-        }) => updateQuantity(itemId, locationId, storageSpaceId, newQuantity, userId, actionType, notes, minQuantityOverride),
+            isOverride?: boolean;
+            overrideReason?: string | null;
+            overrideAdminId?: string | null;
+        }) => updateQuantity(
+            itemId,
+            locationId,
+            storageSpaceId,
+            newQuantity,
+            userId,
+            actionType,
+            notes,
+            minQuantityOverride,
+            isOverride,
+            overrideReason,
+            overrideAdminId
+        ),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['inventory'] });
             queryClient.invalidateQueries({ queryKey: ['inventory-logs'] });

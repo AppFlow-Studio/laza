@@ -11,7 +11,8 @@ import {
     Bell,
     LogOut,
     Home,
-    Tags
+    Tags,
+    Settings
 } from 'lucide-react';
 import Link from 'next/link';
 import { SignOutButton } from '@clerk/nextjs';
@@ -40,6 +41,7 @@ const navigation = [
     { name: 'Items', href: '/admin/items', icon: Package },
     { name: 'Categories', href: '/admin/categories', icon: Tags },
     { name: 'Inventory', href: '/admin/inventory', icon: BarChart3 },
+    { name: 'Settings', href: '/admin/settings/notifications', icon: Settings },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

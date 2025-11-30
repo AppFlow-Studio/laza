@@ -2,6 +2,7 @@
 
 import { createServerSupabaseClient } from '../server';
 import { ItemLocation, InventoryLog, Alert } from '../types';
+import { checkUpdateAllowed, createOverrideLog } from './updateLimits';
 
 export async function getInventoryByLocation(locationId: string) {
     const supabase = await createServerSupabaseClient();
@@ -39,11 +40,25 @@ export async function updateQuantity(
     userId: string,
     actionType: 'count' | 'adjustment' | 'received' | 'used',
     notes?: string,
-    minQuantityOverride?: number | null
+    minQuantityOverride?: number | null,
+    isOverride?: boolean,
+    overrideReason?: string | null,
+    overrideAdminId?: string | null
 ) {
-    const supabase =  createServerSupabaseClient();
+    const supabase = createServerSupabaseClient();
+
+    // Check update limits (unless this is an admin override)
+    if (!isOverride) {
+        const limitCheck = await checkUpdateAllowed(itemId, locationId, storageSpaceId, userId);
+        if (!limitCheck.allowed) {
+            throw new Error(
+                `Update limit reached. You have used ${limitCheck.currentCount}/${limitCheck.limit} updates for this item today. Please contact an admin to override.`
+            );
+        }
+    }
 
     // Get current quantity
+    console.log(itemId, locationId, storageSpaceId)
     const { data: current } = await supabase
         .from('item_locations')
         .select('current_quantity')
@@ -80,7 +95,7 @@ export async function updateQuantity(
     if (upsertError) throw upsertError;
 
     // Create inventory log
-    const { error: logError } = await supabase
+    const { data: inventoryLog, error: logError } = await supabase
         .from('inventory_logs')
         .insert({
             item_id: itemId,
@@ -92,9 +107,47 @@ export async function updateQuantity(
             quantity_change: quantityChange,
             action_type: actionType,
             notes: notes || null,
-        });
+        })
+        .select()
+        .single();
 
     if (logError) throw logError;
+
+    // If this was an admin override, log it
+    if (isOverride && overrideAdminId && inventoryLog) {
+        await createOverrideLog({
+            inventory_log_id: inventoryLog.id,
+            item_id: itemId,
+            location_id: locationId,
+            storage_space_id: storageSpaceId,
+            admin_user_id: overrideAdminId,
+            employee_user_id: userId !== overrideAdminId ? userId : null,
+            override_reason: overrideReason || null,
+        });
+    }
+
+    // Process low stock notifications asynchronously
+    // The database trigger will create alerts, and we process notifications here
+    try {
+        // Get organization_id from location
+        const { data: location } = await supabase
+            .from('locations')
+            .select('organization_id')
+            .eq('id', locationId)
+            .single();
+
+        if (location?.organization_id) {
+            // Import and call the notification processor
+            const { processLowStockNotifications } = await import('@/app/actions/process-notifications');
+            // Process in background (don't await to avoid blocking)
+            processLowStockNotifications(location.organization_id).catch((err) => {
+                console.error('Error processing notifications:', err);
+            });
+        }
+    } catch (error) {
+        // Don't fail the inventory update if notification processing fails
+        console.error('Error triggering notification processing:', error);
+    }
 
     return itemLocation as ItemLocation;
 }
@@ -332,9 +385,32 @@ export async function bulkUpdateInventory(
         actionType: 'count' | 'adjustment' | 'received' | 'used';
         notes?: string;
     }>,
-    userId: string
+    userId: string,
+    isOverride?: boolean
 ) {
     const supabase = await createServerSupabaseClient();
+
+    // Check limits for each item (unless override)
+    const limitErrors: string[] = [];
+    if (!isOverride) {
+        for (const itemLoc of itemLocations) {
+            const limitCheck = await checkUpdateAllowed(
+                itemLoc.itemId,
+                itemLoc.locationId,
+                itemLoc.storageSpaceId,
+                userId
+            );
+            if (!limitCheck.allowed) {
+                limitErrors.push(
+                    `Item ${itemLoc.itemId}: Update limit reached (${limitCheck.currentCount}/${limitCheck.limit} updates used)`
+                );
+            }
+        }
+
+        if (limitErrors.length > 0) {
+            throw new Error(`Update limits exceeded:\n${limitErrors.join('\n')}`);
+        }
+    }
 
     // Process each item location update
     const updates = [];
