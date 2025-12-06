@@ -50,14 +50,15 @@ export interface DailySummaryPreferences {
     summary_format: 'detailed' | 'concise';
     group_by_location: boolean;
     locations_to_include: string[];
+    show_matrix_only_with_stock: boolean;
     created_at: string;
     updated_at: string;
 }
 
 // Get notification preferences
 export async function getNotificationPreferences(organizationId: string): Promise<NotificationPreferences | null> {
-    const supabase =  createServerSupabaseClient();
-    
+    const supabase = createServerSupabaseClient();
+
     const { data, error } = await supabase
         .from('notification_preferences')
         .select('*')
@@ -70,7 +71,7 @@ export async function getNotificationPreferences(organizationId: string): Promis
         throw error;
     }
 
-    console.log(data, 'Get Notification Preferences: data')
+    // console.log(data, 'Get Notification Preferences: data')
 
     return data as NotificationPreferences;
 }
@@ -255,6 +256,7 @@ export async function updateDailySummaryPreferences(
                 summary_format: updates.summary_format || 'detailed',
                 group_by_location: updates.group_by_location ?? false,
                 locations_to_include: updates.locations_to_include || [],
+                show_matrix_only_with_stock: updates.show_matrix_only_with_stock ?? false,
             })
             .select()
             .single();

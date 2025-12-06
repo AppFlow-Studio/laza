@@ -151,137 +151,144 @@ Deno.serve(async (req) => {
     hour12: true,
   })
 
+  // Build URLs with item and location context
+  const baseUrl = 'https://lazadessert.cafe'
+  const viewItemUrl = `${baseUrl}/admin`
+  // const updateInventoryUrl = `${viewItemUrl}&action=update`
+  const notificationSettingsUrl = `${baseUrl}/admin/settings/notifications`
+
   const html = `
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html dir="ltr" lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preload" as="image" href="https://lazadessert.cafe/lazabluelogo.png"/>
+  <meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/>
+  <meta name="x-apple-disable-message-reformatting"/>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f5; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-          
-          <!-- Header with Logo -->
-          <tr>
-            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 32px 40px; text-align: center;">
-              <img src="https://lazadessert.cafe/lazabluelogo.png" alt="Laza" style="height: 50px; margin-bottom: 16px;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Inventory Alert</h1>
-            </td>
-          </tr>
-          
-          <!-- Urgency Badge -->
-          <tr>
-            <td style="padding: 24px 40px 0 40px;">
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="background-color: ${urgencyBgColor}; border-left: 4px solid ${urgencyColor}; padding: 16px 20px; border-radius: 8px;">
-                    <span style="font-size: 28px; vertical-align: middle;">${urgencyEmoji}</span>
-                    <span style="color: ${urgencyColor}; font-size: 18px; font-weight: 700; margin-left: 12px; vertical-align: middle;">${urgencyLabel}</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          
-          <!-- Item Details Card -->
-          <tr>
-            <td style="padding: 24px 40px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; border-radius: 12px; overflow: hidden;">
-                <tr>
-                  <td style="padding: 20px;">
-                    <h2 style="margin: 0 0 4px 0; color: #0f172a; font-size: 20px; font-weight: 600;">${itemName}</h2>
-                    ${alert.items?.sku ? `<p style="margin: 0; color: #64748b; font-size: 14px;">SKU: ${alert.items.sku}</p>` : ''}
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 0 20px 20px 20px;">
-                    <table width="100%" cellpadding="0" cellspacing="0">
+<body style="background-color:#f5f7fa">
+  <!-- Preview Text -->
+  <div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0">
+    ${urgencyLabel}: ${itemName} at ${locationName}${storageName ? ` (${storageName})` : ''} - Current: ${current_quantity}, Threshold: ${min_quantity}
+  </div>
+  
+  <table border="0" width="100%" cellpadding="0" cellspacing="0" role="presentation" align="center">
+    <tbody>
+      <tr>
+        <td style="background-color:#f5f7fa;font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;margin:0 auto;padding:20px">
+          <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;background-color:#ffffff;border-radius:8px;margin:0 auto;padding:0">
+            <tbody>
+              <tr style="width:100%">
+                <td>
+                  <!-- Header -->
+                  <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#1e40af;border-radius:8px 8px 0 0;padding:30px 20px;text-align:center">
+                    <tbody>
                       <tr>
-                        <td style="padding: 8px 0;">
-                          <span style="color: #64748b; font-size: 14px;">📍 Location</span><br>
-                          <span style="color: #0f172a; font-size: 16px; font-weight: 500;">${locationName}</span>
+                        <td>
+                          <img alt="Laza Dessert Cafe" height="auto" src="https://lazadessert.cafe/lazabluelogo.png" style="display:block;outline:none;border:none;text-decoration:none;margin:0 auto 20px" width="130"/>
+                          <h1 style="color:#ffffff;font-size:24px;font-weight:bold;margin:0 0 10px;text-align:center">${urgencyEmoji} ${urgencyLabel}</h1>
+                          <p style="font-size:16px;line-height:24px;color:#e0e7ff;margin:0;text-align:center">Action required for ${itemName}</p>
                         </td>
                       </tr>
-                      ${storageName ? `
+                    </tbody>
+                  </table>
+                  
+                  <!-- Content -->
+                  <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="padding:30px 20px">
+                    <tbody>
                       <tr>
-                        <td style="padding: 8px 0;">
-                          <span style="color: #64748b; font-size: 14px;">🗄️ Storage Space</span><br>
-                          <span style="color: #0f172a; font-size: 16px; font-weight: 500;">${storageName}</span>
+                        <td>
+                          <!-- Item Details Card -->
+                          <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="border:2px solid ${urgencyColor};border-radius:8px;padding:20px;margin-bottom:20px">
+                            <tbody>
+                              <tr>
+                                <td>
+                                  <h1 style="font-size:20px;font-weight:bold;margin:0 0 15px;color:#1f2937">${itemName}</h1>
+                                  <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 15px">
+                                    <strong>Location:</strong> ${locationName}<br/>
+                                    ${storageName ? `<strong>Storage:</strong> ${storageName}` : ''}
+                                  </p>
+                                  
+                                  <hr style="width:100%;border:none;border-top:1px solid #e5e7eb;margin:15px 0"/>
+                                  
+                                  <!-- Quantity Stats -->
+                                  <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation">
+                                    <tbody style="width:100%">
+                                      <tr style="width:100%">
+                                        <td style="padding:10px;text-align:center">
+                                          <p style="font-size:12px;line-height:24px;color:#6b7280;margin:0 0 5px;text-transform:uppercase;letter-spacing:0.5px">Current Qty</p>
+                                          <p style="font-size:24px;line-height:28px;font-weight:bold;color:${current_quantity <= 0 ? '#dc2626' : current_quantity <= min_quantity ? '#d97706' : '#16a34a'};margin:0">${current_quantity}</p>
+                                        </td>
+                                        <td style="padding:10px;text-align:center">
+                                          <p style="font-size:12px;line-height:24px;color:#6b7280;margin:0 0 5px;text-transform:uppercase;letter-spacing:0.5px">Threshold</p>
+                                          <p style="font-size:24px;line-height:28px;font-weight:bold;color:#1f2937;margin:0">${min_quantity}</p>
+                                        </td>
+                                        <td style="padding:10px;text-align:center">
+                                          <p style="font-size:12px;line-height:24px;color:#6b7280;margin:0 0 5px;text-transform:uppercase;letter-spacing:0.5px">Change</p>
+                                          <p style="font-size:24px;line-height:28px;font-weight:bold;color:${quantityChange > 0 ? '#dc2626' : quantityChange < 0 ? '#16a34a' : '#6b7280'};margin:0">${changeText}</p>
+                                        </td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                          
+                          <!-- Action Buttons -->
+                          <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin:30px 0;text-align:center">
+                            <tbody>
+                              <tr>
+                                <td>
+                                  <a href="${viewItemUrl}" style="line-height:100%;text-decoration:none;display:inline-block;background-color:#1e40af;border-radius:6px;color:#ffffff;font-size:16px;font-weight:bold;text-align:center;padding:12px 24px;margin:0 10px 10px 0" target="_blank">
+                                    View Item in App
+                                  </a>
+                                
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                          
+                          <!-- Alert Details Footer -->
+                          <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f9fafb;border-radius:6px;padding:15px;margin-top:20px">
+                            <tbody>
+                              <tr>
+                                <td>
+                                  <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0">
+                                    ${alert.items?.sku ? `<strong>SKU:</strong> ${alert.items.sku}<br/>` : ''}
+                                    <strong>Previous Qty:</strong> ${previous_quantity ?? 'N/A'}<br/>
+                                    <strong>Alert Triggered:</strong> ${triggeredDate}<br/>
+                                    <strong>Alert ID:</strong> <span style="font-size:12px;color:#9ca3af">${alert_id}</span>
+                                  </p>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </td>
                       </tr>
-                      ` : ''}
-                    </table>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          
-          <!-- Quantity Stats -->
-          <tr>
-            <td style="padding: 0 40px 24px 40px;">
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <!-- Current Quantity -->
-                  <td width="33%" style="text-align: center; padding: 16px; background-color: ${current_quantity <= 0 ? '#fef2f2' : current_quantity <= min_quantity ? '#fffbeb' : '#f0fdf4'}; border-radius: 12px;">
-                    <p style="margin: 0 0 4px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Current</p>
-                    <p style="margin: 0; color: ${current_quantity <= 0 ? '#dc2626' : current_quantity <= min_quantity ? '#d97706' : '#16a34a'}; font-size: 28px; font-weight: 700;">${current_quantity}</p>
-                  </td>
-                  <td width="4%"></td>
-                  <!-- Min Threshold -->
-                  <td width="33%" style="text-align: center; padding: 16px; background-color: #f1f5f9; border-radius: 12px;">
-                    <p style="margin: 0 0 4px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Threshold</p>
-                    <p style="margin: 0; color: #475569; font-size: 28px; font-weight: 700;">${min_quantity}</p>
-                  </td>
-                  <td width="4%"></td>
-                  <!-- Change -->
-                  <td width="33%" style="text-align: center; padding: 16px; background-color: #f1f5f9; border-radius: 12px;">
-                    <p style="margin: 0 0 4px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Change</p>
-                    <p style="margin: 0; color: ${quantityChange > 0 ? '#dc2626' : '#16a34a'}; font-size: 28px; font-weight: 700;">${changeText}</p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          
-          <!-- Action Button -->
-          <tr>
-            <td style="padding: 0 40px 32px 40px; text-align: center;">
-              <a href="https://laza.app/admin/inventory" style="display: inline-block; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600;">
-                View Inventory →
-              </a>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="color: #94a3b8; font-size: 12px;">
-                    <p style="margin: 0 0 4px 0;">Alert triggered: ${triggeredDate}</p>
-                    <p style="margin: 0;">Alert ID: ${alert_id}</p>
-                  </td>
-                  <td style="text-align: right;">
-                    <img src="https://lazadessert.cafe/lazabluelogo.png" alt="Laza" style="height: 24px; opacity: 0.5;">
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          
-        </table>
-        
-        <!-- Unsubscribe Link -->
-        <p style="margin: 24px 0 0 0; color: #94a3b8; font-size: 12px; text-align: center;">
-          You're receiving this because you have low stock alerts enabled.<br>
-          <a href="https://laza.app/admin/settings/notifications" style="color: #3b82f6; text-decoration: underline;">Manage notification preferences</a>
-        </p>
-      </td>
-    </tr>
+                    </tbody>
+                  </table>
+                  
+                  <!-- Footer -->
+                  <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="padding:20px;text-align:center;border-top:1px solid #e5e7eb">
+                    <tbody>
+                      <tr>
+                        <td>
+                          <p style="font-size:12px;line-height:24px;color:#6b7280;margin:0 0 10px">This is an automated alert from your Laza inventory management system.</p>
+                          <p style="font-size:12px;line-height:24px;color:#9ca3af;margin:0">
+                            <a href="${notificationSettingsUrl}" style="color:#3b82f6;text-decoration:underline">Manage notification preferences</a>
+                          </p>
+                          <p style="font-size:12px;line-height:24px;color:#9ca3af;margin:10px 0 0">Laza Dessert Cafe - Inventory Management</p>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </td>
+      </tr>
+    </tbody>
   </table>
 </body>
 </html>
