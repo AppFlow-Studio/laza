@@ -126,29 +126,6 @@ export async function updateQuantity(
         });
     }
 
-    // Process low stock notifications asynchronously
-    // The database trigger will create alerts, and we process notifications here
-    try {
-        // Get organization_id from location
-        const { data: location } = await supabase
-            .from('locations')
-            .select('organization_id')
-            .eq('id', locationId)
-            .single();
-
-        if (location?.organization_id) {
-            // Import and call the notification processor
-            const { processLowStockNotifications } = await import('@/app/actions/process-notifications');
-            // Process in background (don't await to avoid blocking)
-            processLowStockNotifications(location.organization_id).catch((err) => {
-                console.error('Error processing notifications:', err);
-            });
-        }
-    } catch (error) {
-        // Don't fail the inventory update if notification processing fails
-        console.error('Error triggering notification processing:', error);
-    }
-
     return itemLocation as ItemLocation;
 }
 

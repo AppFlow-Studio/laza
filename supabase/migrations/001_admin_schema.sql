@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Organizations table
 CREATE TABLE IF NOT EXISTS organizations (
-  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS items (
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   sku TEXT UNIQUE,
-  category TEXT NOT NULL CHECK (category IN ('desserts', 'ingredients', 'supplies')),
+  category_id bigint REFERENCES category(id) ON DELETE CASCADE,
   unit_of_measure TEXT NOT NULL CHECK (unit_of_measure IN ('pcs', 'kg', 'liters', 'lbs', 'oz')),
   min_quantity NUMERIC(10, 2) DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS inventory_logs (
 
 -- Alerts table
 CREATE TABLE IF NOT EXISTS alerts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id bigint PRIMARY KEY DEFAULT uuid_generate_v4(),
   item_id bigint REFERENCES items(id) ON DELETE CASCADE,
   location_id UUID REFERENCES locations(id) ON DELETE CASCADE,
   alert_type TEXT NOT NULL CHECK (alert_type IN ('low_stock')),

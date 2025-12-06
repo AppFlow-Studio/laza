@@ -143,7 +143,7 @@ export default function CategoriesPage() {
                     isOpen={!!editingCategory}
                     onClose={() => setEditingCategory(null)}
                     title="Edit Category"
-                    snapPoints={[0, 0.5, 0.7]}
+                    snapPoints={[0, 0.5, 0.7, 1]}
                 >
                     <CategoryForm
                         initialData={{

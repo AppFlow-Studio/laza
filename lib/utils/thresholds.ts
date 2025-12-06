@@ -8,24 +8,25 @@ export type UrgencyLevel = 'low' | 'critical' | 'out_of_stock';
 export interface EffectiveThreshold {
     lowThreshold: number;
     criticalThreshold: number | null;
-    source: 'item' | 'category' | 'location' | 'default';
+    source: 'item' | 'category' | 'location' | 'storage_override' | 'default';
 }
 
 /**
- * Get the effective threshold for an item at a specific location
- * Priority: item-specific > category-specific > location-specific > default (item.min_quantity)
+ * Get the effective threshold for an item at a specific location and storage space
+ * Priority: item-specific > category-specific > location-specific > min_quantity_override > default (item.min_quantity)
  */
 export async function getEffectiveThreshold(
-    itemId: string,
+    itemId: number,
     locationId: string,
+    storageSpaceId: string,
     organizationId: string
 ): Promise<EffectiveThreshold> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServerSupabaseClient();
 
     // Get item details for default threshold
     const { data: item } = await supabase
         .from('items')
-        .select('min_quantity, category')
+        .select('min_quantity, category_id')
         .eq('id', itemId)
         .single();
 
@@ -34,6 +35,15 @@ export async function getEffectiveThreshold(
     }
 
     const defaultThreshold = item.min_quantity || 0;
+
+    // Get storage-space-specific min_quantity_override from item_locations
+    const { data: itemLocation } = await supabase
+        .from('item_locations')
+        .select('min_quantity_override')
+        .eq('item_id', itemId)
+        .eq('location_id', locationId)
+        .eq('storage_space_id', storageSpaceId)
+        .single();
 
     // Get all thresholds for this organization
     const thresholds = await getLowStockThresholds(organizationId, { isActive: true });
@@ -87,6 +97,15 @@ export async function getEffectiveThreshold(
             lowThreshold: categoryLocationThreshold.low_threshold,
             criticalThreshold: categoryLocationThreshold.critical_threshold,
             source: 'category',
+        };
+    }
+
+    // Check storage-space-specific min_quantity_override
+    if (itemLocation?.min_quantity_override !== null && itemLocation?.min_quantity_override !== undefined) {
+        return {
+            lowThreshold: itemLocation.min_quantity_override,
+            criticalThreshold: null, // No critical threshold for override
+            source: 'storage_override',
         };
     }
 

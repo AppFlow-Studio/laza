@@ -26,11 +26,19 @@ export default function InventoryMatrix({ items, storageSpaces, inventory, onCel
         });
     }, [items, searchQuery]);
 
-    const getQuantity = (itemId: string, storageSpaceId: string | null) => {
-        const inv = inventory.find(
+    const getInventoryRecord = (itemId: string, storageSpaceId: string | null) => {
+        return inventory.find(
             (i) => i.item_id === itemId && i.storage_space_id === storageSpaceId
         );
+    };
+
+    const getQuantity = (itemId: string, storageSpaceId: string | null) => {
+        const inv = getInventoryRecord(itemId, storageSpaceId);
         return inv?.current_quantity || 0;
+    };
+
+    const isItemStoredInSpace = (itemId: string, storageSpaceId: string | null) => {
+        return !!getInventoryRecord(itemId, storageSpaceId);
     };
 
     const getStatusColor = (item: any, quantity: number) => {
@@ -111,7 +119,24 @@ export default function InventoryMatrix({ items, storageSpaces, inventory, onCel
                                                 </div>
                                             </td>
                                             {storageSpaces.map((space) => {
+                                                const isStored = isItemStoredInSpace(item.id, space.id);
                                                 const quantity = getQuantity(item.id, space.id);
+                                                
+                                                // Item is not stored in this space - not clickable
+                                                if (!isStored) {
+                                                    return (
+                                                        <td
+                                                            key={space.id}
+                                                            className="border border-zinc-200 px-4 py-3 text-center text-sm bg-zinc-50/50 cursor-not-allowed"
+                                                        >
+                                                            <div className="flex flex-col items-center gap-0.5">
+                                                                <span className="text-zinc-300 text-xs font-medium">—</span>
+                                                                <span className="text-[10px] text-zinc-300">Not stored</span>
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                }
+                                                
                                                 return (
                                                     <td
                                                         key={space.id}

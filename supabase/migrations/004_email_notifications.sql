@@ -126,9 +126,9 @@ CREATE TRIGGER update_daily_summary_preferences_updated_at
 
 -- Function to get organization_id from location_id
 CREATE OR REPLACE FUNCTION get_organization_id_from_location(p_location_id UUID)
-RETURNS UUID AS $$
+RETURNS TEXT AS $$
 DECLARE
-    v_organization_id UUID;
+    v_organization_id TEXT;
 BEGIN
     SELECT organization_id INTO v_organization_id
     FROM locations
@@ -139,10 +139,10 @@ END;
 $$ LANGUAGE plpgsql STABLE;
 
 -- Function to get organization_id from item_id
-CREATE OR REPLACE FUNCTION get_organization_id_from_item(p_item_id UUID)
-RETURNS UUID AS $$
+CREATE OR REPLACE FUNCTION get_organization_id_from_item(p_item_id BIGINT)
+RETURNS TEXT AS $$
 DECLARE
-    v_organization_id UUID;
+    v_organization_id TEXT;
 BEGIN
     SELECT organization_id INTO v_organization_id
     FROM items
@@ -153,7 +153,7 @@ END;
 $$ LANGUAGE plpgsql STABLE;
 
 -- Function to check if notifications are enabled for an organization
-CREATE OR REPLACE FUNCTION are_notifications_enabled(p_organization_id UUID)
+CREATE OR REPLACE FUNCTION are_notifications_enabled(p_organization_id TEXT)
 RETURNS BOOLEAN AS $$
 DECLARE
     v_enabled BOOLEAN;
@@ -167,7 +167,7 @@ END;
 $$ LANGUAGE plpgsql STABLE;
 
 -- Function to check if low stock alerts are enabled for an organization
-CREATE OR REPLACE FUNCTION are_low_stock_alerts_enabled(p_organization_id UUID)
+CREATE OR REPLACE FUNCTION are_low_stock_alerts_enabled(p_organization_id TEXT)
 RETURNS BOOLEAN AS $$
 DECLARE
     v_enabled BOOLEAN;
@@ -180,6 +180,27 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
+-- Auto-create default notification preferences on organization creation
+CREATE OR REPLACE FUNCTION create_default_notification_preferences()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO notification_preferences (organization_id, primary_email, notifications_enabled)
+    VALUES (NEW.id, '', false)
+    ON CONFLICT (organization_id) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS org_notification_preferences_trigger ON organizations;
+CREATE TRIGGER org_notification_preferences_trigger
+AFTER INSERT ON organizations
+FOR EACH ROW EXECUTE FUNCTION create_default_notification_preferences();
+
+-- Backfill notification_preferences for existing organizations
+INSERT INTO notification_preferences (organization_id, primary_email, notifications_enabled)
+SELECT id, '', false FROM organizations
+ON CONFLICT (organization_id) DO NOTHING;
+
 -- Function to queue low stock alert for digest
 CREATE OR REPLACE FUNCTION queue_low_stock_alert(
     p_alert_id UUID,
@@ -190,7 +211,7 @@ CREATE OR REPLACE FUNCTION queue_low_stock_alert(
 )
 RETURNS UUID AS $$
 DECLARE
-    v_organization_id UUID;
+    v_organization_id TEXT;
     v_queue_id UUID;
 BEGIN
     -- Get organization_id from location
@@ -227,7 +248,7 @@ DECLARE
     min_qty NUMERIC(10, 2);
     item_record RECORD;
     v_alert_id UUID;
-    v_organization_id UUID;
+    v_organization_id TEXT;
     v_delivery_mode TEXT;
     v_notifications_enabled BOOLEAN;
     v_low_stock_alerts_enabled BOOLEAN;
@@ -238,6 +259,8 @@ DECLARE
     v_threshold_record RECORD;
     v_low_threshold NUMERIC(10, 2);
     v_critical_threshold NUMERIC(10, 2);
+    v_supabase_url TEXT;
+    v_service_role_key TEXT;
 BEGIN
     -- Get item details and storage space specific override
     SELECT 
@@ -267,7 +290,7 @@ BEGIN
         RETURNING id INTO v_alert_id;
         
         -- Get organization_id
-        v_organization_id := item_record.organization_id;
+        v_organization_id := item_record.organization_id::TEXT;
         
         -- Check notification preferences
         SELECT 
@@ -337,6 +360,34 @@ BEGIN
                         NEW.storage_space_id,
                         v_urgency_level
                     );
+
+                    -- Attempt to call edge function for immediate send (best-effort)
+                    BEGIN
+                     
+                        
+                            PERFORM net.http_post(
+                                url := v_supabase_url || '/functions/v1/send-low-stock-alert',
+                                headers := jsonb_build_object(
+                                    'Content-Type', 'application/json',
+                                    'Authorization', 'Bearer ' || v_service_role_key
+                                ),
+                                body := jsonb_build_object(
+                                    'alert_id', v_alert_id,
+                                    'item_id', NEW.item_id,
+                                    'location_id', NEW.location_id,
+                                    'storage_space_id', NEW.storage_space_id,
+                                    'organization_id', v_organization_id,
+                                    'urgency_level', v_urgency_level,
+                                    'current_quantity', NEW.current_quantity,
+                                    'previous_quantity', COALESCE(OLD.current_quantity, NEW.current_quantity),
+                                    'min_quantity', min_qty
+                                )::jsonb
+                            );
+               
+                    EXCEPTION WHEN OTHERS THEN
+                        -- Ignore errors from http_post to avoid blocking the trigger
+                        NULL;
+                    END;
                 END IF;
             END IF;
             
@@ -369,14 +420,12 @@ $$ LANGUAGE plpgsql;
 -- Note: The application layer processes notifications after alerts are created
 -- The existing check_low_stock() trigger creates alerts, and the app processes them
 -- 
--- Optional: To enable automatic notification queuing in the database trigger,
--- uncomment and run the following after testing:
--- 
--- DROP TRIGGER IF EXISTS check_low_stock_trigger ON item_locations;
--- CREATE TRIGGER check_low_stock_trigger
--- AFTER INSERT OR UPDATE OF current_quantity, min_quantity_override ON item_locations
--- FOR EACH ROW EXECUTE FUNCTION check_low_stock_with_notifications();
---
+-- Switch item_locations trigger to notification-aware function
+DROP TRIGGER IF EXISTS check_low_stock_trigger ON item_locations;
+CREATE TRIGGER check_low_stock_trigger
+AFTER INSERT OR UPDATE OF current_quantity, min_quantity_override ON item_locations
+FOR EACH ROW EXECUTE FUNCTION check_low_stock_with_notifications();
+
 -- The application layer will still process the queued notifications
 
 -- Enable RLS on new tables

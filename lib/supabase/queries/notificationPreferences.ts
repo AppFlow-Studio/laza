@@ -26,7 +26,7 @@ export interface NotificationPreferences {
 export interface LowStockThreshold {
     id: string;
     organization_id: string;
-    item_id: string | null;
+    item_id: number | null;
     category_id: string | null;
     location_id: string | null;
     low_threshold: number;
@@ -70,7 +70,7 @@ export async function getNotificationPreferences(organizationId: string): Promis
         throw error;
     }
 
-    console.log(data, 'data')
+    console.log(data, 'Get Notification Preferences: data')
 
     return data as NotificationPreferences;
 }
@@ -129,7 +129,7 @@ export async function updateNotificationPreferences(
 export async function getLowStockThresholds(
     organizationId: string,
     filters?: {
-        itemId?: string;
+        itemId?: number;
         categoryId?: string;
         locationId?: string;
         isActive?: boolean;

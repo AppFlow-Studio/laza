@@ -98,7 +98,7 @@ export interface DailySummaryData {
  * Build data for low stock alert email
  */
 export async function buildLowStockAlertData(alertId: string): Promise<LowStockAlertData> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServerSupabaseClient();
 
     // Get alert with related data
     const { data: alert, error: alertError } = await supabase
@@ -134,18 +134,19 @@ export async function buildLowStockAlertData(alertId: string): Promise<LowStockA
     const effectiveThreshold = await getEffectiveThreshold(
         alert.item_id,
         alert.location_id,
+        alert.storage_space_id,
         organizationId
     );
 
     // Calculate urgency
-    const urgencyLevel = calculateUrgencyLevel(
+    const urgencyLevel = await calculateUrgencyLevel(
         currentQuantity,
         effectiveThreshold.lowThreshold,
         effectiveThreshold.criticalThreshold
     );
 
     // Get suggested reorder quantity
-    const suggestedReorderQuantity = getSuggestedReorderQuantity(
+    const suggestedReorderQuantity = await getSuggestedReorderQuantity(
         effectiveThreshold.lowThreshold,
         currentQuantity
     );

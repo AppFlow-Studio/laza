@@ -25,14 +25,6 @@ export async function sendEmail(
 ): Promise<{ success: boolean; emailId?: string; error?: string }> {
     try {
         // Log email attempt
-        const logEntry = await logEmailDelivery({
-            organization_id: organizationId,
-            email_type: emailType,
-            recipient_email: Array.isArray(options.to) ? options.to[0] : options.to,
-            subject: options.subject,
-            status: 'pending',
-            metadata: options.metadata || null,
-        });
 
         // Send email via Resend
         const recipients = Array.isArray(options.to) ? options.to : [options.to];
@@ -45,17 +37,30 @@ export async function sendEmail(
 
         if (error) {
             // Update log with error
-            await updateEmailDeliveryStatus(logEntry.id, 'failed', error.message);
+            // await updateEmailDeliveryStatus(logEntry.id, 'failed', error.message);
             return { success: false, error: error.message };
         }
+        console.log('sendEmail: data', data)
 
         // Update log with success
-        await updateEmailDeliveryStatus(
-            logEntry.id,
-            'sent',
-            null,
-            data?.id || undefined
-        );
+        // await updateEmailDeliveryStatus(
+        //     logEntry.id,
+        //     'sent',
+        //     null,
+        //     data?.id || undefined
+        // );
+        const logEntry = await logEmailDelivery({
+            resend_email_id: data?.id || null,
+            error_message: error?.message || null,
+            sent_at: new Date().toISOString(),
+            organization_id: organizationId,
+            email_type: emailType,
+            recipient_email: Array.isArray(options.to) ? options.to[0] : options.to,
+            subject: options.subject,
+            status: 'sent',
+            metadata: options.metadata || null,
+        });
+
 
         return { success: true, emailId: data?.id };
     } catch (error: any) {

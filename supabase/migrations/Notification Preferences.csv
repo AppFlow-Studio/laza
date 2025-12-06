@@ -1,0 +1,2 @@
+id,organization_id,primary_email,secondary_emails,timezone,notifications_enabled,low_stock_alerts_enabled,daily_summary_enabled,low_stock_delivery_mode,low_stock_digest_schedule,daily_summary_schedule,daily_summary_days,quiet_hours_start,quiet_hours_end,email_format,created_at,updated_at
+db1dc791-deee-4263-b651-4fbe65a3e0e2,org_35np3xhDrzBRkcbl0rtmtl3MDeV,temur@appflowstudio.io,[],America/New_York,true,true,true,immediate,,08:00:00,"[1, 2, 3, 4, 5]",,,html,2025-11-30 22:44:17.571372+00,2025-11-30 22:45:33.312112+00

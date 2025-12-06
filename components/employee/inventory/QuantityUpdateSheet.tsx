@@ -68,6 +68,7 @@ export default function QuantityUpdateSheet({
     // Current quantity being edited
     const [quantity, setQuantity] = useState<string>(currentQuantity.toString());
     const [showKeypad, setShowKeypad] = useState(false);
+    const [isFirstInput, setIsFirstInput] = useState(true); // Track if user hasn't typed yet
     const [reason, setReason] = useState('correction');
     const [actionType, setActionType] = useState<'count' | 'adjustment' | 'received' | 'used'>('count');
     const [showReasonDropdown, setShowReasonDropdown] = useState(false);
@@ -100,6 +101,7 @@ export default function QuantityUpdateSheet({
             setReason('correction');
             setActionType('count');
             setShowKeypad(false);
+            setIsFirstInput(true);
         }
     }, [isOpen, currentQuantity]);
 
@@ -117,6 +119,13 @@ export default function QuantityUpdateSheet({
     };
 
     const handleKeypadInput = (char: string) => {
+        // On first input, clear and start fresh with the new character
+        if (isFirstInput) {
+            setQuantity(char === '.' ? '0.' : char);
+            setIsFirstInput(false);
+            return;
+        }
+
         if (quantity === '0' && char !== '.') {
             setQuantity(char);
         } else {
@@ -311,19 +320,43 @@ export default function QuantityUpdateSheet({
                                         {/* Center Number Display (Tappable) */}
                                         <motion.button
                                             whileTap={{ scale: 0.98 }}
-                                            onClick={() => setShowKeypad(true)}
+                                            onClick={() => {
+                                                setShowKeypad(true);
+                                                setIsFirstInput(true);
+                                            }}
                                             disabled={updateMutation.isPending}
                                             className={cn(
-                                                "w-1/2 h-16 bg-white border-2 border-zinc-200 rounded-xl",
-                                                "flex items-center justify-center",
+                                                "w-1/2 h-20 bg-white border-2 rounded-xl",
+                                                "flex flex-col items-center justify-center gap-1",
                                                 "hover:border-blue-300 active:bg-zinc-50",
                                                 "disabled:opacity-50 disabled:cursor-not-allowed",
-                                                "transition-colors"
+                                                "transition-colors",
+                                                quantityChange !== 0
+                                                    ? "border-blue-400 bg-blue-50/50"
+                                                    : "border-zinc-200"
                                             )}
                                         >
-                                            <span className="text-3xl font-bold text-zinc-900">
+                                            {/* Show original with strikethrough when changed */}
+                                            {quantityChange !== 0 && (
+                                                <span className="text-sm text-zinc-400 line-through">
+                                                    {originalQuantity.toFixed(0)}
+                                                </span>
+                                            )}
+                                            <span className={cn(
+                                                "text-3xl font-bold",
+                                                quantityChange !== 0 ? "text-blue-600" : "text-zinc-900"
+                                            )}>
                                                 {numericQuantity.toFixed(0)}
                                             </span>
+                                            {/* Show change indicator */}
+                                            {quantityChange !== 0 && (
+                                                <span className={cn(
+                                                    "text-xs font-medium",
+                                                    quantityChange > 0 ? "text-green-600" : "text-red-600"
+                                                )}>
+                                                    {quantityChange > 0 ? `+${quantityChange.toFixed(0)}` : quantityChange.toFixed(0)}
+                                                </span>
+                                            )}
                                         </motion.button>
 
                                         {/* Plus Button */}
@@ -343,14 +376,46 @@ export default function QuantityUpdateSheet({
                                         </motion.button>
                                     </div>
 
-                                    {/* Original Quantity */}
-                                    <p className="text-sm text-zinc-500 mt-2">
-                                        Original: {originalQuantity.toFixed(2)}
-                                    </p>
+                                    {/* Original Quantity / Change Summary */}
+                                    <AnimatePresence mode="wait">
+                                        {quantityChange !== 0 ? (
+                                            <motion.div
+                                                key="changed"
+                                                initial={{ opacity: 0, y: -5 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: 5 }}
+                                                className="flex items-center justify-center gap-2 mt-2"
+                                            >
+                                                <span className="text-sm text-zinc-500">
+                                                    {originalQuantity.toFixed(2)}
+                                                </span>
+                                                <span className="text-zinc-400">→</span>
+                                                <span className={cn(
+                                                    "text-sm font-semibold",
+                                                    quantityChange > 0 ? "text-green-600" : "text-red-600"
+                                                )}>
+                                                    {numericQuantity.toFixed(2)}
+                                                </span>
+                                            </motion.div>
+                                        ) : (
+                                            <motion.p
+                                                key="original"
+                                                initial={{ opacity: 0, y: -5 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: 5 }}
+                                                className="text-sm text-zinc-500 mt-2"
+                                            >
+                                                Current: {originalQuantity.toFixed(2)}
+                                            </motion.p>
+                                        )}
+                                    </AnimatePresence>
 
                                     {/* Edit On hand Button */}
                                     <button
-                                        onClick={() => setShowKeypad(true)}
+                                        onClick={() => {
+                                            setShowKeypad(true);
+                                            setIsFirstInput(true);
+                                        }}
                                         className="text-sm text-blue-600 mt-2 hover:underline"
                                     >
                                         Edit On hand

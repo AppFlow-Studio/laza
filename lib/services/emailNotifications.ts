@@ -36,12 +36,14 @@ export async function sendLowStockAlert(
             return { success: false, error: 'No recipients configured' };
         }
 
+        console.log('sendLowStockAlert: alertData', alertData)
         // Determine urgency emoji and color
         const urgencyInfo = {
             low: { emoji: '⚠️', label: 'Low Stock' },
             critical: { emoji: '🔴', label: 'Critical Stock' },
             out_of_stock: { emoji: '🚨', label: 'Out of Stock' },
         }[alertData.urgencyLevel];
+
 
         // Send email
         const result = await sendEmail(organizationId, 'low_stock_alert', {
@@ -55,7 +57,7 @@ export async function sendLowStockAlert(
                 urgencyLevel: alertData.urgencyLevel,
             },
         });
-
+        console.log('sendLowStockAlert: sendEmail result', result)
         return result;
     } catch (error: any) {
         console.error('Error sending low stock alert:', error);
@@ -174,14 +176,15 @@ export async function sendLowStockDigest(organizationId: string): Promise<{ succ
  * Calculate urgency level for an alert
  */
 export async function calculateUrgencyLevel(
-    itemId: string,
+    itemId: number,
     locationId: string,
+    storageSpaceId: string,
     currentQuantity: number,
     organizationId: string
 ): Promise<'low' | 'critical' | 'out_of_stock'> {
     const { getEffectiveThreshold, calculateUrgencyLevel: calcUrgency } = await import('../utils/thresholds');
 
-    const threshold = await getEffectiveThreshold(itemId, locationId, organizationId);
+    const threshold = await getEffectiveThreshold(itemId, locationId, storageSpaceId, organizationId);
     return calcUrgency(currentQuantity, threshold.lowThreshold, threshold.criticalThreshold);
 }
 
