@@ -100,7 +100,16 @@ export function useUpdateQuantity() {
             actionType: 'count' | 'adjustment' | 'received' | 'used';
             notes?: string;
             minQuantityOverride?: number | null;
-        }) => updateQuantity(itemId, locationId, storageSpaceId, newQuantity, userId, actionType, notes, minQuantityOverride),
+        }) => updateQuantity(
+            itemId,
+            locationId,
+            storageSpaceId,
+            newQuantity,
+            userId,
+            actionType,
+            notes,
+            minQuantityOverride
+        ),
         onSuccess: (_, variables) => {
             // Invalidate relevant queries
             queryClient.invalidateQueries({ queryKey: ['employee-items', variables.storageSpaceId] });

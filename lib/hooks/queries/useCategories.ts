@@ -19,8 +19,8 @@ export function useCategory(id: string | null) {
 export function useCreateCategory() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ name, description }: { name: string; description?: string }) =>
-            createCategory(name, description),
+        mutationFn: ({ name, description, organization_id }: { name: string; description?: string; organization_id: string }) =>
+            createCategory(name, organization_id, description || null),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['categories'] });
         },
@@ -42,7 +42,7 @@ export function useUpdateCategory() {
 export function useDeleteCategory() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: deleteCategory,
+        mutationFn: (id: string) => deleteCategory(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['categories'] });
             // Also invalidate items since they reference categories

@@ -4,155 +4,167 @@
 import { createClient } from 'npm:@supabase/supabase-js'
 
 type Payload = {
-    organization_id: string
+  organization_id: string
 }
 
 type DigestItem = {
-    queue_id: string
-    alert_id: string
-    item_id: string
-    item_name: string
-    item_sku: string | null
-    item_unit: string
-    location_id: string
-    location_name: string
-    storage_space_id: string | null
-    storage_space_name: string | null
-    urgency_level: 'low' | 'critical' | 'out_of_stock'
-    current_quantity: number
-    previous_quantity: number | null
-    min_quantity: number
-    quantity_change: number
-    queued_at: string
+  queue_id: string
+  alert_id: string
+  item_id: string
+  item_name: string
+  item_sku: string | null
+  item_unit: string
+  location_id: string
+  location_name: string
+  storage_space_id: string | null
+  storage_space_name: string | null
+  urgency_level: 'low' | 'critical' | 'out_of_stock'
+  current_quantity: number
+  previous_quantity: number | null
+  min_quantity: number
+  quantity_change: number
+  queued_at: string
 }
 
 const RESEND_API_URL = 'https://api.resend.com/emails'
 
 Deno.serve(async (req) => {
-    if (req.method !== 'POST') {
-        return new Response('Method not allowed', { status: 405 })
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405 })
+  }
+
+  let payload: Payload
+  try {
+    payload = (await req.json()) as Payload
+  } catch (_err) {
+    return new Response('Invalid JSON', { status: 400 })
+  }
+
+  const { organization_id } = payload || {}
+
+  if (!organization_id) {
+    return new Response('Missing organization_id', { status: 400 })
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response('Supabase credentials not configured', { status: 500 })
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+  // Fetch notification preferences
+  const { data: prefs, error: prefsError } = await supabase
+    .from('notification_preferences')
+    .select('*')
+    .eq('organization_id', organization_id)
+    .single()
+
+  if (prefsError || !prefs) {
+    console.error('Notification prefs error', prefsError)
+    return new Response('Notification preferences not found', { status: 404 })
+  }
+
+  if (!prefs.notifications_enabled || !prefs.low_stock_alerts_enabled) {
+    return new Response('Notifications disabled', { status: 200 })
+  }
+
+  // Build recipients
+  const recipients = [
+    prefs.primary_email,
+    ...(Array.isArray(prefs.secondary_emails) ? prefs.secondary_emails : []),
+  ].filter(Boolean) as string[]
+
+  if (recipients.length === 0) {
+    return new Response('No recipients configured', { status: 200 })
+  }
+
+  // Fetch pending digest items using the helper function
+  const { data: digestItems, error: digestError } = await supabase
+    .rpc('get_pending_digest_items', { p_organization_id: organization_id })
+
+  if (digestError) {
+    console.error('Digest items fetch error', digestError)
+    return new Response('Failed to fetch digest items', { status: 500 })
+  }
+
+  if (!digestItems || digestItems.length === 0) {
+    return new Response('No pending items for digest', { status: 200 })
+  }
+
+  const items = digestItems as DigestItem[]
+
+  // Get organization name
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('name')
+    .eq('id', organization_id)
+    .single()
+
+  const orgName = org?.name || 'Your Organization'
+
+  // Group items by location
+  const groupedByLocation = items.reduce((acc, item) => {
+    const key = item.location_id
+    if (!acc[key]) {
+      acc[key] = {
+        location_name: item.location_name,
+        items: [],
+      }
     }
+    acc[key].items.push(item)
+    return acc
+  }, {} as Record<string, { location_name: string; items: DigestItem[] }>)
 
-    let payload: Payload
-    try {
-        payload = (await req.json()) as Payload
-    } catch (_err) {
-        return new Response('Invalid JSON', { status: 400 })
-    }
+  // Count urgency levels
+  const criticalCount = items.filter(
+    (i) => i.urgency_level === 'critical' || i.urgency_level === 'out_of_stock'
+  ).length
+  const lowCount = items.filter((i) => i.urgency_level === 'low').length
 
-    const { organization_id } = payload || {}
+  // Get timezone from preferences
+  const timezone = prefs?.timezone || 'America/New_York'
 
-    if (!organization_id) {
-        return new Response('Missing organization_id', { status: 400 })
-    }
+  // Helper function to format date/time in the organization's timezone
+  const formatInTimezone = (dateString: string, options: Intl.DateTimeFormatOptions = {}) => {
+    const date = new Date(dateString)
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      ...options,
+    }).format(date)
+  }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    if (!supabaseUrl || !supabaseServiceKey) {
-        return new Response('Supabase credentials not configured', { status: 500 })
-    }
+  const digestDate = formatInTimezone(new Date().toISOString(), {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  const baseUrl = 'https://lazadessert.cafe'
+  const viewAllUrl = `${baseUrl}/admin/inventory?filter=low_stock`
+  const notificationSettingsUrl = `${baseUrl}/admin/settings/notifications`
 
-    // Fetch notification preferences
-    const { data: prefs, error: prefsError } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('organization_id', organization_id)
-        .single()
+  // Build item rows HTML
+  const buildItemRow = (item: DigestItem) => {
+    const urgencyInfo = {
+      low: { emoji: '⚠️', color: '#f59e0b', bgColor: '#fffbeb' },
+      critical: { emoji: '🔴', color: '#ef4444', bgColor: '#fef2f2' },
+      out_of_stock: { emoji: '🚨', color: '#dc2626', bgColor: '#fef2f2' },
+    }[item.urgency_level]
 
-    if (prefsError || !prefs) {
-        console.error('Notification prefs error', prefsError)
-        return new Response('Notification preferences not found', { status: 404 })
-    }
+    const changeText =
+      item.quantity_change > 0
+        ? `-${item.quantity_change}`
+        : item.quantity_change < 0
+          ? `+${Math.abs(item.quantity_change)}`
+          : '0'
 
-    if (!prefs.notifications_enabled || !prefs.low_stock_alerts_enabled) {
-        return new Response('Notifications disabled', { status: 200 })
-    }
+    const changeColor =
+      item.quantity_change > 0 ? '#dc2626' : item.quantity_change < 0 ? '#16a34a' : '#6b7280'
 
-    // Build recipients
-    const recipients = [
-        prefs.primary_email,
-        ...(Array.isArray(prefs.secondary_emails) ? prefs.secondary_emails : []),
-    ].filter(Boolean) as string[]
-
-    if (recipients.length === 0) {
-        return new Response('No recipients configured', { status: 200 })
-    }
-
-    // Fetch pending digest items using the helper function
-    const { data: digestItems, error: digestError } = await supabase
-        .rpc('get_pending_digest_items', { p_organization_id: organization_id })
-
-    if (digestError) {
-        console.error('Digest items fetch error', digestError)
-        return new Response('Failed to fetch digest items', { status: 500 })
-    }
-
-    if (!digestItems || digestItems.length === 0) {
-        return new Response('No pending items for digest', { status: 200 })
-    }
-
-    const items = digestItems as DigestItem[]
-
-    // Get organization name
-    const { data: org } = await supabase
-        .from('organizations')
-        .select('name')
-        .eq('id', organization_id)
-        .single()
-
-    const orgName = org?.name || 'Your Organization'
-
-    // Group items by location
-    const groupedByLocation = items.reduce((acc, item) => {
-        const key = item.location_id
-        if (!acc[key]) {
-            acc[key] = {
-                location_name: item.location_name,
-                items: [],
-            }
-        }
-        acc[key].items.push(item)
-        return acc
-    }, {} as Record<string, { location_name: string; items: DigestItem[] }>)
-
-    // Count urgency levels
-    const criticalCount = items.filter(
-        (i) => i.urgency_level === 'critical' || i.urgency_level === 'out_of_stock'
-    ).length
-    const lowCount = items.filter((i) => i.urgency_level === 'low').length
-
-    const digestDate = new Date().toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    })
-
-    const baseUrl = 'https://lazadessert.cafe'
-    const viewAllUrl = `${baseUrl}/admin/inventory?filter=low_stock`
-    const notificationSettingsUrl = `${baseUrl}/admin/settings/notifications`
-
-    // Build item rows HTML
-    const buildItemRow = (item: DigestItem) => {
-        const urgencyInfo = {
-            low: { emoji: '⚠️', color: '#f59e0b', bgColor: '#fffbeb' },
-            critical: { emoji: '🔴', color: '#ef4444', bgColor: '#fef2f2' },
-            out_of_stock: { emoji: '🚨', color: '#dc2626', bgColor: '#fef2f2' },
-        }[item.urgency_level]
-
-        const changeText =
-            item.quantity_change > 0
-                ? `-${item.quantity_change}`
-                : item.quantity_change < 0
-                    ? `+${Math.abs(item.quantity_change)}`
-                    : '0'
-
-        const changeColor =
-            item.quantity_change > 0 ? '#dc2626' : item.quantity_change < 0 ? '#16a34a' : '#6b7280'
-
-        return `
+    return `
       <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:${urgencyInfo.bgColor};border-radius:8px;padding:15px;margin-bottom:10px;border-left:4px solid ${urgencyInfo.color}">
         <tbody>
           <tr>
@@ -177,12 +189,12 @@ Deno.serve(async (req) => {
         </tbody>
       </table>
     `
-    }
+  }
 
-    // Build location sections HTML
-    const locationSectionsHtml = Object.entries(groupedByLocation)
-        .map(
-            ([_locationId, group]) => `
+  // Build location sections HTML
+  const locationSectionsHtml = Object.entries(groupedByLocation)
+    .map(
+      ([_locationId, group]) => `
       <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:25px">
         <tbody>
           <tr>
@@ -197,12 +209,20 @@ Deno.serve(async (req) => {
         </tbody>
       </table>
     `
-        )
-        .join('')
+    )
+    .join('')
 
-    const subject = `📦 Low Stock Digest: ${items.length} item${items.length !== 1 ? 's' : ''} need attention`
+  const digestDateTime = formatInTimezone(new Date().toISOString(), {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  const subject = `📦 Low Stock Digest: ${items.length} item${items.length !== 1 ? 's' : ''} need attention - ${digestDateTime}`
 
-    const html = `
+  const html = `
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html dir="ltr" lang="en">
 <head>
@@ -220,7 +240,7 @@ Deno.serve(async (req) => {
     <tbody>
       <tr>
         <td style="background-color:#f5f7fa;font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;margin:0 auto;padding:20px">
-          <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;background-color:#ffffff;border-radius:8px;margin:0 auto;padding:0">
+          <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;max-width:100%;background-color:#ffffff;border-radius:8px;margin:0 auto;padding:0">
             <tbody>
               <tr style="width:100%">
                 <td>
@@ -312,77 +332,77 @@ Deno.serve(async (req) => {
 </html>
   `
 
-    const resendKey = Deno.env.get('RESEND_API_KEY')
-    const fromEmail = 'support@lazadessert.cafe'
+  const resendKey = Deno.env.get('RESEND_API_KEY')
+  const fromEmail = 'support@lazadessert.cafe'
 
-    let sendStatus: 'sent' | 'failed' | 'pending' = 'pending'
-    let errorMessage: string | null = null
+  let sendStatus: 'sent' | 'failed' | 'pending' = 'pending'
+  let errorMessage: string | null = null
 
-    if (resendKey) {
-        try {
-            const res = await fetch(RESEND_API_URL, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${resendKey}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    from: fromEmail,
-                    to: recipients,
-                    subject,
-                    html,
-                }),
-            })
-
-            if (!res.ok) {
-                const text = await res.text()
-                console.error('Resend send error', text)
-                sendStatus = 'failed'
-                errorMessage = text
-            } else {
-                sendStatus = 'sent'
-            }
-        } catch (err) {
-            console.error('Resend exception', err)
-            sendStatus = 'failed'
-            errorMessage = err instanceof Error ? err.message : 'Unknown error'
-        }
-    } else {
-        sendStatus = 'pending'
-        errorMessage = 'RESEND_API_KEY not configured'
-    }
-
-    // Mark items as processed if sent successfully
-    if (sendStatus === 'sent') {
-        const queueIds = items.map((i) => i.queue_id)
-        await supabase.rpc('mark_digest_items_processed', {
-            p_organization_id: organization_id,
-            p_queue_ids: queueIds,
-        })
-    }
-
-    // Log delivery status
-    const firstRecipient = recipients[0]
-    await supabase.from('email_delivery_logs').insert({
-        organization_id,
-        email_type: 'low_stock_digest',
-        recipient_email: firstRecipient,
-        subject,
-        status: sendStatus,
-        error_message: errorMessage,
-        sent_at: sendStatus === 'sent' ? new Date().toISOString() : null,
-        metadata: {
-            items_count: items.length,
-            critical_count: criticalCount,
-            low_count: lowCount,
-            locations: Object.keys(groupedByLocation).length,
-            recipients,
-            item_ids: items.map((i) => i.item_id),
+  if (resendKey) {
+    try {
+      const res = await fetch(RESEND_API_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendKey}`,
+          'Content-Type': 'application/json',
         },
-    })
+        body: JSON.stringify({
+          from: fromEmail,
+          to: recipients,
+          subject,
+          html,
+        }),
+      })
 
-    return new Response(JSON.stringify({ status: sendStatus, items_processed: items.length }), {
-        status: 200,
+      if (!res.ok) {
+        const text = await res.text()
+        console.error('Resend send error', text)
+        sendStatus = 'failed'
+        errorMessage = text
+      } else {
+        sendStatus = 'sent'
+      }
+    } catch (err) {
+      console.error('Resend exception', err)
+      sendStatus = 'failed'
+      errorMessage = err instanceof Error ? err.message : 'Unknown error'
+    }
+  } else {
+    sendStatus = 'pending'
+    errorMessage = 'RESEND_API_KEY not configured'
+  }
+
+  // Mark items as processed if sent successfully
+  if (sendStatus === 'sent') {
+    const queueIds = items.map((i) => i.queue_id)
+    await supabase.rpc('mark_digest_items_processed', {
+      p_organization_id: organization_id,
+      p_queue_ids: queueIds,
     })
+  }
+
+  // Log delivery status
+  const firstRecipient = recipients[0]
+  await supabase.from('email_delivery_logs').insert({
+    organization_id,
+    email_type: 'low_stock_digest',
+    recipient_email: firstRecipient,
+    subject,
+    status: sendStatus,
+    error_message: errorMessage,
+    sent_at: sendStatus === 'sent' ? new Date().toISOString() : null,
+    metadata: {
+      items_count: items.length,
+      critical_count: criticalCount,
+      low_count: lowCount,
+      locations: Object.keys(groupedByLocation).length,
+      recipients,
+      item_ids: items.map((i) => i.item_id),
+    },
+  })
+
+  return new Response(JSON.stringify({ status: sendStatus, items_processed: items.length }), {
+    status: 200,
+  })
 })
 

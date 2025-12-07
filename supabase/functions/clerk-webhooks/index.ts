@@ -200,6 +200,28 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true }), { status: 200 })
     }
 
+    case 'organizationInvitation.revoked': {
+      // Handle invitation revocation
+      const invitationId = event.data.id
+      const userId = event.data.public_user_data?.user_id
+      const organizationId = event.data.organization?.id
+
+      // Update org_invites table
+      const { error: inviteError } = await supabase
+        .from('org_invites')
+        .update({
+          status: 'cancelled',
+        })
+        .eq('clerk_invite_id', invitationId)
+
+      if (inviteError) {
+        console.error('Error updating invitation:', inviteError)
+        return new Response(JSON.stringify({ error: inviteError.message }), { status: 500 })
+      }
+
+      return new Response(JSON.stringify({ success: true }), { status: 200 })
+    }
+
     case 'user.deleted': {
       // Soft delete: Set is_active = false
       const { error } = await supabase

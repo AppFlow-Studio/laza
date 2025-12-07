@@ -35,15 +35,14 @@ export default function PendingInvitationsTable({ invitations }: PendingInvitati
         }
     };
 
-    const handleCancel = async (invitation: OrgInvite) => {
+    const handleCancel = async (clerkInviteId: string) => {
         if (!confirm('Are you sure you want to cancel this invitation?')) {
             return;
         }
 
         try {
             const result = await cancelInvitationMutation.mutateAsync({
-                invitationId: invitation.id,
-                clerkInviteId: invitation.clerk_invite_id,
+                clerkInviteId: clerkInviteId,
             });
             if (result.success) {
                 toast.success(result.message);
@@ -63,6 +62,7 @@ export default function PendingInvitationsTable({ invitations }: PendingInvitati
             </div>
         );
     }
+    console.log('invitations', invitations);
 
     return (
         <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
@@ -132,7 +132,7 @@ export default function PendingInvitationsTable({ invitations }: PendingInvitati
                                                 Resend
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
-                                                onClick={() => handleCancel(invitation)}
+                                                onClick={() => handleCancel(invitation.clerk_invite_id)}
                                                 disabled={cancelInvitationMutation.isPending}
                                                 className="text-red-600"
                                             >

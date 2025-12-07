@@ -67,11 +67,14 @@ CREATE OR REPLACE FUNCTION queue_low_stock_alert(
     p_location_id UUID,
     p_storage_space_id UUID,
     p_urgency_level TEXT,
-    p_current_quantity NUMERIC DEFAULT NULL,
+    p_current_quantity FLOAT8 DEFAULT NULL,
     p_previous_quantity NUMERIC DEFAULT NULL,
     p_min_quantity NUMERIC DEFAULT NULL
 )
-RETURNS UUID AS $$
+RETURNS UUID 
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     v_organization_id TEXT;
     v_queue_id UUID;
@@ -132,7 +135,10 @@ $$ LANGUAGE plpgsql;
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION check_low_stock_with_notifications()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     min_qty NUMERIC(10, 2);
     item_record RECORD;

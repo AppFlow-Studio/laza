@@ -100,7 +100,7 @@ export type Database = {
                     organization_id: string;
                     name: string;
                     sku: string | null;
-                    category: 'desserts' | 'ingredients' | 'supplies';
+                    category_id: number | null;
                     unit_of_measure: 'pcs' | 'kg' | 'liters' | 'lbs' | 'oz';
                     min_quantity: number;
                     created_at: string;

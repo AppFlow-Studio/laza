@@ -101,6 +101,24 @@ type SummaryData = {
 }
 
 const RESEND_API_URL = 'https://api.resend.com/emails'
+const RESEND_BATCH_API_URL = 'https://api.resend.com/emails/batch'
+
+type EmailPayload = {
+  from: string
+  to: string[]
+  subject: string
+  html: string
+  metadata?: {
+    location_id: string | null
+    organization_id: string
+    summary_data?: {
+      updated_items_count: number
+      low_stock_count: number
+    }
+    recipients?: string[]
+    batch_id?: string | null
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
@@ -198,11 +216,13 @@ Deno.serve(async (req) => {
     locationsToProcess = []
   }
 
-  // If group by location, send separate emails
+  // If group by location, send separate emails using batch endpoint
   if (groupByLocation && locationsToProcess.length > 0) {
-    const results = []
+    const emailPayloads: EmailPayload[] = []
+
+    // Build all email payloads first
     for (const locId of locationsToProcess) {
-      const result = await sendSummaryForLocation(
+      const emailData = await buildEmailPayloadForLocation(
         supabase,
         organization_id,
         locId,
@@ -211,9 +231,18 @@ Deno.serve(async (req) => {
         recipients,
         prefs
       )
-      results.push(result)
+      if (emailData) {
+        emailPayloads.push(emailData)
+      }
     }
-    return new Response(JSON.stringify({ status: 'sent', locations: results }), { status: 200 })
+
+    // Send all emails in a single batch request
+    if (emailPayloads.length > 0) {
+      const batchResult = await sendBatchEmails(emailPayloads, supabase, organization_id)
+      return new Response(JSON.stringify({ status: 'sent', batch: batchResult }), { status: 200 })
+    }
+
+    return new Response(JSON.stringify({ status: 'no_emails' }), { status: 200 })
   }
 
   // Single summary email
@@ -235,8 +264,9 @@ async function sendSummaryForLocation(
   date: string,
   summaryPrefs: any,
   recipients: string[],
-  prefs: any
-): Promise<Response> {
+  prefs: any,
+  buildOnly: boolean = false
+): Promise<Response | EmailPayload> {
   const includeUpdatedItems = summaryPrefs?.include_updated_items ?? true
   const includeStorageUtilization = summaryPrefs?.include_storage_utilization ?? true
   const includeLowStockItems = summaryPrefs?.include_low_stock_items ?? true
@@ -280,7 +310,18 @@ async function sendSummaryForLocation(
   }
 
   const orgName = summaryData.organization_name || 'Your Organization'
-  const summaryDateFormatted = new Date(date).toLocaleDateString('en-US', {
+  const timezone = prefs?.timezone || 'America/New_York'
+
+  // Helper function to format date/time in the organization's timezone
+  const formatInTimezone = (dateString: string, options: Intl.DateTimeFormatOptions = {}) => {
+    const date = new Date(dateString)
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      ...options,
+    }).format(date)
+  }
+
+  const summaryDateFormatted = formatInTimezone(date, {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -318,7 +359,7 @@ async function sendSummaryForLocation(
               </td>
               <td style="vertical-align:top;text-align:right">
                 <p style="font-size:13px;color:#9ca3af;margin:0">
-                  ${new Date(item.updated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                  ${formatInTimezone(item.updated_at, { hour: 'numeric', minute: '2-digit', hour12: true })}
                 </p>
               </td>
             </tr>
@@ -389,7 +430,7 @@ async function sendSummaryForLocation(
           <tr>
             <td>
               <h2 style="font-size:18px;font-weight:bold;color:#1f2937;margin:0 0 15px">
-                ⚠️ Low Stock Items as of ${new Date(summaryData.date).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                ⚠️ Low Stock Items as of ${formatInTimezone(new Date().toISOString(), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </h2>
               ${itemRows}
               ${moreCount > 0 ? `<p style="font-size:13px;color:#6b7280;font-style:italic;text-align:center;margin:10px 0 0">...and ${moreCount} more low stock items</p>` : ''}
@@ -725,7 +766,18 @@ async function sendSummaryForLocation(
   }
 
   const locationText = locationName ? ` - ${locationName}` : ''
-  const subject = `📊 Daily Inventory Summary${locationText} - ${new Date(summaryData.date).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+  const summaryDateFormattedForSubject = formatInTimezone(summaryData.date, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  const currentTimeFormatted = formatInTimezone(new Date().toISOString(), {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
+  const subject = `📊 Daily Inventory Summary${locationText} - ${summaryDateFormattedForSubject} at ${currentTimeFormatted}`
 
   const html = `
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -745,7 +797,7 @@ async function sendSummaryForLocation(
     <tbody>
       <tr>
         <td style="background-color:#f5f7fa;font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;margin:0 auto;padding:20px">
-          <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;background-color:#ffffff;border-radius:8px;margin:0 auto;padding:0">
+          <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;max-width:100%;background-color:#ffffff;border-radius:8px;margin:0 auto;padding:0">
             <tbody>
               <tr style="width:100%">
                 <td>
@@ -836,8 +888,28 @@ async function sendSummaryForLocation(
 </html>
   `
 
-  const resendKey = Deno.env.get('RESEND_API_KEY')
   const fromEmail = 'support@lazadessert.cafe'
+
+  // If buildOnly is true, return the email payload instead of sending
+  if (buildOnly) {
+    return {
+      from: fromEmail,
+      to: recipients,
+      subject,
+      html,
+      metadata: {
+        location_id: locationId,
+        organization_id: organizationId,
+        summary_data: {
+          updated_items_count: summaryData.summary.updated_items_count,
+          low_stock_count: summaryData.summary.low_stock_count,
+        },
+      },
+    }
+  }
+
+  // Otherwise, send the email normally
+  const resendKey = Deno.env.get('RESEND_API_KEY')
 
   let sendStatus: 'sent' | 'failed' | 'pending' = 'pending'
   let errorMessage: string | null = null
@@ -905,6 +977,238 @@ async function sendSummaryForLocation(
     { status: 200 }
   )
 }
+
+// Build email payload for a location without sending
+async function buildEmailPayloadForLocation(
+  supabase: any,
+  organizationId: string,
+  locationId: string,
+  date: string,
+  summaryPrefs: any,
+  recipients: string[],
+  prefs: any
+): Promise<EmailPayload | null> {
+  try {
+    const result = await sendSummaryForLocation(
+      supabase,
+      organizationId,
+      locationId,
+      date,
+      summaryPrefs,
+      recipients,
+      prefs,
+      true // buildOnly = true
+    )
+
+    if (result && typeof result === 'object' && 'from' in result) {
+      return result as EmailPayload
+    }
+    return null
+  } catch (error) {
+    console.error('Error building email payload', error)
+    return null
+  }
+}
+
+// Send batch emails using Resend batch API
+async function sendBatchEmails(
+  emailPayloads: EmailPayload[],
+  supabase: any,
+  organizationId: string
+): Promise<{ success: number; failed: number; errors: any[] }> {
+  const resendKey = Deno.env.get('RESEND_API_KEY')
+
+  if (!resendKey) {
+    console.error('RESEND_API_KEY not configured')
+    // Log all as failed
+    for (const payload of emailPayloads) {
+      const firstRecipient = payload.to[0]
+      await supabase.from('email_delivery_logs').insert({
+        organization_id: organizationId,
+        email_type: 'daily_summary',
+        recipient_email: firstRecipient,
+        subject: payload.subject,
+        status: 'failed',
+        error_message: 'RESEND_API_KEY not configured',
+        sent_at: null,
+        metadata: payload.metadata || {},
+      })
+    }
+    return { success: 0, failed: emailPayloads.length, errors: ['RESEND_API_KEY not configured'] }
+  }
+
+  let successCount = 0
+  let failedCount = 0
+  const errors: any[] = []
+
+  try {
+    const res = await fetch(RESEND_BATCH_API_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(emailPayloads),
+    })
+
+    if (!res.ok) {
+      const text = await res.text()
+      console.error('Resend batch send error', text)
+      failedCount = emailPayloads.length
+      errors.push(text)
+
+      // Log all as failed
+      for (const payload of emailPayloads) {
+        const firstRecipient = payload.to[0]
+        await supabase.from('email_delivery_logs').insert({
+          organization_id: organizationId,
+          email_type: 'daily_summary',
+          recipient_email: firstRecipient,
+          subject: payload.subject,
+          status: 'failed',
+          error_message: text,
+          sent_at: null,
+          metadata: payload.metadata || {},
+        })
+      }
+    } else {
+      const result = await res.json()
+      // Resend batch API returns: { data: [{ id: "..." }], errors: [{ index: 0, message: "..." }] }
+      // data array contains successful emails in the same order as input (excluding failed ones)
+      // errors array contains failed emails with their 0-indexed position
+      const successfulEmails = result.data || []
+      const failedEmails = result.errors || []
+
+      // Create a map of index -> error for failed sends
+      const errorMap = new Map<number, string>()
+      failedEmails.forEach((error: { index: number; message: string }) => {
+        errorMap.set(error.index, error.message)
+      })
+
+      // Track which indices succeeded (data array is in order, but we need to map to original indices)
+      // Since data array excludes failed emails, we need to track successful indices separately
+      let successIndex = 0
+
+      // Log each email delivery status
+      for (let i = 0; i < emailPayloads.length; i++) {
+        const payload = emailPayloads[i]
+        const firstRecipient = payload.to[0]
+
+        // Check if this index has an error
+        const errorMessage = errorMap.get(i)
+        if (errorMessage) {
+          // This email failed
+          failedCount++
+          errors.push({ email: firstRecipient, index: i, error: errorMessage })
+
+          await supabase.from('email_delivery_logs').insert({
+            organization_id: organizationId,
+            email_type: 'daily_summary',
+            recipient_email: firstRecipient,
+            subject: payload.subject,
+            status: 'failed',
+            error_message: errorMessage,
+            sent_at: null,
+            metadata: {
+              ...(payload.metadata || {}),
+              recipients: payload.to,
+              batch_index: i,
+            },
+          })
+        } else {
+          // This email succeeded - get the result from data array
+          if (successIndex < successfulEmails.length) {
+            const successInfo = successfulEmails[successIndex]
+            if (successInfo?.id) {
+              successCount++
+
+              await supabase.from('email_delivery_logs').insert({
+                organization_id: organizationId,
+                email_type: 'daily_summary',
+                recipient_email: firstRecipient,
+                subject: payload.subject,
+                status: 'sent',
+                error_message: null,
+                sent_at: new Date().toISOString(),
+                metadata: {
+                  ...(payload.metadata || {}),
+                  recipients: payload.to,
+                  batch_id: successInfo.id,
+                  batch_index: i,
+                },
+              })
+
+              successIndex++
+            } else {
+              // Unexpected: no id in success result
+              failedCount++
+              const errorMsg = 'Success result missing id'
+              errors.push({ email: firstRecipient, index: i, error: errorMsg })
+
+              await supabase.from('email_delivery_logs').insert({
+                organization_id: organizationId,
+                email_type: 'daily_summary',
+                recipient_email: firstRecipient,
+                subject: payload.subject,
+                status: 'failed',
+                error_message: errorMsg,
+                sent_at: null,
+                metadata: {
+                  ...(payload.metadata || {}),
+                  recipients: payload.to,
+                  batch_index: i,
+                },
+              })
+            }
+          } else {
+            // No more success results but no error either - unexpected
+            failedCount++
+            const errorMsg = 'No result returned from batch API'
+            errors.push({ email: firstRecipient, index: i, error: errorMsg })
+
+            await supabase.from('email_delivery_logs').insert({
+              organization_id: organizationId,
+              email_type: 'daily_summary',
+              recipient_email: firstRecipient,
+              subject: payload.subject,
+              status: 'failed',
+              error_message: errorMsg,
+              sent_at: null,
+              metadata: {
+                ...(payload.metadata || {}),
+                recipients: payload.to,
+                batch_index: i,
+              },
+            })
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Resend batch exception', err)
+    failedCount = emailPayloads.length
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+    errors.push(errorMsg)
+
+    // Log all as failed
+    for (const payload of emailPayloads) {
+      const firstRecipient = payload.to[0]
+      await supabase.from('email_delivery_logs').insert({
+        organization_id: organizationId,
+        email_type: 'daily_summary',
+        recipient_email: firstRecipient,
+        subject: payload.subject,
+        status: 'failed',
+        error_message: errorMsg,
+        sent_at: null,
+        metadata: payload.metadata || {},
+      })
+    }
+  }
+
+  return { success: successCount, failed: failedCount, errors }
+}
+
 
 function escapeHtml(text: string): string {
   const map: Record<string, string> = {

@@ -129,6 +129,8 @@ export async function SendFranchiseWaitlistEmails(waitlistData: { name: string; 
     }
 }
 
-// Export notification email functions
-export { sendLowStockAlert, sendLowStockDigest, queueLowStockAlert } from '@/lib/services/emailNotifications';
-export { sendDailySummary } from '@/lib/services/dailySummary';
+// // Export notification email functions
+// export { sendLowStockAlert, sendLowStockDigest, queueLowStockAlert } from '@/lib/services/emailNotifications';
+// export { sendDailySummary } from '@/lib/services/dailySummary';
+
+// @/lib/services/emailNotifications

@@ -38,7 +38,7 @@ import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 const itemSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     sku: z.string().optional().nullable(),
-    category: z.string().optional().nullable(),
+    category: z.number().optional().nullable(),
     unit_of_measure: z.enum(['pcs', 'kg', 'liters', 'lbs', 'oz']),
     min_quantity: z.number().min(0),
 });
@@ -94,7 +94,7 @@ export default function ItemsPage() {
         defaultValues: {
             name: '',
             sku: '',
-            category: '',
+            category: null,
             unit_of_measure: 'pcs',
             min_quantity: 0,
         },
@@ -119,7 +119,7 @@ export default function ItemsPage() {
             reset({
                 name: editingItem.name || '',
                 sku: editingItem.sku || '',
-                category: categoryId,
+                category: Number(categoryId) || null,
                 unit_of_measure: editingItem.unit_of_measure || 'pcs',
                 min_quantity: editingItem.min_quantity || 0,
             });
@@ -127,7 +127,7 @@ export default function ItemsPage() {
             reset({
                 name: '',
                 sku: '',
-                category: '',
+                category: null,
                 unit_of_measure: 'pcs',
                 min_quantity: 0,
             });
@@ -159,13 +159,16 @@ export default function ItemsPage() {
                 });
                 toast.success('Item updated successfully');
             } else {
+                console.log(data);
                 await createMutation.mutateAsync({
-                    organization_id: organizationId,
-                    name: data.name,
-                    sku: data.sku || null,
-                    category_id: data.category || '',
-                    unit_of_measure: data.unit_of_measure,
-                    min_quantity: data.min_quantity,
+                    item: {
+                        organization_id: organizationId,
+                        name: data.name,
+                        sku: data.sku || null,
+                        category_id: Number(data.category) || null,
+                        unit_of_measure: data.unit_of_measure,
+                        min_quantity: data.min_quantity,
+                    }
                 });
                 toast.success('Item created successfully');
             }
@@ -178,7 +181,6 @@ export default function ItemsPage() {
     };
 
     const handleDelete = async (item: any) => {
-        if (!confirm('Are you sure you want to delete this item?')) return;
         try {
             await deleteMutation.mutateAsync(item.id);
             toast.success('Item deleted successfully');

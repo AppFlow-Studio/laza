@@ -51,7 +51,7 @@ export async function createInvitation(input: CreateInvitationInput) {
         const clerkInvite = await clerk.organizations.createOrganizationInvitation({
             organizationId: input.organizationId,
             emailAddress: input.email,
-            role: input.role == 'admin' ? 'org:admin' : 'org:member', 
+            role: input.role == 'admin' ? 'org:admin' : 'org:member',
             publicMetadata: {
                 organizationId: input.organizationId,
                 role: input.role,
@@ -99,8 +99,9 @@ interface UpdateUserInput {
 }
 
 export async function updateUser(input: UpdateUserInput) {
+    console.log('updateUser', input);
     try {
-        const supabase = await createServerSupabaseClient();
+        const supabase = createServerSupabaseClient();
 
         const updates: Partial<User> = {};
 
@@ -120,12 +121,12 @@ export async function updateUser(input: UpdateUserInput) {
             updates.is_active = input.is_active;
         }
 
+        console.log('updates', updates);
         const { data, error } = await supabase
             .from('users')
             .update(updates)
             .eq('id', input.userId)
-            .select()
-            .single();
+            .select('*');
 
         if (error) throw error;
 
@@ -144,11 +145,11 @@ export async function updateUser(input: UpdateUserInput) {
 }
 
 interface CancelInvitationInput {
-    invitationId: string;
     clerkInviteId: string;
 }
 
 export async function cancelInvitation(input: CancelInvitationInput) {
+    console.log('cancelInvitation', input);
     try {
         const supabase = await createServerSupabaseClient();
         const clerk = await clerkClient();
@@ -156,7 +157,7 @@ export async function cancelInvitation(input: CancelInvitationInput) {
         const { data: invite, error: inviteError } = await supabase
             .from('org_invites')
             .select('organization_id')
-            .eq('id', input.invitationId)
+            .eq('clerk_invite_id', input.clerkInviteId)
             .single();
 
         if (inviteError || !invite) {
@@ -173,14 +174,6 @@ export async function cancelInvitation(input: CancelInvitationInput) {
             // If invitation already revoked or doesn't exist, continue
             console.warn('Clerk invitation revocation warning:', clerkError.message);
         }
-
-        // Update org_invites status
-        const { error } = await supabase
-            .from('org_invites')
-            .update({ status: 'cancelled' })
-            .eq('id', input.invitationId);
-
-        if (error) throw error;
 
         return {
             success: true,
@@ -226,7 +219,7 @@ export async function resendInvitation(invitationId: string) {
         const clerkInvite = await clerk.organizations.createOrganizationInvitation({
             organizationId: invite.organization_id,
             emailAddress: invite.email,
-            role: invite.role == 'admin' ? 'org:admin' : 'org:member', 
+            role: invite.role == 'admin' ? 'org:admin' : 'org:member',
             publicMetadata: {
                 organizationId: invite.organization_id,
                 role: invite.role,

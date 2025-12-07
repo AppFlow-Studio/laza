@@ -63,14 +63,15 @@ export async function createItem(item: {
     organization_id: string;
     name: string;
     sku?: string | null;
-    category_id: string;
+    category_id: number | null;
     unit_of_measure: 'pcs' | 'kg' | 'liters' | 'lbs' | 'oz';
     min_quantity: number;
 }) {
+    console.log(item);
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
         .from('items')
-        .insert([item])
+        .insert(item)
         .select()
         .single();
 

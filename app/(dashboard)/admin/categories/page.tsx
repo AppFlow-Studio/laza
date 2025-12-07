@@ -21,9 +21,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import toast from 'react-hot-toast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
+import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 
 export default function CategoriesPage() {
     const [showCreateForm, setShowCreateForm] = useState(false);
+    const { data: userInfo } = useUserInfo();
     const [editingCategory, setEditingCategory] = useState<any | null>(null);
     const [deletingCategory, setDeletingCategory] = useState<any | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -48,6 +50,7 @@ export default function CategoriesPage() {
         try {
             await createMutation.mutateAsync({
                 name: data.name,
+                organization_id: userInfo?.members.organization_id,
                 description: data.description || undefined,
             });
             toast.success('Category created successfully');

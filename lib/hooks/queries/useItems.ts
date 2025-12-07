@@ -12,6 +12,7 @@ import {
     bulkUpdateItems,
     bulkDeleteItems,
 } from '@/lib/supabase/queries/items';
+import { Item } from '@/lib/supabase/types';
 
 export function useItems() {
     return useQuery({
@@ -47,7 +48,16 @@ export function useSearchItems(query: string) {
 export function useCreateItem() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: createItem,
+        mutationFn: ({ item }: {
+            item: {
+                organization_id: string;
+                name: string;
+                sku?: string | null;
+                category_id: number | null;
+                unit_of_measure: 'pcs' | 'kg' | 'liters' | 'lbs' | 'oz';
+                min_quantity: number;
+            }
+        }) => createItem(item),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['items'] });
         },

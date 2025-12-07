@@ -32,13 +32,14 @@ export async function getCategoryById(id: string) {
     return data as any;
 }
 
-export async function createCategory(name: string, description?: string) {
+export async function createCategory(name: string, organization_id: string, description?: string | null) {
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
         .from('category')
         .insert({
             name,
             description: description || null,
+            organization_id,
         })
         .select()
         .single();

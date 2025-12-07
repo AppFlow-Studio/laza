@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import {
-    useDailySummaryPreferences,
+import { 
+    useDailySummaryPreferences, 
     useUpdateDailySummaryPreferences,
     useNotificationPreferences,
-    useUpdateNotificationPreferences
+    useUpdateNotificationPreferences 
 } from '@/lib/hooks/queries/useNotificationPreferences';
 import { useLocations } from '@/lib/hooks/queries/useLocations';
 import { Button } from '@/components/ui/button';
@@ -61,8 +61,8 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
             }
             // Parse JSONB array of days
             if (notificationPrefs.daily_summary_days) {
-                const days = Array.isArray(notificationPrefs.daily_summary_days)
-                    ? notificationPrefs.daily_summary_days
+                const days = Array.isArray(notificationPrefs.daily_summary_days) 
+                    ? notificationPrefs.daily_summary_days 
                     : JSON.parse(notificationPrefs.daily_summary_days as any);
                 setSummaryDays(days.map((d: any) => typeof d === 'string' ? parseInt(d) : d));
             }
@@ -87,8 +87,8 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
     const handleSave = async () => {
         try {
             // Convert HH:MM to HH:MM:SS format for database
-            const scheduleTime = summarySchedule.length === 5
-                ? `${summarySchedule}:00`
+            const scheduleTime = summarySchedule.length === 5 
+                ? `${summarySchedule}:00` 
                 : summarySchedule;
 
             // Save notification preferences (schedule and days)
@@ -159,7 +159,7 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
                         <Calendar className="w-5 h-5 text-zinc-600" />
                         <Label className="text-base font-medium">Schedule</Label>
                     </div>
-
+                    
                     {/* Enable/Disable Toggle */}
                     <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
                         <div>
@@ -207,9 +207,9 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
                                         <label
                                             key={day.value}
                                             className={`flex items-center gap-2 p-2 border rounded-lg cursor-pointer transition-colors ${summaryDays.includes(day.value)
-                                                ? 'bg-indigo-50 border-indigo-300'
-                                                : 'bg-white border-zinc-200 hover:bg-zinc-50'
-                                                }`}
+                                                    ? 'bg-indigo-50 border-indigo-300'
+                                                    : 'bg-white border-zinc-200 hover:bg-zinc-50'
+                                            }`}
                                         >
                                             <input
                                                 type="checkbox"
@@ -339,12 +339,12 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
 
                 {/* Save Button */}
                 <div className="flex justify-end pt-4 border-t">
-                    <Button
-                        onClick={handleSave}
+                    <Button 
+                        onClick={handleSave} 
                         disabled={updateSummaryMutation.isPending || updateNotificationMutation.isPending}
                     >
-                        {updateSummaryMutation.isPending || updateNotificationMutation.isPending
-                            ? 'Saving...'
+                        {updateSummaryMutation.isPending || updateNotificationMutation.isPending 
+                            ? 'Saving...' 
                             : 'Save Preferences'}
                     </Button>
                 </div>
