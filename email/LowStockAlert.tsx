@@ -75,7 +75,7 @@ export default function LowStockAlert({ alertData }: LowStockAlertProps) {
                                     <Text style={metricValue}>{alertData.currentQuantity} {alertData.item.unit_of_measure}</Text>
                                 </Column>
                                 <Column style={metricColumn}>
-                                    <Text style={metricLabel}>Low Threshold</Text>
+                                    <Text style={metricLabel}>Minimum Quantity</Text>
                                     <Text style={metricValue}>{alertData.lowThreshold} {alertData.item.unit_of_measure}</Text>
                                 </Column>
                             </Row>

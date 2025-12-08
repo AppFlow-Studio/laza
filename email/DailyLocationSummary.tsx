@@ -139,7 +139,7 @@ export default function DailyLocationSummary({ summaryData }: DailyLocationSumma
                                                 {urgencyInfo.emoji} {item.itemName}
                                             </Text>
                                             <Text style={lowStockItemDetails}>
-                                                {item.currentQuantity} / {item.threshold} (below threshold)
+                                                {item.currentQuantity} / {item.threshold} (below minimum quantity)
                                             </Text>
                                         </Section>
                                     );
