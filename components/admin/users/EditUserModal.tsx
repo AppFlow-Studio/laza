@@ -49,9 +49,8 @@ interface EditUserModalProps {
 
 export default function EditUserModal({ user, onSuccess, onClose }: EditUserModalProps) {
     const updateUserMutation = useUpdateUser();
-    const { data: userInfo } = useUserInfo();
-    const organizationId = userInfo?.members?.organization_id;
-    const { data: locations } = useLocations(organizationId);
+ 
+    const { data: locations } = useLocations();
     const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
     const [pendingFormData, setPendingFormData] = useState<EditUserFormData | null>(null);
 

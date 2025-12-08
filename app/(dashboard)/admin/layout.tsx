@@ -58,14 +58,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <Sidebar variant="floating" collapsible="icon" className=''>
                         <SidebarHeader>
                             <div className="flex items-center gap-2 px-2 py-2">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white text-sm font-semibold">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-indigo-600 text-white text-sm font-semibold truncate">
                                     L
                                 </div>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-semibold">Laza Dessert Cafe</span>
                                     <span className="truncate text-xs text-muted-foreground">Admin Dashboard</span>
                                 </div>
-                                <SidebarTrigger className="ml-auto" />
                             </div>
                         </SidebarHeader>
 
@@ -140,6 +139,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         {/* Top Header */}
                         <header className="sticky top-0 z-10 bg-white border-b border-zinc-200 px-6 py-4 flex items-center gap-4">
                             {/* <SidebarTrigger /> */}
+                            <SidebarTrigger className="ml-auto" />
+
                             <div className="flex items-center justify-between flex-1">
                                 <div>
                                     <h2 className="text-lg font-semibold text-zinc-900">
@@ -147,12 +148,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                     </h2>
                                 </div>
 
-                                <div className="flex items-center gap-4">
+                                {/* <div className="flex items-center gap-4">
                                     <button className="p-2 hover:bg-zinc-100 rounded-lg transition-colors relative">
                                         <Bell className="w-5 h-5 text-zinc-600" />
                                         <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                                     </button>
-                                </div>
+                                </div> */}
                             </div>
                         </header>
 

@@ -148,6 +148,26 @@ Deno.serve(async (req) => {
         .select()
         .single()
 
+      // Update User with role and assigned_location_id
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .update({
+          role: event.data.public_metadata.role,
+          assigned_location_id: event.data.public_metadata.assigned_location_id,
+        })
+        .eq('id', event.data.public_user_data?.user_id)
+        .select()
+        .single()
+
+      if (userData) {
+        console.log('User updated:', userData)
+      }
+
+      if (userError) {
+        console.error('Error updating user:', userError)
+        return new Response(JSON.stringify({ error: userError.message }), { status: 500 })
+      }
+
       if (error) {
         console.error('Error updating member:', error)
         return new Response(JSON.stringify({ error: error.message }), { status: 500 })

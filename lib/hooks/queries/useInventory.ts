@@ -51,6 +51,8 @@ export function useLowStockItems(groupBy: 'location' | 'item' = 'location') {
 
 export function useUpdateQuantity() {
     const queryClient = useQueryClient();
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
     return useMutation({
         mutationFn: ({
             itemId,
@@ -76,6 +78,7 @@ export function useUpdateQuantity() {
             isOverride?: boolean;
             overrideReason?: string | null;
             overrideAdminId?: string | null;
+            organizationId?: string;
         }) => updateQuantity(
             itemId,
             locationId,
@@ -87,7 +90,8 @@ export function useUpdateQuantity() {
             minQuantityOverride,
             isOverride,
             overrideReason,
-            overrideAdminId
+            overrideAdminId,
+            organizationId
         ),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['inventory'] });

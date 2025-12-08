@@ -103,6 +103,7 @@ export function useUpdateQuantity() {
             actionType: 'count' | 'adjustment' | 'received' | 'used';
             notes?: string;
             minQuantityOverride?: number | null;
+            organizationId?: string;
         }) => updateQuantity(
             itemId,
             locationId,

@@ -47,7 +47,7 @@ export async function updateQuantity(
     organizationId?: string
 ) {
     const supabase = createServerSupabaseClient();
-
+    console.log('updateQuantity', itemId, locationId, storageSpaceId, userId, actionType, notes, minQuantityOverride, isOverride, overrideReason, overrideAdminId, organizationId)
     // Check update limits (unless this is an admin override)
     if (!isOverride) {
         const limitCheck = await checkUpdateAllowed(itemId, locationId, storageSpaceId, userId);
