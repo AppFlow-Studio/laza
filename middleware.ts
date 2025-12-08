@@ -21,7 +21,10 @@ export default clerkMiddleware(async (auth, req) => {
     // console.log('sessionClaims', sessionClaims);
     // Protect admin routes - only admins can access
     if (isAdminRoute(req)) {
-        if (!userId || role !== 'admin') {
+        if (!userId) {
+            return NextResponse.redirect(new URL('/sign-in', req.url));
+        }
+        if (role !== 'admin') {
             return new Response('Unauthorized', { status: 403 })
         }
         return NextResponse.next();
@@ -29,7 +32,10 @@ export default clerkMiddleware(async (auth, req) => {
 
     // Protect employee routes - employees and admins can access
     if (isEmployeeRoute(req)) {
-        if (!userId || (role !== 'member' && role !== 'admin')) {
+        if (!userId) {
+            return NextResponse.redirect(new URL('/sign-in', req.url));
+        }
+        if (role !== 'member' && role !== 'admin') {
             return new Response('Unauthorized', { status: 403 })
         }
         return NextResponse.next();
