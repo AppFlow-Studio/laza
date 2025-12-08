@@ -80,18 +80,20 @@ export function useUpdateQuantity() {
             overrideAdminId?: string | null;
             organizationId?: string;
         }) => updateQuantity(
-            itemId,
-            locationId,
-            storageSpaceId,
-            newQuantity,
-            userId,
-            actionType,
-            notes,
-            minQuantityOverride,
-            isOverride,
-            overrideReason,
-            overrideAdminId,
-            organizationId
+            {
+                itemId,
+                locationId,
+                storageSpaceId,
+                newQuantity,
+                userId,
+                actionType,
+                notes,
+                minQuantityOverride,
+                isOverride,
+                overrideReason,
+                overrideAdminId,
+                organizationId
+            }
         ),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['inventory'] });

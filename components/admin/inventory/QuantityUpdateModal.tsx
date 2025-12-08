@@ -70,9 +70,9 @@ export default function QuantityUpdateModal({
     const onSubmit = async (data: QuantityFormData) => {
         try {
             await updateMutation.mutateAsync({
-                itemId,
-                locationId,
-                storageSpaceId,
+                itemId: itemId,
+                locationId: locationId,
+                storageSpaceId: storageSpaceId,
                 newQuantity: data.new_quantity,
                 userId: userInfo?.id || '',
                 actionType: data.action_type,

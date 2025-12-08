@@ -168,6 +168,7 @@ export default function QuantityUpdateSheet({
 
         try {
             await updateMutation.mutateAsync({
+
                 id: id,
                 itemId: item.id,
                 locationId,

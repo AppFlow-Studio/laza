@@ -84,7 +84,7 @@ export function useUpdateQuantity() {
     const organizationId = userInfo?.members?.organization_id;
     return useMutation({
         mutationFn: ({
-            id,
+            id, 
             itemId,
             locationId,
             storageSpaceId,
@@ -105,15 +105,17 @@ export function useUpdateQuantity() {
             minQuantityOverride?: number | null;
             organizationId?: string;
         }) => updateQuantity(
-            itemId,
-            locationId,
-            storageSpaceId,
-            newQuantity,
-            userId,
-            actionType,
-            notes,
-            minQuantityOverride,
-            organizationId
+            {
+                itemId,
+                locationId,
+                storageSpaceId,
+                newQuantity,
+                userId,
+                actionType,
+                notes,
+                minQuantityOverride,
+                organizationId
+            }
         ),
         onSuccess: (_, variables) => {
             // Invalidate relevant queries

@@ -32,12 +32,25 @@ export async function getInventoryByItemAndLocation(itemId: string, locationId: 
     return data as ItemLocation | null;
 }
 
-export async function updateQuantity(
-    itemId: string,
-    locationId: string,
-    storageSpaceId: string | null,
-    newQuantity: number,
-    userId: string,
+export async function updateQuantity({
+    itemId,
+    locationId,
+    storageSpaceId,
+    newQuantity,
+    userId,
+    actionType,
+    notes,
+    minQuantityOverride,
+    isOverride,
+    overrideReason,
+    overrideAdminId,
+    organizationId,
+}: {
+    itemId: string;
+    locationId: string;
+    storageSpaceId: string | null;
+    newQuantity: number;
+    userId: string;
     actionType: 'count' | 'adjustment' | 'received' | 'used',
     notes?: string,
     minQuantityOverride?: number | null,
@@ -45,7 +58,7 @@ export async function updateQuantity(
     overrideReason?: string | null,
     overrideAdminId?: string | null,
     organizationId?: string
-) {
+}) {
     const supabase = createServerSupabaseClient();
     console.log('updateQuantity', itemId, locationId, storageSpaceId, userId, actionType, notes, minQuantityOverride, isOverride, overrideReason, overrideAdminId, organizationId)
     // Check update limits (unless this is an admin override)
