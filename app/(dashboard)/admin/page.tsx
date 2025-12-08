@@ -1,7 +1,6 @@
 "use client";
 
 import { useLocations } from '@/lib/hooks/queries/useLocations';
-import { useEmployees } from '@/lib/hooks/queries/useEmployees';
 import { useItems } from '@/lib/hooks/queries/useItems';
 import { useAlerts } from '@/lib/hooks/queries/useInventory';
 import StatsCard from '@/components/admin/dashboard/StatsCard';
@@ -12,11 +11,14 @@ import { useState } from 'react';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
 import toast from 'react-hot-toast';
 import ImmediateActions from '@/components/admin/dashboard/ImmediateActions';
+import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
+import { useOrganizationUsers } from '@/lib/hooks/queries/useUsers';
 // import { useInventoryLogsSubscription, useAlertsSubscription, useEmployeesSubscription } from '@/lib/supabase/subscriptions';
 
 export default function AdminDashboard() {
+    const { data: userInfo } = useUserInfo();
     const { data: locations, isLoading: locationsLoading } = useLocations();
-    const { data: employees, isLoading: employeesLoading } = useEmployees();
+    const { data: employees, isLoading: employeesLoading } = useOrganizationUsers(userInfo?.members?.organization_id);
     const { data: items, isLoading: itemsLoading } = useItems();
     const { data: alerts, isLoading: alertsLoading } = useAlerts({ resolved: false });
 

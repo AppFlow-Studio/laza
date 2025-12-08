@@ -3,7 +3,7 @@
 import { createServerSupabaseClient } from '../server';
 import { Item } from '../types';
 import { auth } from '@clerk/nextjs/server';
-export async function getAllItems() {
+export async function getAllItems(organizationId: string) {
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
         .from('items')
@@ -13,6 +13,7 @@ export async function getAllItems() {
             category(*)
             `
         )
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
     if (error) {
         throw error

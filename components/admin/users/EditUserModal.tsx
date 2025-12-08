@@ -22,6 +22,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { AlertTriangle, UserX } from 'lucide-react';
+import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 
 const editUserSchema = z.object({
     role: z.enum(['admin', 'employee']),
@@ -48,7 +49,9 @@ interface EditUserModalProps {
 
 export default function EditUserModal({ user, onSuccess, onClose }: EditUserModalProps) {
     const updateUserMutation = useUpdateUser();
-    const { data: locations } = useLocations();
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
+    const { data: locations } = useLocations(organizationId);
     const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
     const [pendingFormData, setPendingFormData] = useState<EditUserFormData | null>(null);
 

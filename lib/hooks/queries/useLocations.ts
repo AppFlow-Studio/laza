@@ -9,11 +9,15 @@ import {
     updateLocation,
     deleteLocation,
 } from '@/lib/supabase/queries/locations';
+import { useUserInfo } from './useUserInfo';
 
 export function useLocations() {
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
     return useQuery({
-        queryKey: ['locations'],
-        queryFn: getAllLocations,
+        queryKey: ['locations', organizationId],
+        queryFn: () => getAllLocations(organizationId!),
+        enabled: !!organizationId,
     });
 }
 

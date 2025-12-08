@@ -1,10 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAllCategories, getCategoryById, createCategory, updateCategory, deleteCategory } from '@/lib/supabase/queries/categories';
+import { useUserInfo } from './useUserInfo';
 
 export function useCategories() {
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
     return useQuery({
-        queryKey: ['categories'],
-        queryFn: getAllCategories,
+        queryKey: ['categories', organizationId],
+        queryFn: () => getAllCategories(organizationId!),
+        enabled: !!organizationId,
     });
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useItems } from '@/lib/hooks/queries/useItems';
 import ItemGrid from '@/components/admin/items/ItemGrid';
 import SearchBar from '@/components/admin/shared/SearchBar';
@@ -22,33 +22,17 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAdminStore } from '@/lib/stores/adminStore';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useCreateItem, useUpdateItem, useDeleteItem, useBulkUpdateItems, useBulkDeleteItems } from '@/lib/hooks/queries/useItems';
+import { useDeleteItem, useBulkUpdateItems, useBulkDeleteItems } from '@/lib/hooks/queries/useItems';
 import toast from 'react-hot-toast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useSearchItems } from '@/lib/hooks/queries/useItems';
 import { useCategories } from '@/lib/hooks/queries/useCategories';
-import { useUser } from '@clerk/nextjs';
-import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
-
-const itemSchema = z.object({
-    name: z.string().min(1, 'Name is required'),
-    sku: z.string().optional().nullable(),
-    category: z.number().optional().nullable(),
-    unit_of_measure: z.enum(['pcs', 'kg', 'liters', 'lbs', 'oz']),
-    min_quantity: z.number().min(0),
-});
-
-type ItemFormData = z.infer<typeof itemSchema>;
+import ItemForm from '@/components/admin/items/ItemForm';
 
 export default function ItemsPage() {
-    const { data: userInfo } = useUserInfo();
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingItem, setEditingItem] = useState<any>(null);
+
     const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -58,12 +42,10 @@ export default function ItemsPage() {
     const debouncedSearch = useDebounce(searchQuery, 300);
     const { viewMode, setViewMode } = useAdminStore();
 
-    const { data: allItems, isLoading: allItemsLoading, isError: allItemsError } = useItems();
-    const { data: categories, isLoading: categoriesLoading, isError: categoriesError } = useCategories();
+    const { data: allItems, isLoading: allItemsLoading } = useItems();
+    const { data: categories, isLoading: categoriesLoading } = useCategories();
     const { data: searchResults, isLoading: searchLoading } = useSearchItems(debouncedSearch);
 
-    const createMutation = useCreateItem();
-    const updateMutation = useUpdateItem();
     const deleteMutation = useDeleteItem();
     const bulkUpdateMutation = useBulkUpdateItems();
     const bulkDeleteMutation = useBulkDeleteItems();
@@ -74,110 +56,24 @@ export default function ItemsPage() {
     // Filter by category if selected
     if (categoryFilter && items.length > 0) {
         items = items.filter((item: any) => {
-            const itemCategoryId = typeof item.category === 'object' && item.category !== null
-                ? item.category.id
-                : item.category;
-            return itemCategoryId === categoryFilter;
+            // Handle category as object (from join) or category_id
+            const itemCategoryId = item.category_id
+                || (typeof item.category === 'object' && item.category !== null ? item.category.id : null);
+            return itemCategoryId?.toString() === categoryFilter;
         });
     }
     if (debouncedSearch) {
         items = searchResults || [];
     }
 
-    const {
-        register,
-        handleSubmit,
-        formState: { errors },
-        reset,
-    } = useForm<ItemFormData>({
-        resolver: zodResolver(itemSchema),
-        defaultValues: {
-            name: '',
-            sku: '',
-            category: null,
-            unit_of_measure: 'pcs',
-            min_quantity: 0,
-        },
-    });
+    const handleFormSuccess = () => {
+        setShowAddForm(false);
+        setEditingItem(null);
+    };
 
-    // Reset form when editingItem changes
-    useEffect(() => {
-        if (editingItem && categories) {
-            // Extract category ID - handle both object and string formats
-            let categoryId = '';
-            if (typeof editingItem.category === 'object' && editingItem.category !== null && 'id' in editingItem.category) {
-                // Category is an object with id
-                categoryId = editingItem.category.id;
-            } else if (typeof editingItem.category === 'string') {
-                // Category is stored as enum string, find matching category by name
-                const matchingCategory = categories.find(cat =>
-                    cat.name.toLowerCase() === editingItem.category.toLowerCase()
-                );
-                categoryId = matchingCategory?.id || '';
-            }
-
-            reset({
-                name: editingItem.name || '',
-                sku: editingItem.sku || '',
-                category: Number(categoryId) || null,
-                unit_of_measure: editingItem.unit_of_measure || 'pcs',
-                min_quantity: editingItem.min_quantity || 0,
-            });
-        } else if (!editingItem) {
-            reset({
-                name: '',
-                sku: '',
-                category: null,
-                unit_of_measure: 'pcs',
-                min_quantity: 0,
-            });
-        }
-    }, [editingItem, categories, reset]);
-
-    const onSubmit = async (data: ItemFormData) => {
-        try {
-            const organizationId = userInfo?.members.organization_id;
-            console.log(userInfo);
-            if (!organizationId) {
-                toast.error('Organization not found');
-                return;
-            }
-            console.log(organizationId);
-
-
-
-            if (editingItem) {
-                await updateMutation.mutateAsync({
-                    id: editingItem.id,
-                    updates: {
-                        name: data.name,
-                        sku: data.sku || null,
-                        category_id: data.category || null,
-                        unit_of_measure: data.unit_of_measure,
-                        min_quantity: data.min_quantity,
-                    },
-                });
-                toast.success('Item updated successfully');
-            } else {
-                console.log(data);
-                await createMutation.mutateAsync({
-                    item: {
-                        organization_id: organizationId,
-                        name: data.name,
-                        sku: data.sku || null,
-                        category_id: Number(data.category) || null,
-                        unit_of_measure: data.unit_of_measure,
-                        min_quantity: data.min_quantity,
-                    }
-                });
-                toast.success('Item created successfully');
-            }
-            setShowAddForm(false);
-            setEditingItem(null);
-            reset();
-        } catch (error: any) {
-            toast.error(error.message || 'An error occurred');
-        }
+    const handleFormCancel = () => {
+        setShowAddForm(false);
+        setEditingItem(null);
     };
 
     const handleDelete = async (item: any) => {
@@ -324,95 +220,14 @@ export default function ItemsPage() {
             {/* Add/Edit Form */}
             <MobileSheet
                 isOpen={showAddForm || !!editingItem}
-                onClose={() => {
-                    setShowAddForm(false);
-                    setEditingItem(null);
-                    reset();
-                }}
+                onClose={handleFormCancel}
                 title={editingItem ? 'Edit Item' : 'Add Item'}
             >
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                    <div>
-                        <Label htmlFor="name">Item Name</Label>
-                        <Input
-                            id="name"
-                            {...register('name')}
-                            className={errors.name ? 'border-red-500' : ''}
-                        />
-                        {errors.name && (
-                            <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
-                        )}
-                    </div>
-
-                    <div>
-                        <Label htmlFor="sku">SKU (Optional)</Label>
-                        <Input
-                            id="sku"
-                            {...register('sku')}
-                        />
-                    </div>
-
-                    <div>
-                        <Label htmlFor="category">Category</Label>
-                        <select
-                            id="category"
-                            {...register('category')}
-                            className="w-full px-3 py-2 border border-zinc-200 rounded-lg"
-                            disabled={categoriesLoading}
-                        >
-                            <option value="">Select a category</option>
-                            {categories?.map((category) => (
-                                <option key={category.id} value={category.id as string}>
-                                    {category.name}
-                                </option>
-                            ))}
-                        </select>
-                        {errors.category && (
-                            <p className="text-sm text-red-500 mt-1">{errors.category.message}</p>
-                        )}
-                    </div>
-
-                    <div>
-                        <Label htmlFor="unit_of_measure">Unit of Measure</Label>
-                        <select
-                            id="unit_of_measure"
-                            {...register('unit_of_measure')}
-                            className="w-full px-3 py-2 border border-zinc-200 rounded-lg"
-                        >
-                            <option value="pcs">Pieces</option>
-                            <option value="kg">Kilograms</option>
-                            <option value="liters">Liters</option>
-                            <option value="lbs">Pounds</option>
-                            <option value="oz">Ounces</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <Label htmlFor="min_quantity">Minimum Quantity</Label>
-                        <Input
-                            id="min_quantity"
-                            type="number"
-                            step="0.01"
-                            {...register('min_quantity', { valueAsNumber: true })}
-                            className={errors.min_quantity ? 'border-red-500' : ''}
-                        />
-                        {errors.min_quantity && (
-                            <p className="text-sm text-red-500 mt-1">{errors.min_quantity.message}</p>
-                        )}
-                    </div>
-
-                    <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={createMutation.isPending || updateMutation.isPending}
-                    >
-                        {createMutation.isPending || updateMutation.isPending
-                            ? 'Saving...'
-                            : editingItem
-                                ? 'Update'
-                                : 'Create'}
-                    </Button>
-                </form>
+                <ItemForm
+                    item={editingItem}
+                    onSuccess={handleFormSuccess}
+                    onCancel={handleFormCancel}
+                />
             </MobileSheet>
 
             {/* Bulk Update Modal */}

@@ -15,6 +15,7 @@ import SearchBar from '@/components/admin/shared/SearchBar';
 import FilterDropdown from '@/components/admin/shared/FilterDropdown';
 import { Grid, List } from 'lucide-react';
 import CategoryFilter from './CategoryFilter';
+import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 
 interface ItemAssignmentStepProps {
     selectedItems: Set<string>;

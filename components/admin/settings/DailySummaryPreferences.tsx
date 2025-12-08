@@ -33,7 +33,7 @@ const DAYS_OF_WEEK = [
 export default function DailySummaryPreferences({ organizationId }: DailySummaryPreferencesProps) {
     const { data: preferences, isLoading: isLoadingSummary } = useDailySummaryPreferences(organizationId);
     const { data: notificationPrefs, isLoading: isLoadingNotification } = useNotificationPreferences(organizationId);
-    const { data: locations } = useLocations();
+    const { data: locations } = useLocations(organizationId);
     const updateSummaryMutation = useUpdateDailySummaryPreferences();
     const updateNotificationMutation = useUpdateNotificationPreferences();
 

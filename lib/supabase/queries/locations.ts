@@ -3,7 +3,7 @@
 import { createServerSupabaseClient } from '../server';
 import { Location, StorageSpace } from '../types';
 
-export async function getAllLocations() {
+export async function getAllLocations(organizationId: string) {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
         .from('locations')
@@ -17,6 +17,7 @@ export async function getAllLocations() {
             )
             `
         )
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
     if (error) throw error;

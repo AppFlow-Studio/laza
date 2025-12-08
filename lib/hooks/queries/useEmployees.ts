@@ -10,11 +10,15 @@ import {
     bulkAssignEmployees,
     activateEmployee,
 } from '@/lib/supabase/queries/employees';
+import { useUserInfo } from './useUserInfo';
 
 export function useEmployees() {
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
     return useQuery({
-        queryKey: ['employees'],
-        queryFn: getAllEmployees,
+        queryKey: ['employees', organizationId],
+        queryFn: () => getAllEmployees(organizationId!),
+        enabled: !!organizationId,
     });
 }
 

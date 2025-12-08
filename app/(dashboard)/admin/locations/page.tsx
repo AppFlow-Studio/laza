@@ -16,8 +16,9 @@ import { useDeleteLocation } from '@/lib/hooks/queries/useLocations';
 import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 
 export default function LocationsPage() {
-    const { data: locations, isLoading } = useLocations();
     const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
+    const { data: locations, isLoading } = useLocations(organizationId);
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingLocation, setEditingLocation] = useState<any>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -47,7 +48,6 @@ export default function LocationsPage() {
         }
     };
 
-    const organizationId = userInfo?.members.organization_id;
 
     return (
         <div className="space-y-6">

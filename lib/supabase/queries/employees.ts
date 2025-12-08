@@ -3,16 +3,25 @@
 import { createServerSupabaseClient } from '../server';
 import { User } from '../types';
 
-export async function getAllEmployees() {
+export async function getAllEmployees(organizationId: string) {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .in('role', ['admin', 'employee'])
+        .from('members')
+        .select('users(*)')
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data as User[];
+    return data as {
+        members: {
+            id: string;
+            organization_id: string;
+            user_id: string;
+            created_at: string;
+            updated_at: string;
+        }
+        users: User;
+    }[];
 }
 
 export async function getEmployeeById(id: string) {

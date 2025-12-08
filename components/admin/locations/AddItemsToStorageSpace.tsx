@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import SearchBar from '@/components/admin/shared/SearchBar';
 import CategoryFilter from '@/components/admin/locations/CategoryFilter';
 import { Grid, List } from 'lucide-react';
+import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 
 interface AddItemsToStorageSpaceProps {
     existingItemIds: Set<string>;

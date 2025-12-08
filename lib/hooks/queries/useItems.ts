@@ -13,11 +13,14 @@ import {
     bulkDeleteItems,
 } from '@/lib/supabase/queries/items';
 import { Item } from '@/lib/supabase/types';
+import { useUserInfo } from './useUserInfo';
 
 export function useItems() {
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
     return useQuery({
-        queryKey: ['items'],
-        queryFn: getAllItems,
+        queryKey: ['items', organizationId],
+        queryFn: () => getAllItems(organizationId),
     });
 }
 

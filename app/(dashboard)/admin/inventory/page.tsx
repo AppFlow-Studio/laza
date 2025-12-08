@@ -11,6 +11,7 @@ import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import { useLocationWithDetails } from '@/lib/hooks/queries/useLocations';
 import { useAdminStore } from '@/lib/stores/adminStore';
 import FilterDropdown from '@/components/admin/shared/FilterDropdown';
+import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 // import { useInventorySubscription } from '@/lib/supabase/subscriptions';
 
 export default function InventoryPage() {
