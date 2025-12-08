@@ -13,6 +13,7 @@ import {
     bulkUpdateInventory,
     bulkRemoveItemsFromStorage,
 } from '@/lib/supabase/queries/inventory';
+import { useUserInfo } from './useUserInfo';
 
 export function useInventoryByLocation(locationId: string | null) {
     return useQuery({
@@ -23,16 +24,20 @@ export function useInventoryByLocation(locationId: string | null) {
 }
 
 export function useInventoryLogs(filters?: { itemId?: string; locationId?: string; limit?: number }) {
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
     return useQuery({
         queryKey: ['inventory-logs', filters],
-        queryFn: () => getInventoryLogs(filters),
+        queryFn: () => getInventoryLogs(filters, organizationId),
     });
 }
 
 export function useAlerts(filters?: { locationId?: string; storageSpaceId?: string; resolved?: boolean }) {
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
     return useQuery({
-        queryKey: ['alerts', filters],
-        queryFn: () => getAlerts(filters),
+        queryKey: ['alerts', filters, organizationId],
+        queryFn: () => getAlerts(filters, organizationId),
     });
 }
 
@@ -104,7 +109,8 @@ export function useResolveAlert() {
 
 export function useBulkUpdateInventory() {
     const queryClient = useQueryClient();
-    const { user } = useUser();
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
     return useMutation({
         mutationFn: (data: {
             itemLocations: Array<{
@@ -117,8 +123,8 @@ export function useBulkUpdateInventory() {
                 notes?: string;
             }>;
         }) => {
-            if (!user?.id) throw new Error('User not authenticated');
-            return bulkUpdateInventory(data.itemLocations, user.id);
+            if (!userInfo?.id) throw new Error('userInfo not authenticated');
+            return bulkUpdateInventory(data.itemLocations, userInfo.id, organizationId);
         },
         onSuccess: (_, variables) => {
             const firstItem = variables.itemLocations[0];

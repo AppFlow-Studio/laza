@@ -12,6 +12,7 @@ import {
     getEmployeeStats,
 } from '@/lib/supabase/queries/employee';
 import { updateQuantity } from '@/lib/supabase/queries/inventory';
+import { useUserInfo } from './useUserInfo';
 
 export function useEmployeeLocation() {
     const { user } = useUser();
@@ -79,6 +80,8 @@ export function useEmployeeStats(userId: string | null, locationId: string | nul
 
 export function useUpdateQuantity() {
     const queryClient = useQueryClient();
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
     return useMutation({
         mutationFn: ({
             id,
@@ -108,7 +111,8 @@ export function useUpdateQuantity() {
             userId,
             actionType,
             notes,
-            minQuantityOverride
+            minQuantityOverride,
+            organizationId
         ),
         onSuccess: (_, variables) => {
             // Invalidate relevant queries

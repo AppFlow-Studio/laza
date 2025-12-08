@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import { useStorageSpace, useInventoryByStorageSpace, useInventoryLogsByStorageSpace, useUpdateStorageSpace, useDeleteStorageSpace } from '@/lib/hooks/queries/useStorageSpace';
 import { useBulkAssignItems } from '@/lib/hooks/queries/useStorageSetup';
-import { useUpdateQuantity, useBulkUpdateInventory, useBulkRemoveItems } from '@/lib/hooks/queries/useInventory';
+import { useBulkUpdateInventory, useBulkRemoveItems } from '@/lib/hooks/queries/useInventory';
 import { useAdminStore } from '@/lib/stores/adminStore';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import MobileSheet from '@/components/admin/shared/MobileSheet';

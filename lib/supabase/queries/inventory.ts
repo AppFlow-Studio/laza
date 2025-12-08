@@ -43,7 +43,8 @@ export async function updateQuantity(
     minQuantityOverride?: number | null,
     isOverride?: boolean,
     overrideReason?: string | null,
-    overrideAdminId?: string | null
+    overrideAdminId?: string | null,
+    organizationId?: string
 ) {
     const supabase = createServerSupabaseClient();
 
@@ -107,6 +108,7 @@ export async function updateQuantity(
             quantity_change: quantityChange,
             action_type: actionType,
             notes: notes || null,
+            organization_id: organizationId,
         })
         .select()
         .single();
@@ -133,7 +135,7 @@ export async function getInventoryLogs(filters?: {
     itemId?: string;
     locationId?: string;
     limit?: number;
-}) {
+}, organizationId?: string) {
     const supabase = await createServerSupabaseClient();
     let query = supabase
         .from('inventory_logs')
@@ -144,7 +146,8 @@ export async function getInventoryLogs(filters?: {
       storage_spaces (*),
       users (*)
     `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .eq('organization_id', organizationId);
 
     if (filters?.itemId) {
         query = query.eq('item_id', filters.itemId);
@@ -165,7 +168,7 @@ export async function getAlerts(filters?: {
     locationId?: string;
     storageSpaceId?: string;
     resolved?: boolean;
-}) {
+}, organizationId?: string) {
     const supabase = await createServerSupabaseClient();
 
     // First get alerts
@@ -177,7 +180,8 @@ export async function getAlerts(filters?: {
       locations (*),
       storage_spaces (*)
     `)
-        .order('triggered_at', { ascending: false });
+        .order('triggered_at', { ascending: false })
+        .eq('organization_id', organizationId);
 
     if (filters?.locationId) {
         query = query.eq('location_id', filters.locationId);
@@ -363,7 +367,8 @@ export async function bulkUpdateInventory(
         notes?: string;
     }>,
     userId: string,
-    isOverride?: boolean
+    isOverride?: boolean,
+    organizationId?: string
 ) {
     const supabase = await createServerSupabaseClient();
 
@@ -433,6 +438,7 @@ export async function bulkUpdateInventory(
             quantity_change: quantityChange,
             action_type: itemLoc.actionType,
             notes: itemLoc.notes || null,
+            organization_id: organizationId,
         });
     }
 
