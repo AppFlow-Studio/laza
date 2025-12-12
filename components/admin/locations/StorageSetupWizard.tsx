@@ -222,14 +222,14 @@ export default function StorageSetupWizard({ locationId, onComplete, onClose }: 
             {/* Footer Actions */}
             {currentStep === 2 && (
                 <div className="mt-6 pt-4 border-t border-zinc-200 flex flex-col sm:flex-row gap-2">
-                    <Button
+                    {/* <Button
                         variant="outline"
                         onClick={handleAddAnother}
                         className="flex-1"
                         disabled={isLoading}
                     >
                         Add Another Storage Space
-                    </Button>
+                    </Button> */}
                     <Button
                         onClick={handleAssignItems}
                         className="flex-1"

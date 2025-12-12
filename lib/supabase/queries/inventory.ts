@@ -323,7 +323,8 @@ export async function bulkAssignItemsToStorage(
     locationId: string,
     storageSpaceId: string,
     items: Array<{ itemId: string; quantity: number; minQuantityOverride?: number | null }>,
-    userId: string
+    userId: string,
+    organizationId: string
 ) {
     const supabase = await createServerSupabaseClient();
 
@@ -358,6 +359,7 @@ export async function bulkAssignItemsToStorage(
         quantity_change: quantity,
         action_type: 'received' as const,
         notes: 'Initial assignment to storage space',
+        organization_id: organizationId,
     }));
 
     const { error: logError } = await supabase
