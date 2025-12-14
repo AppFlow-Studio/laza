@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocations } from '@/lib/hooks/queries/useLocations';
 import { useInventoryByLocation } from '@/lib/hooks/queries/useInventory';
 import { useItems } from '@/lib/hooks/queries/useItems';
@@ -31,9 +31,12 @@ export default function InventoryPage() {
 
     const selectedLocation = locations?.find((loc) => loc.id === selectedLocationId);
 
-    if (!selectedLocationId && locations && locations.length > 0) {
-        setSelectedLocationId(locations[0].id);
-    }
+    // Auto-select first location when locations are available and none is selected
+    useEffect(() => {
+        if (!selectedLocationId && locations && locations.length > 0) {
+            setSelectedLocationId(locations[0].id);
+        }
+    }, [selectedLocationId, locations, setSelectedLocationId]);
 
     const getCurrentQuantity = (itemId: string, storageSpaceId: string | null) => {
         const inv = inventory?.find(
@@ -55,17 +58,9 @@ export default function InventoryPage() {
         );
     }
 
-    if (!selectedLocationId || !locationDetails) {
-        return (
-            <div className="text-center py-12">
-                <p className="text-zinc-500">Please select a location to view inventory</p>
-            </div>
-        );
-    }
-
     return (
         <div className="space-y-6">
-            {/* Location Selector */}
+            {/* Location Selector - Always visible */}
             <div>
                 <FilterDropdown
                     label="Location"
@@ -80,31 +75,54 @@ export default function InventoryPage() {
                 />
             </div>
 
-            {/* Inventory Matrix */}
-            <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                <div className="p-4 border-b border-zinc-200">
-                    <h2 className="text-lg font-semibold text-zinc-900">
-                        {selectedLocation?.name} - Inventory Matrix
-                    </h2>
+            {/* Show message if no locations exist */}
+            {(!locations || locations.length === 0) && (
+                <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-zinc-200">
+                    <p className="text-zinc-500">No locations available. Please create a location to view inventory.</p>
                 </div>
-                <div className="p-4">
-                    {locationDetails.storage_spaces && locationDetails.storage_spaces.length > 0 && items ? (
-                        <InventoryMatrix
-                            items={items}
-                            storageSpaces={locationDetails.storage_spaces}
-                            inventory={inventory || []}
-                            onCellClick={handleCellClick}
-                        />
-                    ) : (
-                        <div className="text-center py-12 text-zinc-500">
-                            <p>No storage spaces configured for this location</p>
-                        </div>
-                    )}
+            )}
+
+            {/* Show message if location is selected but no details */}
+            {selectedLocationId && !locationDetails && (
+                <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-zinc-200">
+                    <p className="text-zinc-500">Loading location details...</p>
                 </div>
-            </div>
+            )}
+
+            {/* Show message if no location is selected but locations exist */}
+            {!selectedLocationId && locations && locations.length > 0 && (
+                <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-zinc-200">
+                    <p className="text-zinc-500">Please select a location to view inventory</p>
+                </div>
+            )}
+
+            {/* Inventory Matrix - Only show when location is selected and details are loaded */}
+            {selectedLocationId && locationDetails && (
+                <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
+                    <div className="p-4 border-b border-zinc-200">
+                        <h2 className="text-lg font-semibold text-zinc-900">
+                            {selectedLocation?.name} - Inventory Matrix
+                        </h2>
+                    </div>
+                    <div className="p-4">
+                        {locationDetails.storage_spaces && locationDetails.storage_spaces.length > 0 && items ? (
+                            <InventoryMatrix
+                                items={items}
+                                storageSpaces={locationDetails.storage_spaces}
+                                inventory={inventory || []}
+                                onCellClick={handleCellClick}
+                            />
+                        ) : (
+                            <div className="text-center py-12 text-zinc-500">
+                                <p>No storage spaces configured for this location</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Update Quantity Modal */}
-            {updatingCell && (
+            {updatingCell && selectedLocationId && (
                 <MobileSheet
                     isOpen={!!updatingCell}
                     onClose={() => setUpdatingCell(null)}
