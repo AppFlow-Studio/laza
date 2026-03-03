@@ -8,7 +8,7 @@ import { useEmployeeLocation } from '@/lib/hooks/queries/useEmployee';
 import SearchBar from '@/components/admin/shared/SearchBar';
 import FilterDropdown from '@/components/admin/shared/FilterDropdown';
 import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import QuantityUpdateSheet from '@/components/employee/inventory/QuantityUpdateSheet';
 

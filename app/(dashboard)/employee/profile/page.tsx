@@ -2,7 +2,7 @@
 
 import { useUser } from '@clerk/nextjs';
 import { useEmployeeLocation, useEmployeeStats } from '@/lib/hooks/queries/useEmployee';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { User, Mail, MapPin, Package, Clock, TrendingUp, Warehouse } from 'lucide-react';
 import { format } from 'date-fns';
 import { SignOutButton } from '@clerk/nextjs';

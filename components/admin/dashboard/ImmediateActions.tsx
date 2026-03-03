@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { AlertTriangle, Package, MapPin, Warehouse } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
 import QuantityUpdateModal from '@/components/admin/inventory/QuantityUpdateModal';
 import EditStorageSpaceModal from '../locations/EditStorageSpaceModal';

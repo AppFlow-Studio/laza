@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { LucideIcon } from 'lucide-react';
 import CountUp from 'react-countup';
 import { cn } from '@/lib/utils';
