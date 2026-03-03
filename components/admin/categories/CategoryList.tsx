@@ -3,7 +3,7 @@
 import { Edit, Trash2, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 interface Category {
     id: string;

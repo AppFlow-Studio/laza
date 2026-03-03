@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Package, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import QuantityUpdateSheet from './QuantityUpdateSheet';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 interface ItemCardProps {
     item: any;

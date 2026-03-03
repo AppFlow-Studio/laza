@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { User, Mail, MapPin, Edit, Trash2 } from 'lucide-react';
 import { User as EmployeeType } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';

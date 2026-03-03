@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useLocations } from '@/lib/hooks/queries/useLocations';
 import LocationCard from '@/components/admin/locations/LocationCard';
 import LocationForm from '@/components/admin/locations/LocationForm';
@@ -19,7 +20,6 @@ export default function LocationsPage() {
     const { data: userInfo } = useUserInfo();
     const organizationId = userInfo?.members?.organization_id;
     const { data: locations, isLoading } = useLocations(organizationId);
-    const [showAddForm, setShowAddForm] = useState(false);
     const [editingLocation, setEditingLocation] = useState<any>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 300);
@@ -72,10 +72,12 @@ export default function LocationsPage() {
                             <List className="w-4 h-4" />
                         </button>
                     </div>
-                    <Button onClick={() => setShowAddForm(true)}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Location
-                    </Button>
+                    <Link href="/admin/locations/new">
+                        <Button>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Location
+                        </Button>
+                    </Link>
                 </div>
             </div>
 
@@ -114,22 +116,16 @@ export default function LocationsPage() {
                 </div>
             )}
 
-            {/* Add/Edit Form */}
+            {/* Edit Form */}
             <MobileSheet
-                isOpen={showAddForm || !!editingLocation}
-                onClose={() => {
-                    setShowAddForm(false);
-                    setEditingLocation(null);
-                }}
-                title={editingLocation ? 'Edit Location' : 'Add Location'}
+                isOpen={!!editingLocation}
+                onClose={() => setEditingLocation(null)}
+                title="Edit Location"
             >
                 <LocationForm
                     location={editingLocation}
                     organizationId={organizationId}
-                    onSuccess={() => {
-                        setShowAddForm(false);
-                        setEditingLocation(null);
-                    }}
+                    onSuccess={() => setEditingLocation(null)}
                 />
             </MobileSheet>
         </div>

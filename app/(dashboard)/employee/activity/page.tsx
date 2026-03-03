@@ -4,7 +4,7 @@ import { useUser } from '@clerk/nextjs';
 import { useEmployeeLocation, useEmployeeInventoryLogs } from '@/lib/hooks/queries/useEmployee';
 import { useState, useMemo } from 'react';
 import { format, startOfDay, endOfDay, isToday, isYesterday, subDays, isWithinInterval } from 'date-fns';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import InventoryLogCard from '@/components/employee/inventory/InventoryLogCard';
 import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import { Clock } from 'lucide-react';

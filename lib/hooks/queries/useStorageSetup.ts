@@ -26,7 +26,7 @@ export function useBulkAssignItems() {
         mutationFn: (data: {
             locationId: string;
             storageSpaceId: string;
-            items: Array<{ itemId: string; quantity: number }>;
+            items: Array<{ itemId: string; quantity: number; minQuantityOverride?: number | null }>;
         }) => {
             if (!userInfo?.id) throw new Error('User not authenticated');
             return bulkAssignItemsToStorage(data.locationId, data.storageSpaceId, data.items, userInfo.id, userInfo.members?.organizations.organization_id);

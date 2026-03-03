@@ -1,6 +1,6 @@
 "use client"
 import React, { JSX, useEffect, useRef } from 'react'
-import { motion, useInView, useAnimation } from 'framer-motion'
+import { motion, useInView, useAnimation } from 'motion/react'
 import { cn } from '@/lib/utils'
 
 export default function Reveal({children, className} : { children : JSX.Element, className : string | undefined}) {
