@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Users, Shield, User, Mail } from 'lucide-react';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { User as UserType } from '@/lib/supabase/types';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 export default function UsersPage() {
     const { data: userInfo } = useUserInfo();

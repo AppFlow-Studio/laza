@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { MapPin, Users, Box, Edit, Trash2, Eye } from 'lucide-react';
 import { Location } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';

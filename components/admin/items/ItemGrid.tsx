@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Package, Edit, Trash2, Check, AlertTriangle } from 'lucide-react';
 import { Item } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';

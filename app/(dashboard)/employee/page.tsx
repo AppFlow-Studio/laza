@@ -2,7 +2,7 @@
 
 import { useUser } from '@clerk/nextjs';
 import { useEmployeeLocation, useEmployeeStorageSpaces, useEmployeeStats } from '@/lib/hooks/queries/useEmployee';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Package, AlertTriangle, Clock, Warehouse } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';

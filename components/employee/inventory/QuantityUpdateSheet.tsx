@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Minus, Plus, X, ChevronRight, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import NumericKeypad from './NumericKeypad';
 
 interface QuantityUpdateSheetProps {
