@@ -162,7 +162,7 @@ export type Database = {
                 Row: {
                     id: string;
                     email: string;
-                    role: 'admin' | 'employee' | null;
+                    role: 'admin' | 'employee' | 'super_admin' | null;
                     assigned_location_id: string | null;
                     first_name: string | null;
                     last_name: string | null;
@@ -174,7 +174,7 @@ export type Database = {
                 Insert: {
                     id: string;
                     email: string;
-                    role?: 'admin' | 'employee' | null;
+                    role?: 'admin' | 'employee' | 'super_admin' | null;
                     assigned_location_id?: string | null;
                     first_name?: string | null;
                     last_name?: string | null;
@@ -186,7 +186,7 @@ export type Database = {
                 Update: {
                     id?: string;
                     email?: string;
-                    role?: 'admin' | 'employee' | null;
+                    role?: 'admin' | 'employee' | 'super_admin' | null;
                     assigned_location_id?: string | null;
                     first_name?: string | null;
                     last_name?: string | null;

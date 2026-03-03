@@ -24,7 +24,7 @@ export default clerkMiddleware(async (auth, req) => {
         if (!userId) {
             return NextResponse.redirect(new URL('/sign-in', req.url));
         }
-        if (role !== 'admin') {
+        if (role !== 'admin' && role !== 'super_admin') {
             return new Response('Unauthorized', { status: 403 })
         }
         return NextResponse.next();
@@ -35,7 +35,7 @@ export default clerkMiddleware(async (auth, req) => {
         if (!userId) {
             return NextResponse.redirect(new URL('/sign-in', req.url));
         }
-        if (role !== 'member' && role !== 'admin') {
+        if (role !== 'employee' && role !== 'admin' && role !== 'super_admin') {
             return new Response('Unauthorized', { status: 403 })
         }
         return NextResponse.next();
@@ -45,10 +45,10 @@ export default clerkMiddleware(async (auth, req) => {
     // Allow them to navigate to other public pages freely
     const url = new URL(req.url);
     if (userId && url.pathname === '/') {
-        if (role === 'admin') {
+        if (role === 'admin' || role === 'super_admin') {
             return NextResponse.redirect(new URL('/admin', req.url));
         }
-        if (role === 'member') {
+        if (role === 'employee') {
             return NextResponse.redirect(new URL('/employee', req.url));
         }
     }
