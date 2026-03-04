@@ -677,6 +677,7 @@ export default function StorageSpaceDetailPage() {
                 }
             >
                 <AddItemsToStorageSpace
+                    locationId={storageSpace.location.id}
                     existingItemIds={existingItemIds}
                     selectedItems={selectedItems}
                     itemQuantities={itemQuantities}

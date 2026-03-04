@@ -324,9 +324,30 @@ export async function bulkAssignItemsToStorage(
     storageSpaceId: string,
     items: Array<{ itemId: string; quantity: number; minQuantityOverride?: number | null }>,
     userId: string,
-    organizationId: string
+    organizationId: string,
+    callerRole: 'super_admin' | 'admin' | 'employee'  // added
 ) {
     const supabase = await createServerSupabaseClient();
+
+    // If caller is admin, verify all items are approved for this location
+    if (callerRole === 'admin') {
+        const { data: catalogItems, error: catalogError } = await supabase
+            .from('location_catalog')
+            .select('item_id')
+            .eq('location_id', locationId)
+            .in('item_id', items.map(i => i.itemId));
+
+        if (catalogError) throw catalogError;
+
+        const allowedItemIds = new Set(catalogItems?.map(c => String(c.item_id)));
+        const unauthorized = items.filter(i => !allowedItemIds.has(String(i.itemId)));
+
+        if (unauthorized.length > 0) {
+            throw new Error(
+                `These items have not been assigned to this location by a super admin: ${unauthorized.map(i => i.itemId).join(', ')}`
+            );
+        }
+    }
 
     // Prepare item_locations records
     const itemLocations = items.map(({ itemId, quantity, minQuantityOverride }) => ({

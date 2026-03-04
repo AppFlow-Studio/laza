@@ -1412,6 +1412,7 @@ export type Database = {
         }
         Returns: number
       }
+      get_user_role: { Args: { user_id: string }; Returns: string }
       is_super_admin: { Args: never; Returns: boolean }
       is_within_time_window: {
         Args: {

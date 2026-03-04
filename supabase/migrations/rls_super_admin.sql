@@ -47,22 +47,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP POLICY IF EXISTS "Admins full access" ON organizations;
 CREATE POLICY "Admins full access" ON organizations
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
-      AND users.role IN ('admin', 'super_admin')
-    )
+    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
   );
 
 -- locations
 DROP POLICY IF EXISTS "Admins full access" ON locations;
 CREATE POLICY "Admins full access" ON locations
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
-      AND users.role IN ('admin', 'super_admin')
-    )
+    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
   );
 -- "Employees read assigned location" — NO CHANGE
 
@@ -70,33 +62,21 @@ CREATE POLICY "Admins full access" ON locations
 DROP POLICY IF EXISTS "Admins full access" ON storage_spaces;
 CREATE POLICY "Admins full access" ON storage_spaces
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
-      AND users.role IN ('admin', 'super_admin')
-    )
+    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
   );
 
 -- items
 DROP POLICY IF EXISTS "Admins full access" ON items;
 CREATE POLICY "Admins full access" ON items
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
-      AND users.role IN ('admin', 'super_admin')
-    )
+    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
   );
 
 -- item_locations
 DROP POLICY IF EXISTS "Admins full access" ON item_locations;
 CREATE POLICY "Admins full access" ON item_locations
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
-      AND users.role IN ('admin', 'super_admin')
-    )
+    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
   );
 -- "Employees read assigned location items" — NO CHANGE
 -- "Employees update assigned location inventory" — NO CHANGE
@@ -105,11 +85,7 @@ CREATE POLICY "Admins full access" ON item_locations
 DROP POLICY IF EXISTS "Admins full access" ON inventory_logs;
 CREATE POLICY "Admins full access" ON inventory_logs
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
-      AND users.role IN ('admin', 'super_admin')
-    )
+    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
   );
 -- "Employees insert inventory logs" — NO CHANGE
 
@@ -117,11 +93,7 @@ CREATE POLICY "Admins full access" ON inventory_logs
 DROP POLICY IF EXISTS "Admins full access" ON alerts;
 CREATE POLICY "Admins full access" ON alerts
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
-      AND users.role IN ('admin', 'super_admin')
-    )
+    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
   );
 
 
@@ -155,11 +127,7 @@ ALTER TABLE update_limits ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Admins full access" ON update_limits
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
-      AND users.role IN ('admin', 'super_admin')
-    )
+    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
   );
 
 CREATE POLICY "Employees read own location limits" ON update_limits
@@ -173,11 +141,7 @@ ALTER TABLE update_override_logs ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Admins full access" ON update_override_logs
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
-      AND users.role IN ('admin', 'super_admin')
-    )
+    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
   );
 
 
