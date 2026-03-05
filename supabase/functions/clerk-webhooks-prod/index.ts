@@ -184,6 +184,20 @@ Deno.serve(async (req) => {
             const role =
                 roleMap[clerkRole] ?? event.data.public_metadata?.role ?? null;
 
+            // GUARD: super_admin can only be assigned manually, never via membership creation
+            if (role === "super_admin") {
+                console.warn(
+                    "Blocked attempt to create super_admin membership via webhook:",
+                    event.data.public_user_data?.user_id,
+                );
+                return new Response(
+                    JSON.stringify({
+                        error: "super_admin role cannot be assigned via membership creation",
+                    }),
+                    { status: 403 },
+                );
+            }
+
             // Sync role and location to users table
             const { data: userData, error: userError } = await supabase
                 .from("users")
@@ -239,8 +253,7 @@ Deno.serve(async (req) => {
                 });
             }
 
-            // ADDED: Sync role change to users table
-            // This handles promotions/demotions including to/from super_admin
+            // Sync role change to users table
             const clerkRole = event.data.role as string;
             const roleMap: Record<string, string> = {
                 "org:super_admin": "super_admin",
@@ -249,6 +262,30 @@ Deno.serve(async (req) => {
             };
             const role =
                 roleMap[clerkRole] ?? event.data.public_metadata?.role ?? null;
+
+            // GUARD: Prevent escalation to super_admin via webhook
+            // Only allow super_admin role sync if the target user is already super_admin
+            // This prevents a compromised admin account from promoting via Clerk dashboard
+            if (role === "super_admin") {
+                const { data: targetUser } = await supabase
+                    .from("users")
+                    .select("role")
+                    .eq("id", event.data.public_user_data?.user_id)
+                    .single();
+
+                if (targetUser?.role !== "super_admin") {
+                    console.warn(
+                        "Blocked attempt to escalate user to super_admin via webhook:",
+                        event.data.public_user_data?.user_id,
+                    );
+                    return new Response(
+                        JSON.stringify({
+                            error: "Role escalation to super_admin is not permitted via webhook",
+                        }),
+                        { status: 403 },
+                    );
+                }
+            }
 
             const { data: userData, error: userError } = await supabase
                 .from("users")

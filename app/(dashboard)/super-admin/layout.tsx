@@ -35,14 +35,14 @@ import {
 import { Button } from "@/components/ui/button";
 
 const navigation = [
-    { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
-    { name: "Locations", href: "/admin/locations", icon: MapPin },
-    { name: "Users", href: "/admin/users", icon: Users },
-    { name: "Items", href: "/admin/items", icon: Package },
-    { name: "Categories", href: "/admin/categories", icon: Tags },
-    { name: "Inventory", href: "/admin/inventory", icon: BarChart3 },
+    { name: "Dashboard", href: "/super-admin", icon: LayoutDashboard },
+    { name: "Locations", href: "/super-admin/locations", icon: MapPin },
+    { name: "Users", href: "/super-admin/users", icon: Users },
+    { name: "Items", href: "/super-admin/items", icon: Package },
+    { name: "Categories", href: "/super-admin/categories", icon: Tags },
+    { name: "Inventory", href: "/super-admin/inventory", icon: BarChart3 },
     // warehouse
-    { name: "Settings", href: "/admin/settings/notifications", icon: Settings },
+    { name: "Settings", href: "/super-admin/settings/notifications", icon: Settings },
 ];
 
 export default function AdminLayout({
