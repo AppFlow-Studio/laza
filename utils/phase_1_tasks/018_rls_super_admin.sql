@@ -32,7 +32,7 @@ RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM users
-    WHERE users.id = auth.uid()::text
+    WHERE users.id = auth.jwt() ->> 'sub'::text
     AND users.role = 'super_admin'
   );
 END;
@@ -47,14 +47,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP POLICY IF EXISTS "Admins full access" ON organizations;
 CREATE POLICY "Admins full access" ON organizations
   FOR ALL USING (
-    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
+    get_user_role(auth.jwt() ->> 'sub'::text) IN ('admin', 'super_admin')
   );
 
 -- locations
 DROP POLICY IF EXISTS "Admins full access" ON locations;
 CREATE POLICY "Admins full access" ON locations
   FOR ALL USING (
-    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
+    get_user_role(auth.jwt() ->> 'sub'::text) IN ('admin', 'super_admin')
   );
 -- "Employees read assigned location" — NO CHANGE
 
@@ -62,21 +62,21 @@ CREATE POLICY "Admins full access" ON locations
 DROP POLICY IF EXISTS "Admins full access" ON storage_spaces;
 CREATE POLICY "Admins full access" ON storage_spaces
   FOR ALL USING (
-    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
+    get_user_role(auth.jwt() ->> 'sub'::text) IN ('admin', 'super_admin')
   );
 
 -- items
 DROP POLICY IF EXISTS "Admins full access" ON items;
 CREATE POLICY "Admins full access" ON items
   FOR ALL USING (
-    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
+    get_user_role(auth.jwt() ->> 'sub'::text) IN ('admin', 'super_admin')
   );
 
 -- item_locations
 DROP POLICY IF EXISTS "Admins full access" ON item_locations;
 CREATE POLICY "Admins full access" ON item_locations
   FOR ALL USING (
-    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
+    get_user_role(auth.jwt() ->> 'sub'::text) IN ('admin', 'super_admin')
   );
 -- "Employees read assigned location items" — NO CHANGE
 -- "Employees update assigned location inventory" — NO CHANGE
@@ -85,7 +85,7 @@ CREATE POLICY "Admins full access" ON item_locations
 DROP POLICY IF EXISTS "Admins full access" ON inventory_logs;
 CREATE POLICY "Admins full access" ON inventory_logs
   FOR ALL USING (
-    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
+    get_user_role(auth.jwt() ->> 'sub'::text) IN ('admin', 'super_admin')
   );
 -- "Employees insert inventory logs" — NO CHANGE
 
@@ -93,7 +93,7 @@ CREATE POLICY "Admins full access" ON inventory_logs
 DROP POLICY IF EXISTS "Admins full access" ON alerts;
 CREATE POLICY "Admins full access" ON alerts
   FOR ALL USING (
-    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
+    get_user_role(auth.jwt() ->> 'sub'::text) IN ('admin', 'super_admin')
   );
 
 
@@ -107,7 +107,7 @@ CREATE POLICY "Admins manage org invites" ON org_invites
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role IN ('admin', 'super_admin')
       AND EXISTS (
         SELECT 1 FROM members
@@ -127,13 +127,13 @@ ALTER TABLE update_limits ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Admins full access" ON update_limits
   FOR ALL USING (
-    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
+    get_user_role(auth.jwt() ->> 'sub'::text) IN ('admin', 'super_admin')
   );
 
 CREATE POLICY "Employees read own location limits" ON update_limits
   FOR SELECT USING (
     location_id = (
-      SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+      SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
     )
   );
 
@@ -141,7 +141,7 @@ ALTER TABLE update_override_logs ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Admins full access" ON update_override_logs
   FOR ALL USING (
-    get_user_role(auth.uid()::text) IN ('admin', 'super_admin')
+    get_user_role(auth.jwt() ->> 'sub'::text) IN ('admin', 'super_admin')
   );
 
 
@@ -155,7 +155,7 @@ CREATE POLICY "Admins manage notification preferences" ON notification_preferenc
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role IN ('admin', 'super_admin')
       AND EXISTS (
         SELECT 1 FROM members
@@ -172,7 +172,7 @@ CREATE POLICY "Admins manage low stock thresholds" ON low_stock_thresholds
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role IN ('admin', 'super_admin')
       AND EXISTS (
         SELECT 1 FROM members
@@ -189,7 +189,7 @@ CREATE POLICY "Admins manage daily summary preferences" ON daily_summary_prefere
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role IN ('admin', 'super_admin')
       AND EXISTS (
         SELECT 1 FROM members
@@ -206,7 +206,7 @@ CREATE POLICY "Admins view email delivery logs" ON email_delivery_logs
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role IN ('admin', 'super_admin')
       AND EXISTS (
         SELECT 1 FROM members
@@ -223,7 +223,7 @@ CREATE POLICY "Admins view notification queue" ON low_stock_notification_queue
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role IN ('admin', 'super_admin')
       AND EXISTS (
         SELECT 1 FROM members
@@ -245,7 +245,7 @@ CREATE POLICY "Admins view email schedule logs" ON email_schedule_log
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role IN ('admin', 'super_admin')
       AND EXISTS (
         SELECT 1 FROM members
@@ -267,14 +267,14 @@ CREATE POLICY "Admins full access" ON users
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users u
-      WHERE u.id = auth.uid()::text
+      WHERE u.id = auth.jwt() ->> 'sub'::text
       AND u.role IN ('admin', 'super_admin')
     )
   );
 
 CREATE POLICY "Employees read own record" ON users
   FOR SELECT USING (
-    id = auth.uid()::text
+    id = auth.jwt() ->> 'sub'::text
   );
 
 

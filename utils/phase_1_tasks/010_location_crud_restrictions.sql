@@ -47,18 +47,18 @@ CREATE POLICY "Admin update own location" ON locations
   FOR UPDATE TO authenticated
   USING (
     (
-      get_user_role(auth.uid()::text) = 'admin'
+      get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
       AND id = (
-        SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+        SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
       )
     )
     OR is_super_admin()
   )
   WITH CHECK (
     (
-      get_user_role(auth.uid()::text) = 'admin'
+      get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
       AND id = (
-        SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+        SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
       )
     )
     OR is_super_admin()
@@ -76,10 +76,10 @@ CREATE POLICY "Super admin select all locations" ON locations
 CREATE POLICY "Admin select own location" ON locations
   FOR SELECT TO authenticated
   USING (
-    get_user_role(auth.uid()::text) = 'admin'
+    get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
     AND (
       id = (
-        SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+        SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
       )
       -- Also allow admins to read the warehouse catalog (item list only, no quantities)
       -- Quantity restriction enforced at query layer (Task 1.10)
@@ -105,11 +105,11 @@ CREATE POLICY "Super admin full access storage spaces" ON storage_spaces
 CREATE POLICY "Admin select storage spaces" ON storage_spaces
   FOR SELECT TO authenticated
   USING (
-    get_user_role(auth.uid()::text) = 'admin'
+    get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
     AND location_id IN (
       SELECT id FROM locations
       WHERE id = (
-        SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+        SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
       )
       OR location_type = 'warehouse'
     )
@@ -119,9 +119,9 @@ CREATE POLICY "Admin select storage spaces" ON storage_spaces
 CREATE POLICY "Admin insert own store storage spaces" ON storage_spaces
   FOR INSERT TO authenticated
   WITH CHECK (
-    get_user_role(auth.uid()::text) = 'admin'
+    get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
     AND location_id = (
-      SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+      SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
     )
     AND (
       SELECT location_type FROM locations WHERE id = location_id
@@ -132,18 +132,18 @@ CREATE POLICY "Admin insert own store storage spaces" ON storage_spaces
 CREATE POLICY "Admin update own store storage spaces" ON storage_spaces
   FOR UPDATE TO authenticated
   USING (
-    get_user_role(auth.uid()::text) = 'admin'
+    get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
     AND location_id = (
-      SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+      SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
     )
     AND (
       SELECT location_type FROM locations WHERE id = location_id
     ) = 'store'
   )
   WITH CHECK (
-    get_user_role(auth.uid()::text) = 'admin'
+    get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
     AND location_id = (
-      SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+      SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
     )
     AND (
       SELECT location_type FROM locations WHERE id = location_id
@@ -154,9 +154,9 @@ CREATE POLICY "Admin update own store storage spaces" ON storage_spaces
 CREATE POLICY "Admin delete own store storage spaces" ON storage_spaces
   FOR DELETE TO authenticated
   USING (
-    get_user_role(auth.uid()::text) = 'admin'
+    get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
     AND location_id = (
-      SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+      SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
     )
     AND (
       SELECT location_type FROM locations WHERE id = location_id

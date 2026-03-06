@@ -32,7 +32,7 @@ CREATE POLICY "admin_read_location_catalog" ON location_catalog
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'admin'
       AND users.assigned_location_id = location_catalog.location_id
     )
@@ -43,7 +43,7 @@ CREATE POLICY "employee_read_location_catalog" ON location_catalog
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'employee'
       AND users.assigned_location_id = location_catalog.location_id
     )

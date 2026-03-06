@@ -48,10 +48,10 @@ CREATE POLICY "Super admin full access org invites" ON org_invites
 CREATE POLICY "Admin insert own location invites" ON org_invites
   FOR INSERT TO authenticated
   WITH CHECK (
-    get_user_role(auth.uid()::text) = 'admin'
+    get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
     AND role IN ('admin', 'employee')
     AND assigned_location_id = (
-      SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+      SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
     )
   );
 
@@ -59,9 +59,9 @@ CREATE POLICY "Admin insert own location invites" ON org_invites
 CREATE POLICY "Admin select own location invites" ON org_invites
   FOR SELECT TO authenticated
                                                                   USING (
-                                                                  get_user_role(auth.uid()::text) = 'admin'
+                                                                  get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
                                                                   AND assigned_location_id = (
-                                                                  SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+                                                                  SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
                                                                   )
                                                                   );
 
@@ -69,15 +69,15 @@ CREATE POLICY "Admin select own location invites" ON org_invites
 CREATE POLICY "Admin update own location invites" ON org_invites
   FOR UPDATE TO authenticated
                  USING (
-                 get_user_role(auth.uid()::text) = 'admin'
+                 get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
                  AND assigned_location_id = (
-                 SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+                 SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
                  )
                  )
       WITH CHECK (
-                 get_user_role(auth.uid()::text) = 'admin'
+                 get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
                  AND assigned_location_id = (
-                 SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+                 SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
                  )
                  );
 
@@ -85,9 +85,9 @@ CREATE POLICY "Admin update own location invites" ON org_invites
 CREATE POLICY "Admin delete own location invites" ON org_invites
   FOR DELETE TO authenticated
   USING (
-    get_user_role(auth.uid()::text) = 'admin'
+    get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
     AND assigned_location_id = (
-      SELECT assigned_location_id FROM users WHERE id = auth.uid()::text
+      SELECT assigned_location_id FROM users WHERE id = auth.jwt() ->> 'sub'::text
     )
   );
 
@@ -115,9 +115,9 @@ CREATE POLICY "Super admin full access users" ON users
 CREATE POLICY "Admin select own location users" ON users
   FOR SELECT TO authenticated
      USING (
-         get_user_role(auth.uid()::text) = 'admin'
+         get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
          AND assigned_location_id = (
-            SELECT assigned_location_id FROM users u2 WHERE u2.id = auth.uid()::text
+            SELECT assigned_location_id FROM users u2 WHERE u2.id = auth.jwt() ->> 'sub'::text
          )
      );
 
@@ -127,17 +127,17 @@ CREATE POLICY "Admin select own location users" ON users
 CREATE POLICY "Admin update own location employees" ON users
   FOR UPDATE TO authenticated
      USING (
-        get_user_role(auth.uid()::text) = 'admin'
+        get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
         AND role = 'employee'
         AND assigned_location_id = (
-            SELECT assigned_location_id FROM users u2 WHERE u2.id = auth.uid()::text
+            SELECT assigned_location_id FROM users u2 WHERE u2.id = auth.jwt() ->> 'sub'::text
         )
      )
       WITH CHECK (
-          get_user_role(auth.uid()::text) = 'admin'
+          get_user_role(auth.jwt() ->> 'sub'::text) = 'admin'
           AND role = 'employee'
           AND assigned_location_id = (
-            SELECT assigned_location_id FROM users u2 WHERE u2.id = auth.uid()::text
+            SELECT assigned_location_id FROM users u2 WHERE u2.id = auth.jwt() ->> 'sub'::text
           )
       );
 

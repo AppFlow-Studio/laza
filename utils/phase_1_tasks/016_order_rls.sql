@@ -34,7 +34,7 @@ CREATE POLICY "Super admin full access" ON order_tickets
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'super_admin'
     )
   );
@@ -44,7 +44,7 @@ CREATE POLICY "Admin manage own location tickets" ON order_tickets
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'admin'
       AND users.assigned_location_id = order_tickets.requesting_location_id
     )
@@ -56,7 +56,7 @@ CREATE POLICY "Employee view incoming deliveries" ON order_tickets
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'employee'
       AND users.assigned_location_id = order_tickets.requesting_location_id
       AND order_tickets.status IN ('fulfilled', 'confirmed')
@@ -80,7 +80,7 @@ CREATE POLICY "Super admin full access" ON order_ticket_items
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'super_admin'
     )
   );
@@ -90,7 +90,7 @@ CREATE POLICY "Admin manage own location ticket items" ON order_ticket_items
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM order_tickets ot
-      JOIN users u ON u.id = auth.uid()::text
+      JOIN users u ON u.id = auth.jwt() ->> 'sub'::text
       WHERE ot.id = order_ticket_items.ticket_id
       AND u.role = 'admin'
       AND u.assigned_location_id = ot.requesting_location_id
@@ -102,7 +102,7 @@ CREATE POLICY "Employee view incoming delivery items" ON order_ticket_items
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM order_tickets ot
-      JOIN users u ON u.id = auth.uid()::text
+      JOIN users u ON u.id = auth.jwt() ->> 'sub'::text
       WHERE ot.id = order_ticket_items.ticket_id
       AND u.role = 'employee'
       AND u.assigned_location_id = ot.requesting_location_id
@@ -127,7 +127,7 @@ CREATE POLICY "Super admin full access" ON order_ticket_logs
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'super_admin'
     )
   );
@@ -137,7 +137,7 @@ CREATE POLICY "Admin access own location ticket logs" ON order_ticket_logs
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM order_tickets ot
-      JOIN users u ON u.id = auth.uid()::text
+      JOIN users u ON u.id = auth.jwt() ->> 'sub'::text
       WHERE ot.id = order_ticket_logs.ticket_id
       AND u.role = 'admin'
       AND u.assigned_location_id = ot.requesting_location_id
@@ -149,7 +149,7 @@ CREATE POLICY "Employee view delivery ticket logs" ON order_ticket_logs
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM order_tickets ot
-      JOIN users u ON u.id = auth.uid()::text
+      JOIN users u ON u.id = auth.jwt() ->> 'sub'::text
       WHERE ot.id = order_ticket_logs.ticket_id
       AND u.role = 'employee'
       AND u.assigned_location_id = ot.requesting_location_id
@@ -162,7 +162,7 @@ CREATE POLICY "Employee insert confirmation log" ON order_ticket_logs
   FOR INSERT WITH CHECK (
     EXISTS (
       SELECT 1 FROM order_tickets ot
-      JOIN users u ON u.id = auth.uid()::text
+      JOIN users u ON u.id = auth.jwt() ->> 'sub'::text
       WHERE ot.id = order_ticket_logs.ticket_id
       AND u.role = 'employee'
       AND u.assigned_location_id = ot.requesting_location_id
@@ -187,7 +187,7 @@ CREATE POLICY "Super admin full access" ON payment_holds
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'super_admin'
     )
   );
@@ -197,7 +197,7 @@ CREATE POLICY "Admin read own location payment holds" ON payment_holds
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM order_tickets ot
-      JOIN users u ON u.id = auth.uid()::text
+      JOIN users u ON u.id = auth.jwt() ->> 'sub'::text
       WHERE ot.id = payment_holds.ticket_id
       AND u.role = 'admin'
       AND u.assigned_location_id = ot.requesting_location_id

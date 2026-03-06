@@ -1,5 +1,5 @@
 -- ============================================================
--- Fix all policies to use auth.jwt() ->> 'sub' instead of auth.uid()
+-- Fix all policies to use auth.jwt() ->> 'sub' instead of auth.jwt() ->> 'sub'
 -- ============================================================
 
 -- organizations

@@ -35,7 +35,7 @@ CREATE POLICY "Super admin full access" ON location_catalog
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'super_admin'
     )
   );
@@ -44,7 +44,7 @@ CREATE POLICY "Admin read own location catalog" ON location_catalog
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'admin'
       AND users.assigned_location_id = location_catalog.location_id
     )
@@ -54,7 +54,7 @@ CREATE POLICY "Employee read own location catalog" ON location_catalog
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'employee'
       AND users.assigned_location_id = location_catalog.location_id
     )
@@ -75,7 +75,7 @@ CREATE POLICY "Super admin full access" ON item_locations
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'super_admin'
     )
   );
@@ -84,7 +84,7 @@ CREATE POLICY "Admin access own location items" ON item_locations
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'admin'
       AND users.assigned_location_id = item_locations.location_id
     )
@@ -92,7 +92,7 @@ CREATE POLICY "Admin access own location items" ON item_locations
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()::text
+      WHERE users.id = auth.jwt() ->> 'sub'::text
       AND users.role = 'admin'
       AND users.assigned_location_id = item_locations.location_id
     )
