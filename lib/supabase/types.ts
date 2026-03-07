@@ -354,6 +354,61 @@ export type Database = {
           },
         ]
       }
+      item_cost_history: {
+        Row: {
+          created_at: string
+          effective_date: string
+          id: string
+          item_id: number
+          organization_id: string
+          purchase_order_id: string
+          unit_cost_after: number
+          unit_price_before: number
+        }
+        Insert: {
+          created_at?: string
+          effective_date: string
+          id?: string
+          item_id: number
+          organization_id: string
+          purchase_order_id: string
+          unit_cost_after: number
+          unit_price_before: number
+        }
+        Update: {
+          created_at?: string
+          effective_date?: string
+          id?: string
+          item_id?: number
+          organization_id?: string
+          purchase_order_id?: string
+          unit_cost_after?: number
+          unit_price_before?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_cost_history_item_fk"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_cost_history_org_fk"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_cost_history_po_fk"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       item_locations: {
         Row: {
           created_at: string
@@ -479,10 +534,102 @@ export type Database = {
           },
         ]
       }
+      location_catalog: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          id: string
+          item_id: number
+          location_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          item_id: number
+          location_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          item_id?: number
+          location_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_catalog_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_catalog_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_catalog_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      location_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_groups_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           address: string | null
           created_at: string
+          group_id: string | null
           id: string
           is_active: boolean | null
           location_type: string
@@ -492,6 +639,7 @@ export type Database = {
         Insert: {
           address?: string | null
           created_at?: string
+          group_id?: string | null
           id?: string
           is_active?: boolean | null
           location_type?: string
@@ -501,6 +649,7 @@ export type Database = {
         Update: {
           address?: string | null
           created_at?: string
+          group_id?: string | null
           id?: string
           is_active?: boolean | null
           location_type?: string
@@ -508,6 +657,13 @@ export type Database = {
           organization_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "locations_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "location_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "locations_organization_id_fkey"
             columns: ["organization_id"]
@@ -1123,6 +1279,234 @@ export type Database = {
           },
         ]
       }
+      permission_change_logs: {
+        Row: {
+          action_type: string
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          new_location_id: string | null
+          new_value: string | null
+          notes: string | null
+          organization_id: string
+          previous_location_id: string | null
+          previous_value: string | null
+          source: string
+          target_user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_location_id?: string | null
+          new_value?: string | null
+          notes?: string | null
+          organization_id: string
+          previous_location_id?: string | null
+          previous_value?: string | null
+          source?: string
+          target_user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_location_id?: string | null
+          new_value?: string | null
+          notes?: string | null
+          organization_id?: string
+          previous_location_id?: string | null
+          previous_value?: string | null
+          source?: string
+          target_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_change_logs_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permission_change_logs_new_location_id_fkey"
+            columns: ["new_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permission_change_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permission_change_logs_previous_location_id_fkey"
+            columns: ["previous_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permission_change_logs_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_order_items: {
+        Row: {
+          allocated_office_fee: number
+          allocated_shipping_fee: number
+          cartons: number | null
+          cbm: number | null
+          cbm_share: number | null
+          id: string
+          item_id: number
+          pieces_per_carton: number | null
+          purchase_order_id: string
+          quantity_ordered: number
+          quantity_received: number | null
+          total_cost_after: number
+          total_price_before: number
+          unit_cost_after: number
+          unit_price_before: number
+        }
+        Insert: {
+          allocated_office_fee?: number
+          allocated_shipping_fee?: number
+          cartons?: number | null
+          cbm?: number | null
+          cbm_share?: number | null
+          id?: string
+          item_id: number
+          pieces_per_carton?: number | null
+          purchase_order_id: string
+          quantity_ordered: number
+          quantity_received?: number | null
+          total_cost_after?: number
+          total_price_before?: number
+          unit_cost_after?: number
+          unit_price_before: number
+        }
+        Update: {
+          allocated_office_fee?: number
+          allocated_shipping_fee?: number
+          cartons?: number | null
+          cbm?: number | null
+          cbm_share?: number | null
+          id?: string
+          item_id?: number
+          pieces_per_carton?: number | null
+          purchase_order_id?: string
+          quantity_ordered?: number
+          quantity_received?: number | null
+          total_cost_after?: number
+          total_price_before?: number
+          unit_cost_after?: number
+          unit_price_before?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_items_item_fk"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_po_fk"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          actual_arrival: string | null
+          created_at: string
+          created_by: string
+          expected_arrival: string | null
+          id: string
+          notes: string | null
+          office_fee: number
+          order_date: string | null
+          organization_id: string
+          po_number: string
+          shipping_fee: number
+          status: string
+          subtotal_before: number
+          supplier_name: string | null
+          total_cbm: number | null
+          total_pallets: number | null
+          updated_at: string
+        }
+        Insert: {
+          actual_arrival?: string | null
+          created_at?: string
+          created_by: string
+          expected_arrival?: string | null
+          id?: string
+          notes?: string | null
+          office_fee?: number
+          order_date?: string | null
+          organization_id: string
+          po_number: string
+          shipping_fee?: number
+          status?: string
+          subtotal_before?: number
+          supplier_name?: string | null
+          total_cbm?: number | null
+          total_pallets?: number | null
+          updated_at?: string
+        }
+        Update: {
+          actual_arrival?: string | null
+          created_at?: string
+          created_by?: string
+          expected_arrival?: string | null
+          id?: string
+          notes?: string | null
+          office_fee?: number
+          order_date?: string | null
+          organization_id?: string
+          po_number?: string
+          shipping_fee?: number
+          status?: string
+          subtotal_before?: number
+          supplier_name?: string | null
+          total_cbm?: number | null
+          total_pallets?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_created_by_fk"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_org_fk"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       storage_spaces: {
         Row: {
           created_at: string
@@ -1335,6 +1719,130 @@ export type Database = {
           },
         ]
       }
+      warehouse_expense_rates: {
+        Row: {
+          default_rate: number
+          expense_type: string
+          id: string
+          is_optional: boolean
+          organization_id: string
+          rate_unit: string
+          updated_at: string
+        }
+        Insert: {
+          default_rate?: number
+          expense_type: string
+          id?: string
+          is_optional?: boolean
+          organization_id: string
+          rate_unit?: string
+          updated_at?: string
+        }
+        Update: {
+          default_rate?: number
+          expense_type?: string
+          id?: string
+          is_optional?: boolean
+          organization_id?: string
+          rate_unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_expense_rates_org_fk"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouse_expenses: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          expense_date: string
+          expense_type: string
+          id: string
+          is_self_delivered: boolean | null
+          notes: string | null
+          organization_id: string
+          pallet_count: number | null
+          period_end: string | null
+          period_start: string | null
+          purchase_order_id: string | null
+          rate_per_pallet: number | null
+          updated_at: string
+          warehouse_location_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          created_by: string
+          expense_date: string
+          expense_type: string
+          id?: string
+          is_self_delivered?: boolean | null
+          notes?: string | null
+          organization_id: string
+          pallet_count?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          purchase_order_id?: string | null
+          rate_per_pallet?: number | null
+          updated_at?: string
+          warehouse_location_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          expense_date?: string
+          expense_type?: string
+          id?: string
+          is_self_delivered?: boolean | null
+          notes?: string | null
+          organization_id?: string
+          pallet_count?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          purchase_order_id?: string | null
+          rate_per_pallet?: number | null
+          updated_at?: string
+          warehouse_location_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_expenses_created_by_fk"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_expenses_location_fk"
+            columns: ["warehouse_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_expenses_org_fk"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_expenses_po_fk"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1413,6 +1921,7 @@ export type Database = {
         Returns: number
       }
       get_user_role: { Args: { user_id: string }; Returns: string }
+      is_admin_or_above: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       is_within_time_window: {
         Args: {
