@@ -132,6 +132,30 @@ export async function deleteLocation(id: string) {
     if (error) throw error;
 }
 
+export async function deactivateLocation(locationId: string, adminUserId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase.rpc('deactivate_location', {
+        p_location_id: locationId,
+        p_admin_user_id: adminUserId,
+    });
+
+    if (error) throw error;
+    return data;
+}
+
+export async function reactivateLocation(locationId: string, adminUserId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase.rpc('reactivate_location', {
+        p_location_id: locationId,
+        p_admin_user_id: adminUserId,
+    });
+
+    if (error) throw error;
+    return data;
+}
+
 export async function getStorageSpacesByLocation(locationId: string) {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
