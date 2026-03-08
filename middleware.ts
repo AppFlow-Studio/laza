@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const isAdminRoute = createRouteMatcher(['/admin(.*)'])
 const isEmployeeRoute = createRouteMatcher(['/employee(.*)'])
+const isSuperAdminRoute = createRouteMatcher(['/super-admin(.*)'])
 const isPublicRoute = createRouteMatcher([
     '/',
     '/menu(.*)',
@@ -19,12 +20,24 @@ export default clerkMiddleware(async (auth, req) => {
     const { userId, sessionClaims } = await auth();
     const role = (sessionClaims as any)?.o?.rol as string | undefined;
     // console.log('sessionClaims', sessionClaims);
+    
+    // Protect /super-admin/* — only super_admin can access
+    if (isSuperAdminRoute(req)) {
+        if (!userId) {
+            return NextResponse.redirect(new URL('/sign-in', req.url));
+        }
+        if (role !== 'super_admin') {
+            return new Response('Unauthorized', { status: 403 });
+        }
+        return NextResponse.next();
+    }
+
     // Protect admin routes - only admins can access
     if (isAdminRoute(req)) {
         if (!userId) {
             return NextResponse.redirect(new URL('/sign-in', req.url));
         }
-        if (role !== 'admin') {
+        if (role !== 'admin' && role !== 'super_admin') {
             return new Response('Unauthorized', { status: 403 })
         }
         return NextResponse.next();
@@ -35,7 +48,7 @@ export default clerkMiddleware(async (auth, req) => {
         if (!userId) {
             return NextResponse.redirect(new URL('/sign-in', req.url));
         }
-        if (role !== 'member' && role !== 'admin') {
+        if (role !== 'employee' && role !== 'admin' && role !== 'super_admin') {
             return new Response('Unauthorized', { status: 403 })
         }
         return NextResponse.next();
@@ -45,10 +58,13 @@ export default clerkMiddleware(async (auth, req) => {
     // Allow them to navigate to other public pages freely
     const url = new URL(req.url);
     if (userId && url.pathname === '/') {
+        if (role === 'super_admin') {
+            return NextResponse.redirect(new URL('/super-admin', req.url));
+        }
         if (role === 'admin') {
             return NextResponse.redirect(new URL('/admin', req.url));
         }
-        if (role === 'member') {
+        if (role === 'employee') {
             return NextResponse.redirect(new URL('/employee', req.url));
         }
     }

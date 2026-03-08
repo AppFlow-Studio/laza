@@ -7,7 +7,7 @@ import { User, OrgInvite } from '../types';
 interface CreateInvitationInput {
     organizationId: string;
     email: string;
-    role: 'admin' | 'employee';
+    role: 'admin' | 'employee' | 'super_admin';
     assigned_location_id?: string | null;
     first_name?: string;
     last_name?: string;
@@ -17,6 +17,11 @@ export async function createInvitation(input: CreateInvitationInput) {
     try {
         const supabase = await createServerSupabaseClient();
         const clerk = await clerkClient();
+
+        // Guard: super_admin cannot be created via invitation
+        if ((input.role as string) === 'super_admin') {
+            throw new Error('Super admin cannot be assigned via invitation');
+        }
 
         // Validate employee has location
         if (input.role === 'employee' && !input.assigned_location_id) {
@@ -93,7 +98,7 @@ export async function createInvitation(input: CreateInvitationInput) {
 
 interface UpdateUserInput {
     userId: string;
-    role?: 'admin' | 'employee';
+    role?: 'admin' | 'employee' | 'super_admin';
     assigned_location_id?: string | null;
     is_active?: boolean;
 }
@@ -102,8 +107,13 @@ export async function updateUser(input: UpdateUserInput) {
     console.log('updateUser', input);
     try {
         const supabase = createServerSupabaseClient();
+        // Guard: super_admin role cannot be assigned via this function
+        if ((input.role as string) === 'super_admin') {
+            throw new Error('Super admin role cannot be assigned via user update');
+        }
 
         const updates: Partial<User> = {};
+
 
         if (input.role !== undefined) {
             updates.role = input.role;
