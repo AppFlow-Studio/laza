@@ -5,6 +5,7 @@ import { clerkClient } from '@clerk/nextjs/server';
 import { User, OrgInvite } from '../types';
 
 interface CreateInvitationInput {
+    locationId?: string | null; // added during Task 2.7
     organizationId: string;
     email: string;
     role: 'admin' | 'employee' | 'super_admin';
