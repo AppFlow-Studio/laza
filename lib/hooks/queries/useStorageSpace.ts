@@ -6,6 +6,7 @@ import { getInventoryByStorageSpace, getInventoryLogsByStorageSpace } from '@/li
 import { StorageSpace } from '@/lib/supabase/types';
 
 export function useStorageSpace(id: string | null) {
+    console.log(id)
     return useQuery({
         queryKey: ['storage-space', id],
         queryFn: () => getStorageSpaceById(id!),

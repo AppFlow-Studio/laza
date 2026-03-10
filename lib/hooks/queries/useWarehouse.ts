@@ -19,6 +19,7 @@ import {
     getWarehouseInventory,
     getWarehouseStats,
 } from "@/lib/supabase/queries/warehouse";
+import {useUserInfo} from "@/lib/hooks/queries/useUserInfo";
 
 // ---------------------------------------------------------------------------
 // Query key factory
@@ -58,13 +59,14 @@ export const warehouseKeys = {
 // ---------------------------------------------------------------------------
 
 export function useWarehouseLocation() {
-    const { orgId } = useAuth();
+    const { data: userInfo } = useUserInfo();
+    const orgId = userInfo?.members?.organization_id;
 
     return useQuery({
         queryKey: warehouseKeys.location(orgId ?? ""),
         queryFn: () => getWarehouseLocation(orgId!),
         enabled: !!orgId,
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     });
 }
 

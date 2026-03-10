@@ -5,9 +5,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Store, Warehouse } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const locationSchema = z.object({
     name: z.string().min(1, 'Name is required'),
+    location_type: z.enum(['store', 'warehouse']),
     address: z.object({
         street: z.string().min(1, 'Street is required'),
         city: z.string().min(1, 'City is required'),
@@ -29,11 +32,14 @@ export default function LocationDetailsStep({ defaultValues, onSubmit }: Locatio
     const {
         register,
         handleSubmit,
+        watch,
+        setValue,
         formState: { errors },
     } = useForm<LocationFormData>({
         resolver: zodResolver(locationSchema),
         defaultValues: defaultValues || {
             name: '',
+            location_type: 'store',
             address: {
                 street: '',
                 city: '',
@@ -44,6 +50,8 @@ export default function LocationDetailsStep({ defaultValues, onSubmit }: Locatio
             is_active: true,
         },
     });
+
+    const selectedType = watch('location_type');
 
     return (
         <form id="location-details-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -57,6 +65,57 @@ export default function LocationDetailsStep({ defaultValues, onSubmit }: Locatio
                 />
                 {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
+                )}
+            </div>
+
+            {/* Location Type */}
+            <div>
+                <Label className="mb-3 block">Location Type *</Label>
+                <div className="grid grid-cols-2 gap-4">
+                    <button
+                        type="button"
+                        onClick={() => setValue('location_type', 'store')}
+                        className={cn(
+                            "p-4 border-2 rounded-lg text-left transition-all",
+                            selectedType === 'store'
+                                ? "border-indigo-500 bg-indigo-50"
+                                : "border-zinc-200 hover:border-zinc-300"
+                        )}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-100 rounded-lg flex-shrink-0">
+                                <Store className="w-5 h-5 text-indigo-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-zinc-900">Store</h3>
+                                <p className="text-xs text-zinc-500">Customer-facing cafe location</p>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setValue('location_type', 'warehouse')}
+                        className={cn(
+                            "p-4 border-2 rounded-lg text-left transition-all",
+                            selectedType === 'warehouse'
+                                ? "border-indigo-500 bg-indigo-50"
+                                : "border-zinc-200 hover:border-zinc-300"
+                        )}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-100 rounded-lg flex-shrink-0">
+                                <Warehouse className="w-5 h-5 text-indigo-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-zinc-900">Warehouse</h3>
+                                <p className="text-xs text-zinc-500">Central supply distribution hub</p>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+                {errors.location_type && (
+                    <p className="text-sm text-red-500 mt-1">{errors.location_type.message}</p>
                 )}
             </div>
 
