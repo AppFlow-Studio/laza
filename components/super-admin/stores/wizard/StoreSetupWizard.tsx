@@ -10,6 +10,7 @@ import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 import { useCreateLocation, useLocationWithDetails } from '@/lib/hooks/queries/useLocations';
 import { useCreateStorageSpace, useBulkAssignItems } from '@/lib/hooks/queries/useStorageSetup';
 import { useCreateInvitation } from '@/lib/hooks/queries/useUsers';
+import { useCreateInventorySnapshot } from '@/lib/hooks/queries/useInventorySnapshot';
 import StoreWizardSidebar from './StoreWizardSidebar';
 import StoreDetailsStep from './steps/StoreDetailsStep';
 import type { StoreFormData } from './steps/StoreDetailsStep';
@@ -27,11 +28,13 @@ export default function StoreSetupWizard() {
     const router = useRouter();
     const { data: userInfo } = useUserInfo();
     const organizationId = userInfo?.members?.organization_id;
+    const userId = userInfo?.id;
 
-    const createLocationMutation  = useCreateLocation();
+    const createLocationMutation   = useCreateLocation();
     const createStorageSpaceMutation = useCreateStorageSpace();
-    const bulkAssignMutation      = useBulkAssignItems();
+    const bulkAssignMutation       = useBulkAssignItems();
     const createInvitationMutation = useCreateInvitation();
+    const inventorySnapshotMutation = useCreateInventorySnapshot();
 
     // ── Wizard state ─────────────────────────────────────────────────────────
     const [currentStep, setCurrentStep]       = useState(1);
@@ -48,11 +51,8 @@ export default function StoreSetupWizard() {
     const [createdLocationId, setCreatedLocationId] = useState<string | null>(null);
 
     // ── Clone support ─────────────────────────────────────────────────────────
-    // We only fetch clone source details once Step 1 is complete and a clone id is set
     const cloneSourceId = storeData?.clone_from_id ?? '';
-    const { data: cloneSource } = useLocationWithDetails(cloneSourceId, {
-        enabled: !!cloneSourceId,
-    });
+    const { data: cloneSource } = useLocationWithDetails(cloneSourceId);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     const markCompleted = useCallback((step: number) => {
@@ -71,7 +71,6 @@ export default function StoreSetupWizard() {
         setStoreData(data);
         markCompleted(1);
 
-        // If a clone source was chosen, pre-fill storage spaces from it
         if (data.clone_from_id && cloneSource?.storage_spaces?.length) {
             const cloned: WizardStorageSpace[] = cloneSource.storage_spaces.map((s: any) => ({
                 tempId:           crypto.randomUUID(),
@@ -133,8 +132,6 @@ export default function StoreSetupWizard() {
             return;
         }
         if (currentStep === 4) {
-            // Step 4 has its own submit/skip buttons — Next is hidden on this step.
-            // The "Next" button triggers the form submit as a fallback.
             const form = document.getElementById('invite-admin-form') as HTMLFormElement;
             form?.requestSubmit();
             return;
@@ -147,17 +144,16 @@ export default function StoreSetupWizard() {
 
     // ── Final submission ──────────────────────────────────────────────────────
     const handleSubmit = async () => {
-        if (!storeData || !organizationId) return;
+        if (!storeData || !organizationId || !userId) return;
         setIsSubmitting(true);
 
         try {
-            // 1. Create the store location (type = 'store')
+            // 1. Create the store location
             const location = await createLocationMutation.mutateAsync({
                 organization_id: organizationId,
                 name:            storeData.name,
                 address:         storeData.address,
                 is_active:       storeData.is_active,
-                // location_type defaults to 'store' in the DB
             });
 
             // 2. Create storage spaces in parallel
@@ -190,7 +186,7 @@ export default function StoreSetupWizard() {
 
                 assignPromises.push(
                     bulkAssignMutation.mutateAsync({
-                        locationId:    location.id,
+                        locationId:     location.id,
                         storageSpaceId: realId,
                         items,
                     })
@@ -198,13 +194,39 @@ export default function StoreSetupWizard() {
             }
             if (assignPromises.length > 0) await Promise.all(assignPromises);
 
-            // 4. Send admin invitation if not skipped
+            // 4. Create inventory snapshot — ensures every assigned item has an
+            //    item_locations row with current_quantity = 0 so employees can
+            //    start counting on day one. Also writes initial inventory_logs
+            //    entries and resolves the auto-generated low_stock alerts that
+            //    fire from the check_low_stock trigger (since 0 < min_quantity).
+            //    Non-blocking: a failure here does not prevent store creation.
+            const snapshotItems: { itemId: string; storageSpaceId: string }[] = [];
+            for (const [tempId, assignment] of Object.entries(itemAssignments)) {
+                if (assignment.selectedItems.size === 0) continue;
+                const realId = idMap.get(tempId);
+                if (!realId) continue;
+                for (const itemId of assignment.selectedItems) {
+                    snapshotItems.push({ itemId, storageSpaceId: realId });
+                }
+            }
+
+            if (snapshotItems.length > 0) {
+                await inventorySnapshotMutation.mutateAsync({
+                    locationId: location.id,
+                    userId,
+                    items: snapshotItems,
+                }).catch(err => {
+                    console.error('Inventory snapshot failed (non-fatal):', err);
+                });
+            }
+
+            // 5. Send admin invitation if not skipped
             if (inviteData?.email) {
                 await createInvitationMutation.mutateAsync({
-                    email:               inviteData.email,
-                    role:                'admin',
+                    email:              inviteData.email,
+                    role:               'admin',
                     organizationId,
-                    assignedLocationId:  location.id,
+                    assignedLocationId: location.id,
                 });
             }
 
@@ -295,10 +317,7 @@ export default function StoreSetupWizard() {
         }
     };
 
-    // On step 4, the InviteAdminStep manages its own submit/skip buttons.
-    // We show "Next" but wire it to the form submit, and hide the footer
-    // Next button in favour of the step's own controls.
-    const showFooterNext = currentStep < TOTAL_STEPS && currentStep !== 4;
+    const showFooterNext   = currentStep < TOTAL_STEPS && currentStep !== 4;
     const showFooterSubmit = currentStep === TOTAL_STEPS && !createdLocationId;
 
     return (
@@ -370,7 +389,6 @@ export default function StoreSetupWizard() {
                             </Button>
 
                             <div className="flex gap-2">
-                                {/* Step 4 manages its own buttons; show a subtle hint */}
                                 {currentStep === 4 && (
                                     <p className="text-sm text-zinc-400 self-center mr-2">
                                         Use the buttons above to invite or skip

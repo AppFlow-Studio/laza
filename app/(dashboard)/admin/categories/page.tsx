@@ -94,12 +94,8 @@ export default function CategoriesPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-semibold text-zinc-900">Categories</h1>
-                    <p className="text-sm text-zinc-600 mt-1">Manage item categories</p>
                 </div>
-                <Button onClick={() => setShowCreateForm(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Category
-                </Button>
+
             </div>
 
             {/* Search */}

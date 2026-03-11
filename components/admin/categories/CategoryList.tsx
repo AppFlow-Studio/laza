@@ -68,26 +68,7 @@ export default function CategoryList({ categories, onEdit, onDelete, isLoading }
                                 </p>
                             )}
                         </div>
-                        <div className="flex items-center gap-2 ml-4">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onEdit(category)}
-                                className="flex items-center gap-2"
-                            >
-                                <Edit className="w-4 h-4" />
-                                Edit
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onDelete(category)}
-                                className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                Delete
-                            </Button>
-                        </div>
+
                     </div>
                 </motion.div>
             ))}
