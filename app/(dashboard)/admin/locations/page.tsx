@@ -19,7 +19,7 @@ import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 export default function LocationsPage() {
     const { data: userInfo } = useUserInfo();
     const organizationId = userInfo?.members?.organization_id;
-    const { data: locations, isLoading } = useLocations(organizationId);
+    const { data: locations, isLoading } = useLocations();
     const [editingLocation, setEditingLocation] = useState<any>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 300);
@@ -72,12 +72,6 @@ export default function LocationsPage() {
                             <List className="w-4 h-4" />
                         </button>
                     </div>
-                    <Link href="/admin/locations/new">
-                        <Button>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add Location
-                        </Button>
-                    </Link>
                 </div>
             </div>
 
