@@ -40,7 +40,7 @@ import {
 
 export default function WarehouseStorageSpaceDetailPage() {
     const params = useParams();
-    const storageSpaceId = params.id as string;
+    const storageSpaceId = params.storageId as string;
     console.log(storageSpaceId)
 
     const { user } = useUser();

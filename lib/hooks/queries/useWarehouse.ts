@@ -1,123 +1,88 @@
 // lib/hooks/queries/useWarehouse.ts
-//
-// React Query hooks for warehouse data — Task 2.11.
-// Wraps the four functions in lib/supabase/queries/warehouse.ts.
-// Follows the exact same pattern as useLocations.ts and useInventory.ts:
-//   useQuery for reads, useMutation for writes, with cache invalidation.
-//
-// Stale times (from Developer Task Plan v3, Task 2.11):
-//   useWarehouseLocation  — 5 min  (changes rarely)
-//   useWarehouseInventory — 30s    (quantities change frequently)
-//   useWarehouseCatalog   — 5 min  (catalog changes rarely)
-//   useWarehouseStats     — 1 min  (dashboard summary cards)
 
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@clerk/nextjs";
 import {
+    getWarehouses,
+    getWarehouseById,
     getWarehouseLocation,
-    getWarehouseCatalog,
     getWarehouseInventory,
+    getWarehouseCatalog,
     getWarehouseStats,
 } from "@/lib/supabase/queries/warehouse";
-import {useUserInfo} from "@/lib/hooks/queries/useUserInfo";
+import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 
-// ---------------------------------------------------------------------------
-// Query key factory
-// Mirrors the pattern in useLocations.ts / useInventory.ts.
-// Centralising keys here means cache invalidation (e.g. after fulfilling
-// an order ticket in Task 3.12) can target exactly the right entries.
-// ---------------------------------------------------------------------------
+// ─── Multi-warehouse hooks ────────────────────────────────────────────────────
 
-export const warehouseKeys = {
-    // All warehouse queries for this org
-    all: (organizationId: string) =>
-        ["warehouse", organizationId] as const,
+/** Returns ALL warehouse locations for the current org */
+export function useWarehouses() {
+    const { data: userInfo } = useUserInfo();
+    const orgId = userInfo?.members?.organization_id;
 
-    // The warehouse location record + its storage spaces
-    location: (organizationId: string) =>
-        [...warehouseKeys.all(organizationId), "location"] as const,
+    return useQuery({
+        queryKey: ["warehouses", orgId],
+        queryFn: () => getWarehouses(orgId!),
+        enabled: !!orgId,
+        staleTime: 5 * 60 * 1000,
+    });
+}
 
-    // Full inventory with quantities (super admin only)
-    inventory: (warehouseLocationId: string) =>
-        ["warehouse", "inventory", warehouseLocationId] as const,
+/** Returns a single warehouse by its location ID */
+export function useWarehouseById(warehouseId: string) {
+    return useQuery({
+        queryKey: ["warehouse", warehouseId],
+        queryFn: () => getWarehouseById(warehouseId),
+        enabled: !!warehouseId,
+        staleTime: 5 * 60 * 1000,
+    });
+}
 
-    // Item catalog without quantities (store admin safe)
-    catalog: (organizationId: string) =>
-        [...warehouseKeys.all(organizationId), "catalog"] as const,
+// ─── Legacy single-warehouse hook (backwards compat) ─────────────────────────
 
-    // Dashboard summary stats
-    stats: (warehouseLocationId: string) =>
-        ["warehouse", "stats", warehouseLocationId] as const,
-};
-
-// ---------------------------------------------------------------------------
-// 1. useWarehouseLocation
-//    Fetches the single warehouse location + its storage spaces.
-//    Used by: Super Admin warehouse page (2.4), store admin order creation
-//    (needs warehouse location ID to attach to order tickets — Task 3.2).
-//    Stale time: 5 minutes.
-// ---------------------------------------------------------------------------
-
+/** Returns the first/primary warehouse for the org.
+ *  Prefer useWarehouses() for new multi-warehouse-aware code. */
 export function useWarehouseLocation() {
     const { data: userInfo } = useUserInfo();
     const orgId = userInfo?.members?.organization_id;
 
     return useQuery({
-        queryKey: warehouseKeys.location(orgId ?? ""),
+        queryKey: ["warehouse-location", orgId],
         queryFn: () => getWarehouseLocation(orgId!),
         enabled: !!orgId,
         staleTime: 5 * 60 * 1000,
     });
 }
 
-// ---------------------------------------------------------------------------
-// 2. useWarehouseInventory
-//    Fetches all items WITH current quantities for a warehouse location.
-//    SUPER ADMIN ONLY — do not call from store admin components.
-//    RLS enforces this at the DB level even if called accidentally.
-//    Stale time: 30 seconds (quantities change when orders are fulfilled).
-// ---------------------------------------------------------------------------
+// ─── Inventory hooks ──────────────────────────────────────────────────────────
 
-export function useWarehouseInventory(warehouseLocationId: string | undefined) {
+/** Full warehouse inventory including quantities — Super Admin only */
+export function useWarehouseInventory(warehouseLocationId: string) {
     return useQuery({
-        queryKey: warehouseKeys.inventory(warehouseLocationId ?? ""),
-        queryFn: () => getWarehouseInventory(warehouseLocationId!),
+        queryKey: ["warehouse-inventory", warehouseLocationId],
+        queryFn: () => getWarehouseInventory(warehouseLocationId),
         enabled: !!warehouseLocationId,
-        staleTime: 30 * 1000, // 30 seconds
+        staleTime: 30 * 1000,
     });
 }
 
-// ---------------------------------------------------------------------------
-// 3. useWarehouseCatalog
-//    Fetches items WITHOUT quantity data.
-//    Safe to call from store admin context — used on the new order creation
-//    page (Task 3.2) to let store admins browse what is available to order.
-//    Stale time: 5 minutes (catalog items change infrequently).
-// ---------------------------------------------------------------------------
-
+/** Warehouse catalog without quantities — safe for Store Admins */
 export function useWarehouseCatalog() {
-    const { orgId } = useAuth();
+    const { data: userInfo } = useUserInfo();
+    const orgId = userInfo?.members?.organization_id;
 
     return useQuery({
-        queryKey: warehouseKeys.catalog(orgId ?? ""),
+        queryKey: ["warehouse-catalog", orgId],
         queryFn: () => getWarehouseCatalog(orgId!),
         enabled: !!orgId,
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     });
 }
 
-// ---------------------------------------------------------------------------
-// 4. useWarehouseStats
-//    Fetches summary stats for the Super Admin dashboard home cards (Task 2.3):
-//    total items, low stock count, out of stock count, total storage spaces.
-//    Stale time: 1 minute.
-// ---------------------------------------------------------------------------
-
-export function useWarehouseStats(warehouseLocationId: string | undefined) {
+/** Warehouse stats for dashboard cards */
+export function useWarehouseStats(warehouseLocationId: string) {
     return useQuery({
-        queryKey: warehouseKeys.stats(warehouseLocationId ?? ""),
-        queryFn: () => getWarehouseStats(warehouseLocationId!),
+        queryKey: ["warehouse-stats", warehouseLocationId],
+        queryFn: () => getWarehouseStats(warehouseLocationId),
         enabled: !!warehouseLocationId,
-        staleTime: 60 * 1000, // 1 minute
+        staleTime: 60 * 1000,
     });
 }

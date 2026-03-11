@@ -20,6 +20,7 @@ import {
 	Map as MapIcon,
 	X,
 	ClipboardList,
+	Plus,
 } from "lucide-react";
 import {
 	GoogleMap,
@@ -120,8 +121,8 @@ function StoreCard({
 				<p className="text-sm text-zinc-500 mb-4 flex items-start gap-1.5 leading-snug">
 					<MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-zinc-400" />
 					<span>
-                        {address.street}, {address.city}, {address.state} {address.zip}
-                    </span>
+						{address.street}, {address.city}, {address.state} {address.zip}
+					</span>
 				</p>
 			)}
 
@@ -129,8 +130,8 @@ function StoreCard({
 				<div className="flex items-center gap-1.5 text-sm text-zinc-600">
 					<Users className="w-4 h-4 text-zinc-400" />
 					<span>
-                        {employeeCount} {employeeCount === 1 ? "employee" : "employees"}
-                    </span>
+						{employeeCount} {employeeCount === 1 ? "employee" : "employees"}
+					</span>
 				</div>
 				{alertCount > 0 ? (
 					<div className="flex items-center gap-1.5 text-sm text-red-600 font-medium ml-auto">
@@ -295,16 +296,16 @@ function StoresMap({
 							<div className="flex items-center gap-2 text-xs mb-3">
 								{(alertsByLocation[selectedStore.id] ?? 0) > 0 && (
 									<span className="flex items-center gap-1 text-red-600 font-medium">
-                                        <AlertTriangle className="w-3 h-3" />
+										<AlertTriangle className="w-3 h-3" />
 										{alertsByLocation[selectedStore.id]} alert
 										{alertsByLocation[selectedStore.id] !== 1 ? "s" : ""}
-                                    </span>
+									</span>
 								)}
 								{(pendingByLocation[selectedStore.id] ?? 0) > 0 && (
 									<span className="flex items-center gap-1 text-yellow-600 font-medium">
-                                        <ClipboardList className="w-3 h-3" />
+										<ClipboardList className="w-3 h-3" />
 										{pendingByLocation[selectedStore.id]} pending
-                                    </span>
+									</span>
 								)}
 								{(alertsByLocation[selectedStore.id] ?? 0) === 0 &&
 									(pendingByLocation[selectedStore.id] ?? 0) === 0 && (
@@ -382,7 +383,6 @@ export default function AllStoresPage() {
 	}, [alerts]);
 
 	// Pending ticket counts per location — placeholder until useAllTickets exists
-	// Replace with: tickets grouped by requesting_location_id where status = 'submitted'
 	const pendingByLocation: Record<string, number> = {};
 
 	const totalAlerts = Object.values(alertsByLocation).reduce((a, b) => a + b, 0);
@@ -404,8 +404,6 @@ export default function AllStoresPage() {
 						? JSON.parse(loc.address)
 						: loc.address;
 
-				// If lat/lng columns exist on the location, use them directly
-				// and skip the geocoding API call entirely.
 				if (loc.latitude != null && loc.longitude != null) {
 					return { ...loc, address, lat: loc.latitude, lng: loc.longitude };
 				}
@@ -442,14 +440,14 @@ export default function AllStoresPage() {
 							: `${stores.length} ${stores.length === 1 ? "store" : "stores"}`}
 						{totalAlerts > 0 && (
 							<span className="ml-2 text-red-600 font-medium">
-                                · {totalAlerts} active{" "}
+								· {totalAlerts} active{" "}
 								{totalAlerts === 1 ? "alert" : "alerts"}
-                            </span>
+							</span>
 						)}
 					</p>
 				</div>
 
-				<div className="flex items-center gap-3">
+				<div className="flex items-center gap-3 flex-wrap">
 					{/* View toggle */}
 					<div className="flex items-center gap-1 bg-zinc-100 rounded-lg p-1">
 						<button
@@ -482,6 +480,15 @@ export default function AllStoresPage() {
 							onSearch={setSearchQuery}
 						/>
 					</div>
+
+					{/* ── Add new store button ── */}
+					<Link
+						href="/super-admin/stores/new"
+						className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors whitespace-nowrap"
+					>
+						<Plus className="w-4 h-4" />
+						New Store
+					</Link>
 				</div>
 			</div>
 
@@ -510,9 +517,19 @@ export default function AllStoresPage() {
 									</button>
 								</>
 							) : (
-								<p className="text-zinc-500 font-medium">
-									No store locations found
-								</p>
+								<>
+									<p className="text-zinc-500 font-medium">No store locations yet</p>
+									<p className="text-zinc-400 text-sm mt-1 mb-4">
+										Get started by opening your first store.
+									</p>
+									<Link
+										href="/super-admin/stores/new"
+										className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
+									>
+										<Plus className="w-4 h-4" />
+										New Store
+									</Link>
+								</>
 							)}
 						</div>
 					) : (
@@ -557,9 +574,9 @@ export default function AllStoresPage() {
 							Has alerts
 						</div>
 						<div className="flex items-center gap-1.5">
-                            <span className="w-4 h-4 rounded-full bg-zinc-400 text-white text-[9px] flex items-center justify-center font-bold inline-flex">
-                                3
-                            </span>
+							<span className="w-4 h-4 rounded-full bg-zinc-400 text-white text-[9px] flex items-center justify-center font-bold inline-flex">
+								3
+							</span>
 							Clustered pins
 						</div>
 					</div>

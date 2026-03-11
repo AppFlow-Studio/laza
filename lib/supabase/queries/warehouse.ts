@@ -42,12 +42,11 @@ export type WarehouseCatalogItem = {
     sku: string | null;
     unit_of_measure: "pcs" | "kg" | "liters" | "lbs" | "oz";
     box_quantity: number | null;
-    // Supabase returns nested one-to-many as array even for single records
     category:
         | {
-              id: number;
-              name: string;
-          }[]
+        id: number;
+        name: string;
+    }[]
         | null;
 };
 
@@ -84,9 +83,59 @@ export type WarehouseStats = {
 };
 
 // ============================================================
+// getWarehouses
+// Returns ALL warehouse locations for an organization.
+// Used for multi-warehouse list view.
+// ============================================================
+
+export async function getWarehouses(organizationId: string) {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase
+        .from("locations")
+        .select(
+            `
+            *,
+            storage_spaces (*)
+        `,
+        )
+        .eq("organization_id", organizationId)
+        .eq("location_type", "warehouse")
+        .eq("is_active", true)
+        .order("created_at", { ascending: true });
+
+    if (error) throw error;
+    return (data ?? []) as WarehouseLocation[];
+}
+
+// ============================================================
+// getWarehouseById
+// Returns a single warehouse location by its ID.
+// Used for the warehouse detail page.
+// ============================================================
+
+export async function getWarehouseById(warehouseId: string) {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase
+        .from("locations")
+        .select(
+            `
+            *,
+            storage_spaces (*)
+        `,
+        )
+        .eq("id", warehouseId)
+        .eq("location_type", "warehouse")
+        .single();
+
+    if (error) throw error;
+    return data as WarehouseLocation;
+}
+
+// ============================================================
 // getWarehouseLocation
-// Returns the single warehouse location for an organization.
-// Every other warehouse function depends on this ID.
+// Returns the FIRST/primary warehouse for an organization.
+// Kept for backwards compatibility — prefer getWarehouses()
+// for new multi-warehouse-aware code.
 // ============================================================
 
 export async function getWarehouseLocation(organizationId: string) {
@@ -102,8 +151,12 @@ export async function getWarehouseLocation(organizationId: string) {
         .eq("organization_id", organizationId)
         .eq("location_type", "warehouse")
         .eq("is_active", true)
+        .order("created_at", { ascending: true })
+        .limit(1)
         .single();
 
+    // PGRST116 = no rows found — return null gracefully
+    if (error?.code === "PGRST116") return null;
     if (error) throw error;
     return data as WarehouseLocation;
 }
@@ -188,7 +241,6 @@ export async function getWarehouseStats(
 ): Promise<WarehouseStats> {
     const supabase = await createServerSupabaseClient();
 
-    // Fetch all item_locations for the warehouse with item min quantities
     const { data: inventory, error: inventoryError } = await supabase
         .from("item_locations")
         .select(
@@ -204,7 +256,6 @@ export async function getWarehouseStats(
 
     if (inventoryError) throw inventoryError;
 
-    // Fetch storage spaces count
     const { data: storageSpaces, error: storageError } = await supabase
         .from("storage_spaces")
         .select("id")
@@ -212,7 +263,6 @@ export async function getWarehouseStats(
 
     if (storageError) throw storageError;
 
-    // Calculate stats
     const total_items = inventory?.length || 0;
     const total_storage_spaces = storageSpaces?.length || 0;
 
