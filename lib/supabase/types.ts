@@ -479,8 +479,10 @@ export type Database = {
           barcode_text: string | null
           box_quantity: number | null
           category_id: number | null
+          cbm_per_carton: number | null
           cost_per_unit: number | null
           created_at: string
+          current_unit_cost: number | null
           id: number
           min_quantity: number | null
           name: string | null
@@ -493,8 +495,10 @@ export type Database = {
           barcode_text?: string | null
           box_quantity?: number | null
           category_id?: number | null
+          cbm_per_carton?: number | null
           cost_per_unit?: number | null
           created_at?: string
+          current_unit_cost?: number | null
           id?: number
           min_quantity?: number | null
           name?: string | null
@@ -507,8 +511,10 @@ export type Database = {
           barcode_text?: string | null
           box_quantity?: number | null
           category_id?: number | null
+          cbm_per_carton?: number | null
           cost_per_unit?: number | null
           created_at?: string
+          current_unit_cost?: number | null
           id?: number
           min_quantity?: number | null
           name?: string | null
@@ -632,7 +638,9 @@ export type Database = {
           group_id: string | null
           id: string
           is_active: boolean | null
+          latitude: number | null
           location_type: string
+          longitude: number | null
           name: string | null
           organization_id: string | null
         }
@@ -642,7 +650,9 @@ export type Database = {
           group_id?: string | null
           id?: string
           is_active?: boolean | null
+          latitude?: number | null
           location_type?: string
+          longitude?: number | null
           name?: string | null
           organization_id?: string | null
         }
@@ -652,7 +662,9 @@ export type Database = {
           group_id?: string | null
           id?: string
           is_active?: boolean | null
+          latitude?: number | null
           location_type?: string
+          longitude?: number | null
           name?: string | null
           organization_id?: string | null
         }
@@ -931,27 +943,33 @@ export type Database = {
           fulfilled_units: number | null
           id: string
           item_id: number
+          line_total: number | null
           quantity_boxes: number
           quantity_units: number
           ticket_id: string
+          unit_cost_at_time: number | null
         }
         Insert: {
           fulfilled_boxes?: number | null
           fulfilled_units?: number | null
           id?: string
           item_id: number
+          line_total?: number | null
           quantity_boxes: number
           quantity_units: number
           ticket_id: string
+          unit_cost_at_time?: number | null
         }
         Update: {
           fulfilled_boxes?: number | null
           fulfilled_units?: number | null
           id?: string
           item_id?: number
+          line_total?: number | null
           quantity_boxes?: number
           quantity_units?: number
           ticket_id?: string
+          unit_cost_at_time?: number | null
         }
         Relationships: [
           {
@@ -1961,6 +1979,18 @@ export type Database = {
         }
         Returns: string
       }
+      recalculate_po_costs: {
+        Args: { p_purchase_order_id: string }
+        Returns: Json
+      }
+      receive_purchase_order: {
+        Args: {
+          p_purchase_order_id: string
+          p_received_items: Json
+          p_user_id: string
+        }
+        Returns: Json
+      }
       requesting_user_id: { Args: never; Returns: string }
       trigger_scheduled_emails_now: {
         Args: never
@@ -2096,8 +2126,6 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-
-export type StorageSpace = Tables<"storage_spaces">
 
 export const Constants = {
   public: {

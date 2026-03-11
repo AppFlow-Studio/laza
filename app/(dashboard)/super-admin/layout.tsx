@@ -16,7 +16,8 @@ import {
     Warehouse,
     Store,
     ChartColumn,
-    StretchHorizontal
+    StretchHorizontal,
+    ShoppingCart
 } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
@@ -42,6 +43,7 @@ const navigation = [
     { name: "Dashboard", href: "/super-admin", icon: LayoutDashboard },
     { name: "Warehouse", href: "/super-admin/warehouse", icon: Warehouse },
     { name: "All Stores", href: "/super-admin/stores", icon: Store },
+    { name: "Purchase Orders", href: "/super-admin/purchase-orders", icon: ShoppingCart },
     { name: "Orders", href: "/super-admin/orders", icon: StretchHorizontal },
     { name: "Analytics", href: "/super-admin/analytics", icon: ChartColumn },
     { name: "Locations", href: "/super-admin/locations", icon: MapPin },
