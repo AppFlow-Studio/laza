@@ -142,7 +142,7 @@ export default function WarehouseInventoryPage() {
                     {storageSpaces.map((space) => (
                         <Link
                             key={space.id}
-                            href={`/super-admin/warehouse/storage-spaces/${space.id}`}
+                            href={`/app/(dashboard)/super-admin/warehouse/%5Bid%5D/storage-spaces/${space.id}`}
                             className="bg-white rounded-xl shadow-sm border border-zinc-200 p-5 hover:shadow-md hover:border-zinc-300 transition-all group"
                         >
                             <div className="flex items-start justify-between mb-4">

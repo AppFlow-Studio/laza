@@ -4,7 +4,7 @@
 //
 // Task 2.7 — Warehouse employee management.
 //
-// Mirrors the employee right-panel from /admin/locations/[id] exactly,
+// Mirrors the employee right-panel from /admin/locations/[storageId] exactly,
 // adapted for the warehouse context:
 //   - Shows all employees currently assigned to the warehouse location
 //   - Lets super admin search unassigned employees and assign them
