@@ -41,6 +41,7 @@ import {
 export default function WarehouseStorageSpaceDetailPage() {
     const params = useParams();
     const storageSpaceId = params.id as string;
+    console.log(storageSpaceId)
 
     const { user } = useUser();
     const { viewMode, setViewMode } = useAdminStore();

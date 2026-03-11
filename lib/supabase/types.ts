@@ -2097,6 +2097,8 @@ export type CompositeTypes<
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
+export type StorageSpace = Tables<"storage_spaces">
+
 export const Constants = {
   public: {
     Enums: {},

@@ -13,6 +13,10 @@ import {
     Home,
     Tags,
     Settings,
+    Warehouse,
+    Store,
+    ChartColumn,
+    StretchHorizontal
 } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
@@ -36,12 +40,15 @@ import { Button } from "@/components/ui/button";
 
 const navigation = [
     { name: "Dashboard", href: "/super-admin", icon: LayoutDashboard },
+    { name: "Warehouse", href: "/super-admin/warehouse", icon: Warehouse },
+    { name: "All Stores", href: "/super-admin/stores", icon: Store },
+    { name: "Orders", href: "/super-admin/orders", icon: StretchHorizontal },
+    { name: "Analytics", href: "/super-admin/analytics", icon: ChartColumn },
     { name: "Locations", href: "/super-admin/locations", icon: MapPin },
     { name: "Users", href: "/super-admin/users", icon: Users },
     { name: "Items", href: "/super-admin/items", icon: Package },
     { name: "Categories", href: "/super-admin/categories", icon: Tags },
     { name: "Inventory", href: "/super-admin/inventory", icon: BarChart3 },
-    // warehouse
     { name: "Settings", href: "/super-admin/settings/notifications", icon: Settings },
 ];
 
