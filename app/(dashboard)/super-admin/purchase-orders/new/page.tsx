@@ -232,11 +232,15 @@ export default function NewPurchaseOrderPage() {
                 })),
             });
 
+            console.log({ created });
+
             toast.success(
                 action === "draft" ? "PO saved as draft" : "PO submitted",
             );
             router.push(`/super-admin/purchase-orders/${(created as any).id}`);
         } catch (err: any) {
+            console.log({ err });
+
             toast.error(err.message || "Failed to save PO");
         }
     }
@@ -253,9 +257,7 @@ export default function NewPurchaseOrderPage() {
                 >
                     <ChevronLeft className="h-5 w-5" />
                 </button>
-                <h1 className="text-xl font-semibold">
-                    New Purchase Order
-                </h1>
+                <h1 className="text-xl font-semibold">New Purchase Order</h1>
             </div>
 
             {/* ── Shared fees (top — affect all line calculations) ── */}
@@ -354,9 +356,7 @@ export default function NewPurchaseOrderPage() {
             {/* ── Line items ───────────────────────────────────────── */}
             <section className="rounded-xl border border-gray-200 p-6">
                 <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold">
-                        Line Items
-                    </h2>
+                    <h2 className="text-sm font-semibold">Line Items</h2>
                     <button
                         onClick={addLine}
                         className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-900"

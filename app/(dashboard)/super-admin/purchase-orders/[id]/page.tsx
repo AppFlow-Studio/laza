@@ -61,7 +61,7 @@ function StatusTimeline({ current }: { current: string }) {
                             <span
                                 className={`mt-1 text-xs ${
                                     active
-                                        ? "font-medium text-white"
+                                        ? "font-medium"
                                         : done
                                           ? "text-zinc-400"
                                           : "text-zinc-600"
@@ -351,12 +351,12 @@ export default function PurchaseOrderDetailPage() {
                         onClick={() =>
                             router.push("/super-admin/purchase-orders")
                         }
-                        className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white"
+                        className="rounded-lg p-1.5 text-zinc-400  hover:bg-zinc-100 transition-all duration-300"
                     >
                         <ChevronLeft className="h-5 w-5" />
                     </button>
                     <div>
-                        <h1 className="text-xl font-semibold text-white">
+                        <h1 className="text-xl font-semibold">
                             {po.po_number}
                         </h1>
                         {po.supplier_name && (
@@ -393,7 +393,7 @@ export default function PurchaseOrderDetailPage() {
                                     `/super-admin/purchase-orders/${po.id}/edit`,
                                 )
                             }
-                            className="rounded-lg border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+                            className="rounded-lg border border-zinc-600 px-4 py-2 text-sm font-medium"
                         >
                             Edit PO
                         </button>
@@ -402,9 +402,9 @@ export default function PurchaseOrderDetailPage() {
             </div>
 
             {/* ── Status timeline ───────────────────────────────────── */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+            <div className="rounded-xl border border-gray-200 p-6">
                 <StatusTimeline current={po.status} />
-                <div className="mt-4 grid grid-cols-2 gap-4 text-xs text-zinc-500 sm:grid-cols-4">
+                <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-zinc-500 sm:grid-cols-4">
                     {po.order_date && (
                         <div>
                             <span className="block text-zinc-400">
@@ -461,27 +461,27 @@ export default function PurchaseOrderDetailPage() {
 
             {/* ── Cost summary cards ────────────────────────────────── */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
+                <div className="rounded-lg border border-gray-200 px-4 py-3">
                     <p className="text-xs text-zinc-500">
                         Subtotal (before fees)
                     </p>
-                    <p className="mt-0.5 text-base font-semibold text-white">
+                    <p className="mt-0.5 text-base font-semibold">
                         {fmtMoney(po.subtotal_before ?? 0)}
                     </p>
                 </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
+                <div className="rounded-lg border border-gray-200 px-4 py-3">
                     <p className="text-xs text-zinc-500">Office Fee</p>
-                    <p className="mt-0.5 text-base font-semibold text-white">
+                    <p className="mt-0.5 text-base font-semibold">
                         {fmtMoney(po.office_fee ?? 0)}
                     </p>
                 </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
+                <div className="rounded-lg border border-gray-200 px-4 py-3">
                     <p className="text-xs text-zinc-500">Shipping Fee</p>
-                    <p className="mt-0.5 text-base font-semibold text-white">
+                    <p className="mt-0.5 text-base font-semibold">
                         {fmtMoney(po.shipping_fee ?? 0)}
                     </p>
                 </div>
-                <div className="rounded-lg border border-emerald-800/40 bg-emerald-950/30 px-4 py-3">
+                <div className="rounded-lg border border-emerald-800/40 px-4 py-3">
                     <p className="text-xs text-emerald-400">
                         Grand Total (landed)
                     </p>
@@ -492,14 +492,14 @@ export default function PurchaseOrderDetailPage() {
             </div>
 
             {/* ── Line items table ──────────────────────────────────── */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900">
-                <div className="border-b border-zinc-800 px-5 py-3">
+            <div className="rounded-xl border border-gray-200">
+                <div className="border-b border-gray-200 px-5 py-3">
                     <h2 className="text-sm font-semibold text-white">
                         Line Items
                     </h2>
                 </div>
                 {/* Column headers */}
-                <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] gap-3 border-b border-zinc-800 px-5 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] gap-3 border-b border-gray-200 px-5 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
                     <span>Item</span>
                     <span className="text-right">Qty</span>
                     <span className="text-right">Unit (before)</span>
@@ -507,14 +507,14 @@ export default function PurchaseOrderDetailPage() {
                     <span className="text-right">Total (before)</span>
                     <span className="text-right">Landed Cost / unit</span>
                 </div>
-                <div className="divide-y divide-zinc-800/60">
+                <div className="divide-y divide-gray-200">
                     {(po.purchase_order_items ?? []).map((item: any) => (
                         <div
                             key={item.id}
                             className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] gap-3 items-center px-5 py-3"
                         >
                             <div>
-                                <p className="text-sm font-medium text-white">
+                                <p className="text-sm font-medium">
                                     {item.items?.name ?? `Item ${item.item_id}`}
                                 </p>
                                 {item.items?.sku && (
@@ -523,16 +523,16 @@ export default function PurchaseOrderDetailPage() {
                                     </p>
                                 )}
                             </div>
-                            <span className="text-right text-sm text-zinc-300">
+                            <span className="text-right text-sm text-zinc-500">
                                 {item.quantity_ordered}
                             </span>
-                            <span className="text-right text-sm text-zinc-300">
+                            <span className="text-right text-sm text-zinc-500">
                                 {fmtUnitCost(item.unit_price_before)}
                             </span>
-                            <span className="text-right text-sm text-zinc-400">
+                            <span className="text-right text-sm text-zinc-600">
                                 {item.cbm ?? "—"}
                             </span>
-                            <span className="text-right text-sm text-zinc-300">
+                            <span className="text-right text-sm text-zinc-500">
                                 {fmtMoney(item.total_price_before)}
                             </span>
                             <span className="text-right text-sm font-medium text-emerald-400">
@@ -545,11 +545,11 @@ export default function PurchaseOrderDetailPage() {
 
             {/* ── Notes ────────────────────────────────────────────── */}
             {po.notes && (
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+                <div className="rounded-xl border border-gray-200 p-5">
                     <h2 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-zinc-500">
                         Notes
                     </h2>
-                    <p className="text-sm text-zinc-300">{po.notes}</p>
+                    <p className="text-sm text-zinc-500">{po.notes}</p>
                 </div>
             )}
 
