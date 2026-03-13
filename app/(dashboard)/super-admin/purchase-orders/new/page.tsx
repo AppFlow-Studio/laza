@@ -1,10 +1,8 @@
 "use client";
 
 // app/(dashboard)/super-admin/purchase-orders/new/page.tsx
-//
-// Step 2: New PO form — mirrors Carton Calculator logic with live recalculation.
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Plus, Trash2, ChevronLeft, AlertCircle } from "lucide-react";
@@ -20,11 +18,11 @@ import {
 } from "@/lib/utils/poCalculations";
 
 // ---------------------------------------------------------------------------
-// Types for form state
+// Types
 // ---------------------------------------------------------------------------
 
 interface LineFormState {
-    _key: string; // stable React key, not sent to DB
+    _key: string;
     item_id: string;
     quantity_ordered: string;
     unit_price_before: string;
@@ -57,7 +55,13 @@ function lineToInput(l: LineFormState): POLineInput | null {
 }
 
 // ---------------------------------------------------------------------------
-// Small numeric input helper — consistent styling
+// NumInput — with optional preset quick-add dropdown
+//
+// Props:
+//   presets?: number[]  — if provided, a dropdown appears on focus showing
+//                         each preset. Clicking one ADDS it to the current
+//                         value (always accumulates). Dropdown closes when
+//                         focus leaves the input area.
 // ---------------------------------------------------------------------------
 
 function NumInput({
@@ -65,14 +69,36 @@ function NumInput({
     onChange,
     placeholder,
     prefix,
+    presets,
     className = "",
 }: {
     value: string;
     onChange: (v: string) => void;
     placeholder: string;
     prefix?: string;
+    presets?: number[];
     className?: string;
 }) {
+    const [open, setOpen] = useState(false);
+    const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    function handleFocus() {
+        if (closeTimer.current) clearTimeout(closeTimer.current);
+        if (presets && presets.length > 0) setOpen(true);
+    }
+
+    function handleBlur() {
+        // Small delay so onMouseDown on a preset button fires before blur closes the dropdown
+        closeTimer.current = setTimeout(() => setOpen(false), 150);
+    }
+
+    function handlePresetClick(preset: number) {
+        const current = parseFloat(value) || 0;
+        onChange(String(current + preset));
+        if (closeTimer.current) clearTimeout(closeTimer.current);
+        // Keep dropdown open for repeated clicking
+    }
+
     return (
         <div className={`relative ${className}`}>
             {prefix && (
@@ -86,9 +112,34 @@ function NumInput({
                 min="0"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
                 placeholder={placeholder}
-                className={`w-full rounded-md border border-gray-200 py-2 text-right text-sm focus:border-indigo-500 focus:outline-none ${prefix ? "pl-6 pr-3" : "px-3"}`}
+                className={`w-full rounded-md border border-zinc-200 bg-white py-2 text-right text-sm text-zinc-900 placeholder-zinc-400 focus:border-indigo-500 focus:outline-none ${prefix ? "pl-6 pr-3" : "px-3"}`}
             />
+
+            {/* Preset dropdown */}
+            {open && presets && presets.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg">
+                    {presets.map((preset) => (
+                        <button
+                            key={preset}
+                            type="button"
+                            onMouseDown={(e) => {
+                                // Prevent blur from firing before click
+                                e.preventDefault();
+                                handlePresetClick(preset);
+                            }}
+                            className="flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-indigo-50"
+                        >
+                            <span className="text-xs text-zinc-400">+</span>
+                            <span className="font-medium text-zinc-700">
+                                {preset.toLocaleString()}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
@@ -103,7 +154,6 @@ export default function NewPurchaseOrderPage() {
     const { data: catalog = [] } = useWarehouseCatalog();
     const createPO = useCreatePurchaseOrder();
 
-    // ── Header / fees state ──────────────────────────────────────────────────
     const [poNumber, setPoNumber] = useState("");
     const [supplierName, setSupplierName] = useState("");
     const [orderDate, setOrderDate] = useState("");
@@ -111,27 +161,18 @@ export default function NewPurchaseOrderPage() {
     const [officeFee, setOfficeFee] = useState("0");
     const [shippingFee, setShippingFee] = useState("0");
     const [notes, setNotes] = useState("");
-
-    // ── Line items ───────────────────────────────────────────────────────────
     const [lines, setLines] = useState<LineFormState[]>([emptyLine()]);
 
-    // ── Live calculations ────────────────────────────────────────────────────
-    // Re-run every time any input changes — pure function, instant
+    // Live calculations
     const validInputs = lines.map(lineToInput).filter(Boolean) as POLineInput[];
-
     const { lines: calcLines, totals } = calculatePOLines(
         validInputs,
         parseFloat(officeFee) || 0,
         parseFloat(shippingFee) || 0,
     );
-
-    // Map calc results back by index position (only valid lines have results)
-    // Build a lookup: item_id → calculated line
     const calcByItemId = Object.fromEntries(
         calcLines.map((l) => [String(l.item_id), l]),
     );
-
-    // ── Line helpers ─────────────────────────────────────────────────────────
 
     function updateLine(
         key: string,
@@ -151,10 +192,8 @@ export default function NewPurchaseOrderPage() {
         setLines((prev) => prev.filter((l) => l._key !== key));
     }
 
-    // Items already in the form (prevent duplicate selection)
     const usedItemIds = new Set(lines.map((l) => l.item_id).filter(Boolean));
 
-    // ── Pre-fill cbm_per_carton when item is selected ────────────────────────
     function handleItemSelect(key: string, itemId: string) {
         const item = catalog.find((c: any) => String(c.id) === itemId);
         setLines((prev) =>
@@ -166,7 +205,6 @@ export default function NewPurchaseOrderPage() {
                     pieces_per_carton: item?.box_quantity
                         ? String(item.box_quantity)
                         : l.pieces_per_carton,
-                    // cbm_per_carton pre-fill when item has it (Task 1.21)
                     cbm: (item as any)?.cbm_per_carton
                         ? String((item as any).cbm_per_carton)
                         : l.cbm,
@@ -174,8 +212,6 @@ export default function NewPurchaseOrderPage() {
             }),
         );
     }
-
-    // ── Submit ───────────────────────────────────────────────────────────────
 
     async function handleSubmit(action: "draft" | "submit") {
         if (!orgId || !userId) return;
@@ -193,7 +229,6 @@ export default function NewPurchaseOrderPage() {
             return;
         }
 
-        // Attach calculated values to each line for storage
         const { lines: final } = calculatePOLines(
             validLines,
             parseFloat(officeFee) || 0,
@@ -232,117 +267,112 @@ export default function NewPurchaseOrderPage() {
                 })),
             });
 
-            console.log({ created });
-
             toast.success(
                 action === "draft" ? "PO saved as draft" : "PO submitted",
             );
             router.push(`/super-admin/purchase-orders/${(created as any).id}`);
         } catch (err: any) {
-            console.log({ err });
-
             toast.error(err.message || "Failed to save PO");
         }
     }
 
-    // ── Render ────────────────────────────────────────────────────────────────
-
     return (
         <div className="mx-auto max-w-5xl space-y-8 p-6">
-            {/* ── Back + title ─────────────────────────────────────── */}
+            {/* Header */}
             <div className="flex items-center gap-3">
                 <button
                     onClick={() => router.back()}
-                    className="rounded-lg p-1.5 text-zinc-400 hover"
+                    className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-600 transition-colors"
                 >
                     <ChevronLeft className="h-5 w-5" />
                 </button>
-                <h1 className="text-xl font-semibold">New Purchase Order</h1>
+                <h1 className="text-xl font-semibold text-zinc-900">
+                    New Purchase Order
+                </h1>
             </div>
 
-            {/* ── Shared fees (top — affect all line calculations) ── */}
-            <section className="rounded-xl border border-gray-200 p-6">
-                <h2 className="mb-4 text-sm font-semibold">
+            {/* Order Details & Shared Fees */}
+            <section className="rounded-xl border border-zinc-200 bg-white p-6">
+                <h2 className="mb-4 text-sm font-semibold text-zinc-900">
                     Order Details &amp; Shared Fees
                 </h2>
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-zinc-400">
+                        <label className="text-xs font-medium text-zinc-500">
                             PO Number *
                         </label>
                         <input
                             value={poNumber}
                             onChange={(e) => setPoNumber(e.target.value)}
                             placeholder="PO-2026-001"
-                            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm placeholder-zinc-600 focus:border-indigo-500 focus:outline-none"
+                            className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-indigo-500 focus:outline-none"
                         />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-zinc-400">
+                        <label className="text-xs font-medium text-zinc-500">
                             Supplier
                         </label>
                         <input
                             value={supplierName}
                             onChange={(e) => setSupplierName(e.target.value)}
                             placeholder="Supplier name"
-                            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm placeholder-zinc-600 focus:border-indigo-500 focus:outline-none"
+                            className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-indigo-500 focus:outline-none"
                         />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-zinc-400">
+                        <label className="text-xs font-medium text-zinc-500">
                             Order Date
                         </label>
                         <input
                             type="date"
                             value={orderDate}
                             onChange={(e) => setOrderDate(e.target.value)}
-                            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                            className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:border-indigo-500 focus:outline-none"
                         />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-zinc-400">
+                        <label className="text-xs font-medium text-zinc-500">
                             Expected Arrival
                         </label>
                         <input
                             type="date"
                             value={expectedArrival}
                             onChange={(e) => setExpectedArrival(e.target.value)}
-                            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                            className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:border-indigo-500 focus:outline-none"
                         />
                     </div>
-
-                    {/* Office fee — updates all line allocations instantly */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-zinc-400">
+                        <label className="text-xs font-medium text-zinc-500">
                             Office / Agent Fee ($)
                         </label>
+                        {/* presets=[1000, 5000, 10000] — click adds to current value */}
                         <NumInput
                             value={officeFee}
                             onChange={setOfficeFee}
                             placeholder="5400"
                             prefix="$"
+                            presets={[1000, 5000, 10000]}
                         />
                     </div>
-
-                    {/* Shipping fee — same */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-zinc-400">
+                        <label className="text-xs font-medium text-zinc-500">
                             Shipping Fee ($)
                         </label>
+                        {/* presets=[10000, 25000, 37500] */}
                         <NumInput
                             value={shippingFee}
                             onChange={setShippingFee}
                             placeholder="37500"
                             prefix="$"
+                            presets={[10000, 25000, 37500]}
                         />
                     </div>
                 </div>
 
-                {/* Fee allocation hint */}
                 {(parseFloat(officeFee) > 0 || parseFloat(shippingFee) > 0) && (
                     <p className="mt-3 text-xs text-zinc-500">
                         Total fees:{" "}
-                        <span className="text-zinc-900">
+                        <span className="font-medium text-zinc-900">
                             {fmtMoney(
                                 (parseFloat(officeFee) || 0) +
                                     (parseFloat(shippingFee) || 0),
@@ -353,20 +383,21 @@ export default function NewPurchaseOrderPage() {
                 )}
             </section>
 
-            {/* ── Line items ───────────────────────────────────────── */}
-            <section className="rounded-xl border border-gray-200 p-6">
+            {/* Line Items */}
+            <section className="rounded-xl border border-zinc-200 bg-white p-6">
                 <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold">Line Items</h2>
+                    <h2 className="text-sm font-semibold text-zinc-900">
+                        Line Items
+                    </h2>
                     <button
                         onClick={addLine}
-                        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-900"
+                        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 transition-colors"
                     >
                         <Plus className="h-3.5 w-3.5" />
                         Add item
                     </button>
                 </div>
 
-                {/* Column headers */}
                 <div className="mb-2 grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
                     <span>Item</span>
                     <span className="text-right">Qty</span>
@@ -378,16 +409,14 @@ export default function NewPurchaseOrderPage() {
                 </div>
 
                 <div className="space-y-2">
-                    {lines.map((line, idx) => {
+                    {lines.map((line) => {
                         const calc = calcByItemId[line.item_id];
-                        const hasCalc = !!calc;
 
                         return (
                             <div
                                 key={line._key}
                                 className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] items-center gap-2"
                             >
-                                {/* Item selector */}
                                 <select
                                     value={line.item_id}
                                     onChange={(e) =>
@@ -396,7 +425,7 @@ export default function NewPurchaseOrderPage() {
                                             e.target.value,
                                         )
                                     }
-                                    className="rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                                    className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-indigo-500 focus:outline-none"
                                 >
                                     <option value="">Select item…</option>
                                     {catalog.map((item: any) => (
@@ -416,7 +445,7 @@ export default function NewPurchaseOrderPage() {
                                     ))}
                                 </select>
 
-                                {/* Quantity */}
+                                {/* Qty — presets for common order sizes */}
                                 <NumInput
                                     value={line.quantity_ordered}
                                     onChange={(v) =>
@@ -427,9 +456,10 @@ export default function NewPurchaseOrderPage() {
                                         )
                                     }
                                     placeholder="0"
+                                    presets={[100, 1000, 10000]}
                                 />
 
-                                {/* Unit price before fees */}
+                                {/* Unit price — no presets (too item-specific) */}
                                 <NumInput
                                     value={line.unit_price_before}
                                     onChange={(v) =>
@@ -443,7 +473,7 @@ export default function NewPurchaseOrderPage() {
                                     prefix="$"
                                 />
 
-                                {/* Pieces per carton */}
+                                {/* Pcs/carton — no presets */}
                                 <NumInput
                                     value={line.pieces_per_carton}
                                     onChange={(v) =>
@@ -454,9 +484,10 @@ export default function NewPurchaseOrderPage() {
                                         )
                                     }
                                     placeholder="—"
+                                    presets={[100, 1000, 10000]}
                                 />
 
-                                {/* CBM */}
+                                {/* CBM — no presets */}
                                 <NumInput
                                     value={line.cbm}
                                     onChange={(v) =>
@@ -465,22 +496,21 @@ export default function NewPurchaseOrderPage() {
                                     placeholder="0.00"
                                 />
 
-                                {/* Landed cost — read-only calculated value */}
-                                <div className="rounded-md border border-gray-200 px-3 py-2 text-right text-sm">
-                                    {hasCalc ? (
-                                        <span className="font-medium text-emerald-400">
+                                {/* Landed cost — read-only */}
+                                <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-right text-sm">
+                                    {calc ? (
+                                        <span className="font-medium text-emerald-600">
                                             {fmtUnitCost(calc.unit_cost_after)}
                                         </span>
                                     ) : (
-                                        <span className="text-zinc-600">—</span>
+                                        <span className="text-zinc-400">—</span>
                                     )}
                                 </div>
 
-                                {/* Remove */}
                                 <button
                                     onClick={() => removeLine(line._key)}
                                     disabled={lines.length === 1}
-                                    className="rounded p-1.5 text-zinc-600 hover:text-red-400 disabled:opacity-30"
+                                    className="rounded p-1.5 text-zinc-400 hover:text-red-500 disabled:opacity-30 transition-colors"
                                 >
                                     <Trash2 className="h-4 w-4" />
                                 </button>
@@ -489,12 +519,11 @@ export default function NewPurchaseOrderPage() {
                     })}
                 </div>
 
-                {/* CBM warning — fee allocation requires CBM values */}
                 {(parseFloat(officeFee) > 0 || parseFloat(shippingFee) > 0) &&
                     validInputs.some((l) => !l.cbm) && (
-                        <div className="mt-3 flex items-center gap-2 rounded-lg border border-amber-800/40 px-3 py-2">
-                            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-amber-400" />
-                            <p className="text-xs text-amber-500">
+                        <div className="mt-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
+                            <p className="text-xs text-amber-700">
                                 Some items are missing CBM values — fee
                                 allocation will be skipped for those lines
                             </p>
@@ -502,41 +531,41 @@ export default function NewPurchaseOrderPage() {
                     )}
             </section>
 
-            {/* ── Totals summary ───────────────────────────────────── */}
+            {/* Order Summary */}
             {validInputs.length > 0 && (
-                <section className="rounded-xl border border-gray-200 p-6">
-                    <h2 className="mb-4 text-sm font-semibold">
+                <section className="rounded-xl border border-zinc-200 bg-white p-6">
+                    <h2 className="mb-4 text-sm font-semibold text-zinc-900">
                         Order Summary
                     </h2>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <div className="rounded-lg bg-gray-200 px-4 py-3">
+                        <div className="rounded-lg bg-zinc-50 px-4 py-3">
                             <p className="text-xs text-zinc-500">
                                 Subtotal (before fees)
                             </p>
-                            <p className="mt-0.5 text-lg font-semibold">
+                            <p className="mt-0.5 text-lg font-semibold text-zinc-900">
                                 {fmtMoney(totals.subtotal_before)}
                             </p>
                         </div>
-                        <div className="rounded-lg bg-gray-200 px-4 py-3">
+                        <div className="rounded-lg bg-zinc-50 px-4 py-3">
                             <p className="text-xs text-zinc-500">Total Fees</p>
-                            <p className="mt-0.5 text-lg font-semibold">
+                            <p className="mt-0.5 text-lg font-semibold text-zinc-900">
                                 {fmtMoney(
                                     (parseFloat(officeFee) || 0) +
                                         (parseFloat(shippingFee) || 0),
                                 )}
                             </p>
                         </div>
-                        <div className="rounded-lg bg-gray-200 px-4 py-3">
+                        <div className="rounded-lg bg-zinc-50 px-4 py-3">
                             <p className="text-xs text-zinc-500">Total CBM</p>
-                            <p className="mt-0.5 text-lg font-semibold">
+                            <p className="mt-0.5 text-lg font-semibold text-zinc-900">
                                 {totals.total_cbm.toFixed(2)} m³
                             </p>
                         </div>
-                        <div className="rounded-lg border border-gray-200 px-4 py-3">
-                            <p className="text-xs text-emerald-400">
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                            <p className="text-xs text-emerald-600">
                                 Grand Total (landed)
                             </p>
-                            <p className="mt-0.5 text-lg font-semibold text-emerald-300">
+                            <p className="mt-0.5 text-lg font-semibold text-emerald-700">
                                 {fmtMoney(totals.grand_total_after)}
                             </p>
                         </div>
@@ -544,9 +573,9 @@ export default function NewPurchaseOrderPage() {
                 </section>
             )}
 
-            {/* ── Notes ────────────────────────────────────────────── */}
+            {/* Notes */}
             <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">
+                <label className="text-xs font-medium text-zinc-500">
                     Notes (optional)
                 </label>
                 <textarea
@@ -554,29 +583,29 @@ export default function NewPurchaseOrderPage() {
                     onChange={(e) => setNotes(e.target.value)}
                     rows={2}
                     placeholder="Any additional notes about this order…"
-                    className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                    className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-indigo-500 focus:outline-none"
                 />
             </div>
 
-            {/* ── Action buttons ───────────────────────────────────── */}
+            {/* Actions */}
             <div className="flex justify-end gap-3 pb-8">
                 <button
                     onClick={() => router.back()}
-                    className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-medium text-zinc-300"
+                    className="rounded-lg border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
                 >
                     Cancel
                 </button>
                 <button
                     onClick={() => handleSubmit("draft")}
                     disabled={createPO.isPending}
-                    className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-medium text-zinc-200 disabled:opacity-50"
+                    className="rounded-lg border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors disabled:opacity-50"
                 >
                     Save Draft
                 </button>
                 <button
                     onClick={() => handleSubmit("submit")}
                     disabled={createPO.isPending}
-                    className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-50"
+                    className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors disabled:opacity-50"
                 >
                     {createPO.isPending ? "Saving…" : "Submit PO"}
                 </button>

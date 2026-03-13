@@ -1,5 +1,7 @@
 "use client";
 
+// components/admin/settings/LowStockThresholdManager.tsx
+
 import { useState } from "react";
 import {
     useLowStockThresholds,
@@ -9,35 +11,30 @@ import {
 } from "@/lib/hooks/queries/useNotificationPreferences";
 import { useItems } from "@/lib/hooks/queries/useItems";
 import { useLocations } from "@/lib/hooks/queries/useLocations";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import toast from "react-hot-toast";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface LowStockThresholdManagerProps {
     organizationId: string;
-    // When set, the list is filtered to this location and new thresholds
-    // are pre-scoped to it. Used by the warehouse thresholds page.
-    // Omit on the admin settings page — shows all thresholds as before.
+    /** When set, list is filtered + new thresholds pre-scoped to this location. */
     locationId?: string;
-    // Human-readable label for this location context ("Warehouse", "Brooklyn").
-    // Shown in the empty state and the form location field label.
-    // Defaults to "location".
+    /** Human-readable label shown in headings ("Warehouse", "Brooklyn"). Defaults to "location". */
     locationLabel?: string;
-    // Controls the min-quantity placeholder value in the form.
-    // "warehouse" → 200 (appropriate for 45-day overseas lead time)
-    // "store"     → 5   (existing behaviour, default)
+    /** Controls min-quantity placeholder: "warehouse" → 200, "store" → 5 */
     context?: "store" | "warehouse";
 }
+
+type ThresholdType = "item" | "category" | "location";
+
+const EMPTY_FORM = (lockedLocationId?: string) => ({
+    item_id: "",
+    category_id: "",
+    location_id: lockedLocationId ?? "",
+    low_threshold: "",
+    critical_threshold: "",
+});
 
 export default function LowStockThresholdManager({
     organizationId,
@@ -45,440 +42,416 @@ export default function LowStockThresholdManager({
     locationLabel = "location",
     context = "store",
 }: LowStockThresholdManagerProps) {
-    // ── Data ────────────────────────────────────────────────────────────────
-    // Pass locationId as a filter when provided — scopes results to the
-    // warehouse without any other changes to the hook or query function.
     const { data: thresholds, isLoading: thresholdsLoading } =
-        useLowStockThresholds(
-            organizationId,
-            { isActive: true, locationId: locationId ?? undefined },
-        );
+        useLowStockThresholds(organizationId, { isActive: true, locationId });
     const { data: items, isLoading: itemsLoading } = useItems();
     const { data: locations, isLoading: locationsLoading } = useLocations();
     const createMutation = useCreateLowStockThreshold();
     const updateMutation = useUpdateLowStockThreshold();
     const deleteMutation = useDeleteLowStockThreshold();
 
-    // ── Form state ──────────────────────────────────────────────────────────
     const [showForm, setShowForm] = useState(false);
-    const [editingThreshold, setEditingThreshold] = useState<any>(null);
-    const [formData, setFormData] = useState({
-        item_id: "",
-        category_id: "",
-        // Pre-fill with locationId prop when available so new thresholds are
-        // automatically scoped to the warehouse without the user selecting it.
-        location_id: locationId ?? "",
-        low_threshold: "",
-        critical_threshold: "",
-        is_active: true,
-    });
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [formData, setFormData] = useState(EMPTY_FORM(locationId));
+    const [thresholdType, setThresholdType] = useState<ThresholdType>("item");
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
-    const resetForm = () => {
+    const loading = thresholdsLoading || itemsLoading || locationsLoading;
+
+    function openAddForm() {
+        setEditingId(null);
+        setFormData(EMPTY_FORM(locationId));
+        setThresholdType("item");
+        setShowForm(true);
+    }
+
+    function openEditForm(t: any) {
+        setEditingId(t.id);
         setFormData({
+            item_id: t.item_id ?? "",
+            category_id: t.category_id ?? "",
+            location_id: t.location_id ?? locationId ?? "",
+            low_threshold: String(t.low_threshold),
+            critical_threshold: t.critical_threshold
+                ? String(t.critical_threshold)
+                : "",
+        });
+        setThresholdType(
+            t.item_id ? "item" : t.category_id ? "category" : "location",
+        );
+        setShowForm(true);
+    }
+
+    function closeForm() {
+        setShowForm(false);
+        setEditingId(null);
+        setFormData(EMPTY_FORM(locationId));
+    }
+
+    function handleTypeChange(type: ThresholdType) {
+        setThresholdType(type);
+        setFormData((prev) => ({
+            ...prev,
             item_id: "",
             category_id: "",
-            location_id: locationId ?? "",   // always reset to the locked location
-            low_threshold: "",
-            critical_threshold: "",
-            is_active: true,
-        });
-        setEditingThreshold(null);
-        setShowForm(false);
-    };
+            location_id: locationId ?? "",
+        }));
+    }
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        const payload = {
+            organization_id: organizationId,
+            item_id: formData.item_id || null,
+            category_id: formData.category_id || null,
+            location_id: locationId ?? (formData.location_id || null),
+            low_threshold: parseFloat(formData.low_threshold),
+            critical_threshold: formData.critical_threshold
+                ? parseFloat(formData.critical_threshold)
+                : null,
+            is_active: true,
+        };
         try {
-            const thresholdData = {
-                organization_id: organizationId,
-                item_id: formData.item_id || null,
-                category_id: formData.category_id || null,
-                // When locationId prop is set, always use it — don't let the
-                // dropdown override the warehouse context.
-                location_id: locationId ?? (formData.location_id || null),
-                low_threshold: parseFloat(formData.low_threshold),
-                critical_threshold: formData.critical_threshold
-                    ? parseFloat(formData.critical_threshold)
-                    : null,
-                is_active: formData.is_active,
-            };
-
-            if (editingThreshold) {
+            if (editingId) {
                 await updateMutation.mutateAsync({
-                    id: editingThreshold.id,
-                    updates: thresholdData as any,
+                    id: editingId,
+                    updates: payload as any,
                 });
                 toast.success("Threshold updated");
             } else {
-                await createMutation.mutateAsync(thresholdData as any);
+                await createMutation.mutateAsync(payload as any);
                 toast.success("Threshold created");
             }
-            resetForm();
-        } catch (error: any) {
-            toast.error(error.message || "Failed to save threshold");
+            closeForm();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to save threshold");
         }
-    };
+    }
 
-    const handleEdit = (threshold: any) => {
-        setEditingThreshold(threshold);
-        setFormData({
-            item_id: threshold.item_id || "",
-            category_id: threshold.category_id || "",
-            location_id: threshold.location_id || locationId || "",
-            low_threshold: threshold.low_threshold.toString(),
-            critical_threshold: threshold.critical_threshold?.toString() || "",
-            is_active: threshold.is_active,
-        });
-        setShowForm(true);
-    };
-
-    const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this threshold?")) return;
+    async function handleDelete(id: string) {
+        if (!confirm("Delete this threshold?")) return;
         try {
             await deleteMutation.mutateAsync({ id, organizationId });
             toast.success("Threshold deleted");
-        } catch (error: any) {
-            toast.error(error.message || "Failed to delete threshold");
+        } catch (err: any) {
+            toast.error(err.message || "Failed to delete threshold");
         }
-    };
-
-    // Derive current type selection from form state — needed for the type
-    // dropdown to stay in sync with which secondary field is visible.
-    const currentType = formData.item_id
-        ? "item"
-        : formData.category_id
-          ? "category"
-          : "location";
-
-    const handleTypeChange = (type: string) => {
-        // Reset the three target fields when the user switches types
-        setFormData({
-            ...formData,
-            item_id: "",
-            category_id: "",
-            // Keep the locationId locked if prop is set
-            location_id: locationId ?? "",
-        });
-    };
-
-    // ── Loading ──────────────────────────────────────────────────────────────
-    if (thresholdsLoading || itemsLoading || locationsLoading) {
-        return <LoadingSkeleton />;
     }
 
-    // ── Render ───────────────────────────────────────────────────────────────
+    if (loading) return <LoadingSkeleton />;
+
     return (
-        <div className="space-y-6">
-            <Card>
-                <CardHeader>
+        <div className="space-y-4">
+            {/* Header row */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-sm font-medium text-zinc-900">
+                        Low Stock Thresholds
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                        Set custom thresholds for items, categories, or{" "}
+                        {locationLabel}
+                    </p>
+                </div>
+                <button
+                    onClick={openAddForm}
+                    className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 transition-colors"
+                >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Threshold
+                </button>
+            </div>
+
+            {/* Add / edit form */}
+            {showForm && (
+                <form
+                    onSubmit={handleSubmit}
+                    className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 space-y-4"
+                >
                     <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>Low Stock Thresholds</CardTitle>
-                            <CardDescription>
-                                Set custom thresholds for items, categories, or{" "}
-                                {locationLabel}
-                            </CardDescription>
-                        </div>
-                        <Button onClick={() => setShowForm(true)}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add Threshold
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    {/* ── Add / edit form ─────────────────────────────────── */}
-                    {showForm && (
-                        <form
-                            onSubmit={handleSubmit}
-                            className="mb-6 p-4 border rounded-lg space-y-4 bg-zinc-50"
+                        <p className="text-xs font-semibold text-zinc-700">
+                            {editingId ? "Edit threshold" : "New threshold"}
+                        </p>
+                        <button
+                            type="button"
+                            onClick={closeForm}
+                            className="text-zinc-400 hover:text-zinc-600"
                         >
-                            <div className="grid grid-cols-2 gap-4">
-                                {/* Type selector */}
-                                <div className="space-y-2">
-                                    <Label>Type</Label>
-                                    <select
-                                        value={currentType}
-                                        onChange={(e) =>
-                                            handleTypeChange(e.target.value)
-                                        }
-                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                                    >
-                                        <option value="item">Item</option>
-                                        <option value="category">
-                                            Category
-                                        </option>
-                                        {/* Only show Location type when not
-                                            locked to a specific locationId —
-                                            on the warehouse page the location
-                                            is always pre-filled. */}
-                                        {!locationId && (
-                                            <option value="location">
-                                                Location
-                                            </option>
-                                        )}
-                                    </select>
-                                </div>
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
 
-                                {/* Secondary field — item, category, or location */}
-                                {currentType === "item" && (
-                                    <div className="space-y-2">
-                                        <Label>Item</Label>
-                                        <select
-                                            value={formData.item_id}
-                                            onChange={(e) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    item_id: e.target.value,
-                                                    category_id: "",
-                                                    location_id:
-                                                        locationId ?? "",
-                                                })
-                                            }
-                                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                                        >
-                                            <option value="">
-                                                Select item
-                                            </option>
-                                            {items?.map((item: any) => (
-                                                <option
-                                                    key={item.id}
-                                                    value={item.id}
-                                                >
-                                                    {item.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
+                    {/* Type tabs */}
+                    <div className="flex gap-1 rounded-lg border border-zinc-200 bg-white p-1 w-fit">
+                        {(
+                            [
+                                "item",
+                                "category",
+                                ...(locationId ? [] : ["location"]),
+                            ] as ThresholdType[]
+                        ).map((t) => (
+                            <button
+                                key={t}
+                                type="button"
+                                onClick={() => handleTypeChange(t)}
+                                className={cn(
+                                    "rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors",
+                                    thresholdType === t
+                                        ? "bg-indigo-600 text-white"
+                                        : "text-zinc-600 hover:text-zinc-900",
                                 )}
+                            >
+                                {t}
+                            </button>
+                        ))}
+                    </div>
 
-                                {currentType === "category" && (
-                                    <div className="space-y-2">
-                                        <Label>Category</Label>
-                                        <select
-                                            value={formData.category_id}
-                                            onChange={(e) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    category_id: e.target.value,
-                                                    item_id: "",
-                                                    location_id:
-                                                        locationId ?? "",
-                                                })
-                                            }
-                                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                                        >
-                                            <option value="">
-                                                Select category
-                                            </option>
-                                            <option value="desserts">
-                                                Desserts
-                                            </option>
-                                            <option value="ingredients">
-                                                Ingredients
-                                            </option>
-                                            <option value="supplies">
-                                                Supplies
-                                            </option>
-                                        </select>
-                                    </div>
-                                )}
-
-                                {/* Location selector — only shown when NOT
-                                    locked to a specific location (i.e. on the
-                                    admin settings page, not the warehouse page) */}
-                                {currentType === "location" && !locationId && (
-                                    <div className="space-y-2">
-                                        <Label>Location</Label>
-                                        <select
-                                            value={formData.location_id}
-                                            onChange={(e) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    location_id: e.target.value,
-                                                    item_id: "",
-                                                    category_id: "",
-                                                })
-                                            }
-                                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                                        >
-                                            <option value="">
-                                                Select location
-                                            </option>
-                                            {locations?.map((loc: any) => (
-                                                <option
-                                                    key={loc.id}
-                                                    value={loc.id}
-                                                >
-                                                    {loc.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-
-                                {/* When locationId is locked (warehouse page),
-                                    show a read-only label instead of a dropdown */}
-                                {currentType === "location" && locationId && (
-                                    <div className="space-y-2">
-                                        <Label>
-                                            {locationLabel.charAt(0).toUpperCase() +
-                                                locationLabel.slice(1)}
-                                        </Label>
-                                        <div className="flex h-9 items-center rounded-md border border-input bg-zinc-100 px-3 text-sm text-zinc-500">
-                                            Pre-set to{" "}
-                                            {locationLabel}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Quantity thresholds */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="low-threshold">
-                                        Low Threshold
-                                    </Label>
-                                    <Input
-                                        id="low-threshold"
-                                        type="number"
-                                        step="0.01"
-                                        // Warehouse context → suggest 200, store → 5
-                                        placeholder={
-                                            context === "warehouse"
-                                                ? "200"
-                                                : "5"
-                                        }
-                                        value={formData.low_threshold}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                low_threshold: e.target.value,
-                                            })
-                                        }
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="critical-threshold">
-                                        Critical Threshold (optional)
-                                    </Label>
-                                    <Input
-                                        id="critical-threshold"
-                                        type="number"
-                                        step="0.01"
-                                        placeholder={
-                                            context === "warehouse"
-                                                ? "100"
-                                                : "2"
-                                        }
-                                        value={formData.critical_threshold}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                critical_threshold:
-                                                    e.target.value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <Button
-                                    type="submit"
-                                    disabled={
-                                        createMutation.isPending ||
-                                        updateMutation.isPending
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {/* Target selector */}
+                        {thresholdType === "item" && (
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-zinc-600">
+                                    Item
+                                </label>
+                                <select
+                                    value={formData.item_id}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            item_id: e.target.value,
+                                        })
                                     }
+                                    required
+                                    className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-indigo-400 focus:outline-none"
                                 >
-                                    {editingThreshold ? "Update" : "Create"}{" "}
-                                    Threshold
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={resetForm}
-                                >
-                                    Cancel
-                                </Button>
+                                    <option value="">Select item…</option>
+                                    {items?.map((item: any) => (
+                                        <option key={item.id} value={item.id}>
+                                            {item.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
-                        </form>
-                    )}
+                        )}
 
-                    {/* ── Threshold list ──────────────────────────────────── */}
-                    {thresholds && thresholds.length > 0 ? (
-                        <div className="space-y-2">
-                            {thresholds.map((threshold: any) => {
-                                const item = items?.find(
-                                    (i: any) => i.id === threshold.item_id,
-                                );
-                                const location = locations?.find(
-                                    (l: any) => l.id === threshold.location_id,
-                                );
-                                const type = threshold.item_id
-                                    ? "Item"
-                                    : threshold.category_id
-                                      ? "Category"
-                                      : "Location";
-                                const name = threshold.item_id
-                                    ? item?.name
-                                    : threshold.category_id
-                                      ? threshold.category_id
-                                      : location?.name;
+                        {thresholdType === "category" && (
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-zinc-600">
+                                    Category
+                                </label>
+                                <select
+                                    value={formData.category_id}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            category_id: e.target.value,
+                                        })
+                                    }
+                                    required
+                                    className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-indigo-400 focus:outline-none"
+                                >
+                                    <option value="">Select category…</option>
+                                    <option value="desserts">Desserts</option>
+                                    <option value="ingredients">
+                                        Ingredients
+                                    </option>
+                                    <option value="supplies">Supplies</option>
+                                </select>
+                            </div>
+                        )}
 
-                                return (
-                                    <div
-                                        key={threshold.id}
-                                        className="flex items-center justify-between p-4 border rounded-lg"
-                                    >
-                                        <div>
-                                            <div className="font-medium">
-                                                {type}: {name}
-                                            </div>
-                                            <div className="text-sm text-zinc-600">
-                                                Low: {threshold.low_threshold}
-                                                {threshold.critical_threshold &&
-                                                    ` | Critical: ${threshold.critical_threshold}`}
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() =>
-                                                    handleEdit(threshold)
-                                                }
-                                            >
-                                                <Edit className="w-4 h-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() =>
-                                                    handleDelete(threshold.id)
-                                                }
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                        {thresholdType === "location" && !locationId && (
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-zinc-600">
+                                    Location
+                                </label>
+                                <select
+                                    value={formData.location_id}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            location_id: e.target.value,
+                                        })
+                                    }
+                                    required
+                                    className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-indigo-400 focus:outline-none"
+                                >
+                                    <option value="">Select location…</option>
+                                    {locations?.map((loc: any) => (
+                                        <option key={loc.id} value={loc.id}>
+                                            {loc.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {thresholdType === "location" && locationId && (
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-zinc-600">
+                                    Location
+                                </label>
+                                <div className="flex h-9 items-center rounded-lg border border-zinc-200 bg-zinc-100 px-3 text-xs text-zinc-500">
+                                    {locationLabel} (pre-set)
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Low threshold */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-medium text-zinc-600">
+                                Low Threshold
+                            </label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder={
+                                    context === "warehouse" ? "200" : "5"
+                                }
+                                value={formData.low_threshold}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        low_threshold: e.target.value,
+                                    })
+                                }
+                                required
+                                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 placeholder-zinc-400 focus:border-indigo-400 focus:outline-none"
+                            />
                         </div>
-                    ) : (
-                        // Empty state uses locationLabel so the copy is correct
-                        // in both contexts: "No custom thresholds configured for
-                        // this warehouse" vs "No custom thresholds configured"
-                        <p className="text-center text-zinc-500 py-8">
+
+                        {/* Critical threshold */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-medium text-zinc-600">
+                                Critical Threshold{" "}
+                                <span className="font-normal text-zinc-400">
+                                    (optional)
+                                </span>
+                            </label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder={
+                                    context === "warehouse" ? "100" : "2"
+                                }
+                                value={formData.critical_threshold}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        critical_threshold: e.target.value,
+                                    })
+                                }
+                                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 placeholder-zinc-400 focus:border-indigo-400 focus:outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                        <button
+                            type="submit"
+                            disabled={
+                                createMutation.isPending ||
+                                updateMutation.isPending
+                            }
+                            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                        >
+                            <Check className="h-3.5 w-3.5" />
+                            {editingId ? "Update" : "Create"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={closeForm}
+                            className="rounded-lg border border-zinc-200 px-4 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {/* Threshold list */}
+            {thresholds && thresholds.length > 0 ? (
+                <div className="divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white overflow-hidden">
+                    {thresholds.map((t: any) => {
+                        const item = items?.find(
+                            (i: any) => i.id === t.item_id,
+                        );
+                        const loc = locations?.find(
+                            (l: any) => l.id === t.location_id,
+                        );
+                        const typeLabel = t.item_id
+                            ? "Item"
+                            : t.category_id
+                              ? "Category"
+                              : "Location";
+                        const nameLabel = t.item_id
+                            ? (item?.name ?? t.item_id)
+                            : t.category_id
+                              ? t.category_id
+                              : (loc?.name ?? locationLabel);
+
+                        return (
+                            <div
+                                key={t.id}
+                                className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 transition-colors"
+                            >
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-zinc-600">
+                                            {typeLabel}
+                                        </span>
+                                        <span className="truncate text-sm font-medium text-zinc-900">
+                                            {nameLabel}
+                                        </span>
+                                    </div>
+                                    <p className="mt-0.5 text-xs text-zinc-500">
+                                        Low:{" "}
+                                        <span className="font-medium text-zinc-700">
+                                            {t.low_threshold}
+                                        </span>
+                                        {t.critical_threshold && (
+                                            <>
+                                                {" "}
+                                                · Critical:{" "}
+                                                <span className="font-medium text-red-600">
+                                                    {t.critical_threshold}
+                                                </span>
+                                            </>
+                                        )}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-1 ml-4">
+                                    <button
+                                        onClick={() => openEditForm(t)}
+                                        className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
+                                    >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(t.id)}
+                                        disabled={deleteMutation.isPending}
+                                        className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-40 transition-colors"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                !showForm && (
+                    <div className="rounded-xl border border-dashed border-zinc-200 bg-white py-10 text-center">
+                        <p className="text-sm text-zinc-400">
                             No custom thresholds configured
                             {locationLabel !== "location" && (
                                 <> for this {locationLabel}</>
                             )}
                         </p>
-                    )}
-                </CardContent>
-            </Card>
+                    </div>
+                )
+            )}
         </div>
     );
 }
