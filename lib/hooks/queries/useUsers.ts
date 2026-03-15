@@ -11,15 +11,7 @@ export function useOrganizationUsers(organizationId: string | null) {
         enabled: !!organizationId,
     });
 }
-export function useCancelInvitation() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ clerkInviteId }: { clerkInviteId: string }) => cancelInvitation({ clerkInviteId }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['pending-invitations'] });
-        },
-    });
-}
+
 export function usePendingInvitations(organizationId: string | null) {
     return useQuery({
         queryKey: ['pending-invitations', organizationId],
@@ -41,13 +33,37 @@ export function useCreateInvitation() {
 export function useUpdateUser() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ userId, role, assigned_location_id, is_active }: { userId: string; role: 'admin' | 'employee'; assigned_location_id: string | null; is_active: boolean }) => updateUser({ userId, role, assigned_location_id, is_active }),
+        mutationFn: ({
+                         userId,
+                         role,
+                         assigned_location_id,
+                         assigned_location_ids,
+                         is_active,
+                     }: {
+            userId: string;
+            role: 'admin' | 'employee' | 'super_admin';
+            assigned_location_id?: string | null;
+            assigned_location_ids?: string[];
+            is_active: boolean;
+        }) => updateUser({ userId, role, assigned_location_id, assigned_location_ids, is_active }),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['organization-users'] });
             queryClient.invalidateQueries({ queryKey: ['user', variables.userId] });
         },
     });
 }
+
+export function useCancelInvitation() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ clerkInviteId }: { clerkInviteId: string }) =>
+            cancelInvitation({ clerkInviteId }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['pending-invitations'] });
+        },
+    });
+}
+
 export function useResendInvitation() {
     const queryClient = useQueryClient();
     return useMutation({
@@ -57,4 +73,3 @@ export function useResendInvitation() {
         },
     });
 }
-

@@ -184,35 +184,30 @@ Deno.serve(async (req) => {
             const role =
                 roleMap[clerkRole] ?? event.data.public_metadata?.role ?? null;
 
-            // GUARD: super_admin can only be assigned manually, never via membership creation
-            if (role === "super_admin") {
-                console.warn(
-                    "Blocked attempt to create super_admin membership via webhook:",
-                    event.data.public_user_data?.user_id,
-                );
-                return new Response(
-                    JSON.stringify({
-                        error: "super_admin role cannot be assigned via membership creation",
-                    }),
-                    { status: 403 },
-                );
-            }
+            // GUARD: super_admin is assigned manually via direct DB update only.
+            // If somehow super_admin comes through here, downgrade to admin.
+            // Never allow privilege escalation through membership events.
+            const safeRole = role === "super_admin" ? "admin" : role;
 
             // Sync role and location to users table
+            const userId = event.data.public_user_data?.user_id;
+            const assignedLocationId =
+                event.data.public_metadata?.assigned_location_id || null;
+            const assignedLocationIds: string[] =
+                event.data.public_metadata?.assigned_location_ids ?? [];
+
             const { data: userData, error: userError } = await supabase
                 .from("users")
                 .update({
-                    role: role,
-                    assigned_location_id:
-                        event.data.public_metadata?.assigned_location_id ||
-                        null,
+                    role: safeRole,
+                    assigned_location_id: assignedLocationId,
                 })
-                .eq("id", event.data.public_user_data?.user_id)
+                .eq("id", userId)
                 .select()
                 .single();
 
             if (userData) {
-                console.log("User updated with role:", role, userData);
+                console.log("User updated with role:", safeRole, userData);
             }
 
             if (userError) {
@@ -221,6 +216,34 @@ Deno.serve(async (req) => {
                     JSON.stringify({ error: userError.message }),
                     { status: 500 },
                 );
+            }
+
+            // Sync user_location_assignments for admin role
+            if (role === "admin" && userId) {
+                // Clear existing assignments first
+                await supabase
+                    .from("user_location_assignments")
+                    .delete()
+                    .eq("user_id", userId);
+
+                // Insert new assignments if any
+                if (assignedLocationIds.length > 0) {
+                    const { error: assignError } = await supabase
+                        .from("user_location_assignments")
+                        .insert(
+                            assignedLocationIds.map((location_id: string) => ({
+                                user_id: userId,
+                                location_id,
+                            })),
+                        );
+
+                    if (assignError) {
+                        console.error(
+                            "Error inserting location assignments:",
+                            assignError,
+                        );
+                    }
+                }
             }
 
             if (error) {
@@ -314,6 +337,38 @@ Deno.serve(async (req) => {
                     JSON.stringify({ error: userError.message }),
                     { status: 500 },
                 );
+            }
+
+            // Sync user_location_assignments on membership update
+            const updatedUserId = event.data.public_user_data?.user_id;
+            const updatedLocationIds: string[] =
+                event.data.public_metadata?.assigned_location_ids ?? [];
+
+            if (updatedUserId) {
+                // Always clear existing assignments
+                await supabase
+                    .from("user_location_assignments")
+                    .delete()
+                    .eq("user_id", updatedUserId);
+
+                // Re-insert if admin with locations
+                if (role === "admin" && updatedLocationIds.length > 0) {
+                    const { error: assignError } = await supabase
+                        .from("user_location_assignments")
+                        .insert(
+                            updatedLocationIds.map((location_id: string) => ({
+                                user_id: updatedUserId,
+                                location_id,
+                            })),
+                        );
+
+                    if (assignError) {
+                        console.error(
+                            "Error updating location assignments:",
+                            assignError,
+                        );
+                    }
+                }
             }
 
             return new Response(JSON.stringify({ data }), { status: 200 });

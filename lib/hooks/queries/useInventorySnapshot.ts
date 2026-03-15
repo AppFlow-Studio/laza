@@ -6,7 +6,7 @@ import { createInventorySnapshot, type SnapshotItem } from '@/lib/supabase/queri
 // /**
 //  * useCreateInventorySnapshot
 //  *
-//  * Mutation hook called at the end of the store onboarding wizard.
+//  * Mutation hook called at the end of the store onboarding steps.
 //  * Creates item_locations rows with current_quantity = 0 and resolves
 //  * the initial-setup low-stock alerts so the dashboard stays clean.
 //  *
