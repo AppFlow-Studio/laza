@@ -10,7 +10,7 @@ export interface SnapshotItem {
 // /**
 //  * createInventorySnapshot
 //  *
-//  * Called after a new store is created via the onboarding wizard.
+//  * Called after a new store is created via the onboarding steps.
 //  * For every item × storage-space pair that was assigned, this:
 //  *   1. Upserts an item_locations row with current_quantity = 0
 //  *      (the check_low_stock trigger will fire and create alerts — that's expected)
@@ -19,7 +19,7 @@ export interface SnapshotItem {
 //  *      isn't flooded with noise before any real counts have been done
 //  *
 //  * Uses upsert so it's safe to call even if some records already exist
-//  * (e.g. if the wizard was partially re-run).
+//  * (e.g. if the steps was partially re-run).
 //  */
 export async function createInventorySnapshot(
     locationId: string,

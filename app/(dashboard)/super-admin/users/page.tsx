@@ -5,17 +5,22 @@ import { useOrganizationUsers, usePendingInvitations } from '@/lib/hooks/queries
 import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 import UserTable from '@/components/admin/users/UserTable';
 import PendingInvitationsTable from '@/components/admin/users/PendingInvitationsTable';
-import InviteUserModal from '@/components/admin/users/InviteUserModal';
-import EditUserModal from '@/components/admin/users/EditUserModal';
+import InviteUserWizard from '@/components/super-admin/users/InviteUserWizard';
+import EditUserModal from '@/components/super-admin/users/EditUserModal';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
 import SearchBar from '@/components/admin/shared/SearchBar';
 import FilterDropdown from '@/components/admin/shared/FilterDropdown';
 import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import { Button } from '@/components/ui/button';
-import { Plus, Users, Shield, User, Mail } from 'lucide-react';
+import {
+    Dialog,
+    DialogContent,
+} from '@/components/ui/dialog';
+import { Plus, Users, Shield, User } from 'lucide-react';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { User as UserType } from '@/lib/supabase/types';
 import { motion } from 'motion/react';
+import InviteUserModal from "@/components/admin/users/InviteUserModal";
 
 export default function UsersPage() {
     const { data: userInfo } = useUserInfo();
@@ -24,7 +29,7 @@ export default function UsersPage() {
     const { data: users, isLoading: usersLoading } = useOrganizationUsers(organizationId);
     const { data: invitations, isLoading: invitationsLoading } = usePendingInvitations(organizationId);
 
-    const [showInviteModal, setShowInviteModal] = useState(false);
+    const [showInviteWizard, setShowInviteWizard] = useState(false);
     const [editingUser, setEditingUser] = useState<(UserType & { assigned_location?: any }) | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState<string | null>(null);
@@ -38,15 +43,12 @@ export default function UsersPage() {
                 const searchLower = debouncedSearch.toLowerCase();
                 const name = `${user.first_name || ''} ${user.last_name || ''}`.toLowerCase();
                 const email = user.email.toLowerCase();
-                if (!name.includes(searchLower) && !email.includes(searchLower)) {
-                    return false;
-                }
+                if (!name.includes(searchLower) && !email.includes(searchLower)) return false;
             }
             if (roleFilter && user.role !== roleFilter) return false;
             if (statusFilter) {
-                const isActive = user.is_active;
-                if (statusFilter === 'active' && !isActive) return false;
-                if (statusFilter === 'inactive' && isActive) return false;
+                if (statusFilter === 'active' && !user.is_active) return false;
+                if (statusFilter === 'inactive' && user.is_active) return false;
             }
             return true;
         });
@@ -56,7 +58,8 @@ export default function UsersPage() {
         if (!users) return { active: 0, admins: 0, employees: 0 };
         return {
             active: users.filter((u) => u.is_active).length,
-            admins: users.filter((u) => u.role === 'admin').length,
+            // Count both admin and super_admin toward the Admins card
+            admins: users.filter((u) => u.role === 'admin' || u.role === 'super_admin').length,
             employees: users.filter((u) => u.role === 'employee').length,
         };
     }, [users]);
@@ -73,7 +76,7 @@ export default function UsersPage() {
                     <h1 className="text-2xl font-semibold text-zinc-900">Team Members</h1>
                     <p className="text-sm text-zinc-600 mt-1">Manage your organization's users and invitations</p>
                 </div>
-                <Button onClick={() => setShowInviteModal(true)}>
+                <Button onClick={() => setShowInviteWizard(true)}>
                     <Plus className="w-4 h-4 mr-2" />
                     Invite User
                 </Button>
@@ -143,8 +146,9 @@ export default function UsersPage() {
                     label="Role"
                     options={[
                         { value: null, label: 'All Roles' },
-                        { value: 'admin', label: 'Admins' },
-                        { value: 'employee', label: 'Employees' },
+                        { value: 'super_admin', label: 'Super Admin' },
+                        { value: 'admin', label: 'Store Admin' },
+                        { value: 'employee', label: 'Employee' },
                     ]}
                     value={roleFilter}
                     onChange={setRoleFilter}
@@ -187,22 +191,21 @@ export default function UsersPage() {
                 <PendingInvitationsTable invitations={invitations || []} />
             </div>
 
-            {/* Invite User Modal */}
+            {/* Invite User Wizard — bare Dialog with no padding so the steps owns its layout */}
             {organizationId && (
                 <MobileSheet
-                    isOpen={showInviteModal}
-                    onClose={() => setShowInviteModal(false)}
-                    title="Invite User"
+                    isOpen={showInviteWizard}
+                    onClose={() => setShowInviteWizard(false)}
                 >
-                    <InviteUserModal
+                    <InviteUserWizard
                         organizationId={organizationId}
-                        onSuccess={() => setShowInviteModal(false)}
-                        onClose={() => setShowInviteModal(false)}
+                        onSuccess={() => setShowInviteWizard(false)}
+                        onClose={() => setShowInviteWizard(false)}
                     />
                 </MobileSheet>
             )}
 
-            {/* Edit User Modal */}
+            {/* Edit User Modal — MobileSheet is still correct here (it's a simple form) */}
             {editingUser && (
                 <MobileSheet
                     isOpen={!!editingUser}
@@ -219,4 +222,3 @@ export default function UsersPage() {
         </div>
     );
 }
-
