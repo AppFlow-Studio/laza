@@ -87,6 +87,11 @@ const warehouseChildren = [
         href: "/super-admin/warehouse/expenses",
         icon: Receipt,
     },
+    {
+        name: "Pallets",
+        href: "/super-admin/warehouse/pallets",
+        icon: Receipt,
+    },
 ];
 
 // ---------------------------------------------------------------------------
