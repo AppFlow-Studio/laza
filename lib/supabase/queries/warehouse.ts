@@ -44,9 +44,9 @@ export type WarehouseCatalogItem = {
     box_quantity: number | null;
     category:
         | {
-        id: number;
-        name: string;
-    }[]
+              id: number;
+              name: string;
+          }[]
         | null;
 };
 
@@ -286,4 +286,220 @@ export async function getWarehouseStats(
         out_of_stock_count,
         total_storage_spaces,
     };
+}
+
+// ── Pallets ───────────────────────────────────────────────────────────
+
+export type PalletFilters = {
+    status?: "active" | "empty" | "retired";
+    storageSpaceId?: string;
+};
+
+export async function getPallets(
+    warehouseLocationId: string,
+    filters?: PalletFilters,
+) {
+    const supabase = await createServerSupabaseClient();
+
+    let query = supabase
+        .from("warehouse_pallets")
+        .select(
+            `
+        *,
+        storage_spaces ( id, name, temperature_type )
+      `,
+        )
+        .eq("warehouse_location_id", warehouseLocationId)
+        .order("received_at", { ascending: true });
+
+    if (filters?.status) {
+        query = query.eq("status", filters.status);
+    }
+    if (filters?.storageSpaceId) {
+        query = query.eq("storage_space_id", filters.storageSpaceId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+}
+
+export async function getPalletById(palletId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("warehouse_pallets")
+        .select(
+            `
+        *,
+        storage_spaces ( id, name, temperature_type ),
+        pallet_inventory (
+          *,
+          items ( id, name, short_label, sku, unit_of_measure )
+        )
+      `,
+        )
+        .eq("id", palletId)
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
+// ── Pallet Inventory ──────────────────────────────────────────────────
+
+export async function getPalletInventory(palletId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("pallet_inventory")
+        .select(
+            `
+        *,
+        items ( id, name, short_label, sku, unit_of_measure, box_quantity ),
+        purchase_order_items ( id, pieces_per_box )
+      `,
+        )
+        .eq("pallet_id", palletId)
+        .gt("box_count", 0);
+
+    if (error) throw error;
+    return data;
+}
+
+// ── Warehouse Overview (uses the view from 1.46) ──────────────────────
+
+export type WarehouseViewMode = "pallet" | "box" | "master";
+
+export async function getWarehouseOverview(
+    warehouseLocationId: string,
+    mode: WarehouseViewMode = "pallet",
+) {
+    const supabase = await createServerSupabaseClient();
+
+    const baseQuery = supabase
+        .from("warehouse_inventory_overview")
+        .select("*")
+        .eq("warehouse_location_id", warehouseLocationId);
+
+    if (mode === "pallet") {
+        const { data, error } = await baseQuery
+            .order("pallet_label")
+            .order("display_label");
+        if (error) throw error;
+        return data;
+    }
+
+    if (mode === "box") {
+        // Box view: total boxes per item — aggregate client-side
+        // (Supabase JS doesn't support GROUP BY natively)
+        const { data, error } = await baseQuery;
+        if (error) throw error;
+
+        const grouped = data.reduce(
+            (acc, row) => {
+                const key = String(row.item_id);
+                if (!acc[key]) {
+                    acc[key] = {
+                        item_id: row.item_id,
+                        display_label: row.display_label,
+                        sku: row.sku,
+                        unit_of_measure: row.unit_of_measure,
+                        total_boxes: 0,
+                    };
+                }
+                acc[key].total_boxes += row.box_count;
+                return acc;
+            },
+            {} as Record<string, any>,
+        );
+
+        return Object.values(grouped);
+    }
+
+    if (mode === "master") {
+        // Master view: total pieces per item
+        const { data, error } = await baseQuery;
+        if (error) throw error;
+
+        const grouped = data.reduce(
+            (acc, row) => {
+                const key = String(row.item_id);
+                if (!acc[key]) {
+                    acc[key] = {
+                        item_id: row.item_id,
+                        display_label: row.display_label,
+                        sku: row.sku,
+                        unit_of_measure: row.unit_of_measure,
+                        total_pieces: 0,
+                    };
+                }
+                acc[key].total_pieces += row.total_pieces ?? 0;
+                return acc;
+            },
+            {} as Record<string, any>,
+        );
+
+        return Object.values(grouped);
+    }
+}
+
+// ── Pallet Summary (quick stats for dashboard cards) ─────────────────
+
+export async function getPalletSummary(warehouseLocationId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("warehouse_pallets")
+        .select("status")
+        .eq("warehouse_location_id", warehouseLocationId);
+
+    if (error) throw error;
+
+    return {
+        active: data.filter((p) => p.status === "active").length,
+        empty: data.filter((p) => p.status === "empty").length,
+        retired: data.filter((p) => p.status === "retired").length,
+        total: data.length,
+    };
+}
+
+// ── Pallet Operations Log ─────────────────────────────────────────────
+
+export async function getPalletOperationsLog(palletId: string, limit = 50) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("pallet_operations_log")
+        .select(
+            `
+        *,
+        users ( id, first_name, last_name, email )
+      `,
+        )
+        .eq("pallet_id", palletId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+    if (error) throw error;
+    return data;
+}
+
+// ── Rent Snapshots ────────────────────────────────────────────────────
+
+export async function getRentSnapshots(
+    organizationId: string,
+    limit = 24, // 2 years of monthly snapshots by default
+) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("warehouse_rent_snapshots")
+        .select("*")
+        .eq("organization_id", organizationId)
+        .order("snapshot_date", { ascending: false })
+        .limit(limit);
+
+    if (error) throw error;
+    return data;
 }
