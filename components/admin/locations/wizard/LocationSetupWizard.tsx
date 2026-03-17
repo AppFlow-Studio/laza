@@ -302,13 +302,14 @@ export default function LocationSetupWizard() {
                         </Button>
 
                         {currentStep < TOTAL_STEPS ? (
-                            <Button onClick={handleNext} disabled={isSubmitting}>
+                            <Button className='bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]' onClick={handleNext} disabled={isSubmitting}>
                                 Next
                                 <ArrowRight className="w-4 h-4 ml-2" />
                             </Button>
                         ) : (
                             <Button
                                 onClick={handleSubmit}
+                                className='bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]'
                                 disabled={isSubmitting || !locationData}
                             >
                                 {isSubmitting ? (

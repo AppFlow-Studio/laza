@@ -209,9 +209,9 @@ export default function InviteUserWizard({ organizationId, onSuccess, onClose }:
 			</div>
 
 			{/* Body */}
-			<div className="flex flex-1 overflow-hidden">
+			<div className="flex flex-1 flex-col overflow-hidden">
 				{/* Sidebar */}
-				<div className="hidden sm:block w-52 flex-shrink-0 px-4 py-6 border-r border-zinc-100">
+				<div className="hidden sm:block w-full flex-shrink-0 px-4 py-6 border-r border-zinc-100">
 					<UserWizardSidebar
 						currentStep={currentStep}
 						completedSteps={completedSteps}
@@ -241,9 +241,10 @@ export default function InviteUserWizard({ organizationId, onSuccess, onClose }:
 			{/* Footer */}
 			<div className="flex items-center justify-between px-6 py-4 border-t border-zinc-100 flex-shrink-0 bg-zinc-50/50">
 				<Button
-					variant="outline"
+					variant="ghost"
 					onClick={handleBack}
 					disabled={currentStep === 1 || isSubmitting}
+					className="hover:bg-zinc-100/50 text-zinc-600"
 					size="sm"
 				>
 					<ArrowLeft className="w-4 h-4 mr-1.5" />
@@ -251,7 +252,7 @@ export default function InviteUserWizard({ organizationId, onSuccess, onClose }:
 				</Button>
 
 				{currentStep < TOTAL_STEPS ? (
-					<Button onClick={handleNext} disabled={isNextDisabled()} size="sm">
+					<Button className='bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]' onClick={handleNext} disabled={isNextDisabled()} size="sm">
 						Next
 						<ArrowRight className="w-4 h-4 ml-1.5" />
 					</Button>

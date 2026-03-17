@@ -76,7 +76,7 @@ export default function UsersPage() {
                     <h1 className="text-2xl font-semibold text-zinc-900">Team Members</h1>
                     <p className="text-sm text-zinc-600 mt-1">Manage your organization's users and invitations</p>
                 </div>
-                <Button onClick={() => setShowInviteWizard(true)}>
+                <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]" onClick={() => setShowInviteWizard(true)}>
                     <Plus className="w-4 h-4 mr-2" />
                     Invite User
                 </Button>
