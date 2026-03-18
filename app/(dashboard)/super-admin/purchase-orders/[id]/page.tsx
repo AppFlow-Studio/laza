@@ -1,565 +1,355 @@
 "use client";
 
-// app/(dashboard)/super-admin/purchase-orders/[id]/page.tsx
-//
-// Step 3: PO detail — view, edit (if draft), Mark as Received, status timeline.
-
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
-import { ChevronLeft, CheckCircle2, Package, AlertCircle } from "lucide-react";
+import { use, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+    ArrowLeft, Ship, Package, ChevronDown,
+    CheckCircle2, XCircle, Clock, Anchor,
+    FileText, DollarSign, Calendar, Hash,
+    Boxes, AlertCircle, Pencil, PackageCheck, Warehouse,
+} from "lucide-react";
+import { usePurchaseOrder, useUpdatePurchaseOrderStatus, useDeletePurchaseOrder } from "@/lib/hooks/queries/usePurchaseOrders";
+import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import toast from "react-hot-toast";
 
-import {
-    usePurchaseOrder,
-    useUpdatePurchaseOrder,
-    useReceivePurchaseOrder,
-} from "@/lib/hooks/queries/usePurchaseOrders";
-import { fmtMoney, fmtUnitCost } from "@/lib/utils/poCalculations";
+// ─── Status config ────────────────────────────────────────────────────────────
 
-// ---------------------------------------------------------------------------
-// Status timeline config
-// ---------------------------------------------------------------------------
+type POStatus = "draft" | "submitted" | "in_transit" | "arrived" | "received" | "cancelled";
 
-const STATUS_STEPS = [
-    { key: "draft", label: "Draft" },
-    { key: "submitted", label: "Submitted" },
-    { key: "in_transit", label: "In Transit" },
-    { key: "arrived", label: "Arrived" },
-    { key: "received", label: "Received" },
-];
+const STATUS_CONFIG: Record<POStatus, { label: string; icon: React.ElementType; className: string; dotColor: string }> = {
+    draft:      { label: "Draft",      icon: FileText,     className: "bg-zinc-100 text-zinc-600",     dotColor: "bg-zinc-400" },
+    submitted:  { label: "Submitted",  icon: Clock,        className: "bg-blue-100 text-blue-700",     dotColor: "bg-blue-500" },
+    in_transit: { label: "In Transit", icon: Ship,         className: "bg-violet-100 text-violet-700", dotColor: "bg-violet-500" },
+    arrived:    { label: "Arrived",    icon: Anchor,       className: "bg-amber-100 text-amber-700",   dotColor: "bg-amber-500" },
+    received:   { label: "Received",   icon: CheckCircle2, className: "bg-green-100 text-green-700",   dotColor: "bg-green-500" },
+    cancelled:  { label: "Cancelled",  icon: XCircle,      className: "bg-red-100 text-red-700",       dotColor: "bg-red-400" },
+};
 
-const STATUS_ORDER = STATUS_STEPS.map((s) => s.key);
+// Status flow — what transitions are allowed from each status
+const NEXT_STATUSES: Record<POStatus, POStatus[]> = {
+    draft:      ["submitted", "cancelled"],
+    submitted:  ["in_transit", "cancelled"],
+    in_transit: ["arrived", "cancelled"],
+    arrived:    ["cancelled"],
+    received:   [],
+    cancelled:  [],
+};
 
-function StatusTimeline({ current }: { current: string }) {
-    const currentIdx = STATUS_ORDER.indexOf(current);
-    const isCancelled = current === "cancelled";
+// Statuses that show the Receive Shipment button
+const RECEIVABLE_STATUSES: POStatus[] = ["in_transit", "arrived"];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmt(n: number | null | undefined) {
+    if (n == null) return "—";
+    return `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+}
+function fmtDate(d: string | null | undefined) {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+function fmtNum(n: number | null | undefined, decimals = 2) {
+    if (n == null) return "—";
+    return Number(n).toFixed(decimals);
+}
+
+function StatusBadge({ status }: { status: string }) {
+    const cfg = STATUS_CONFIG[status as POStatus] ?? { label: status, icon: AlertCircle, className: "bg-zinc-100 text-zinc-600", dotColor: "bg-zinc-400" };
+    const Icon = cfg.icon;
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${cfg.className}`}>
+            <Icon className="w-4 h-4" />{cfg.label}
+        </span>
+    );
+}
+
+// ─── Status advance dropdown ──────────────────────────────────────────────────
+
+function StatusActions({ poId, currentStatus, warehouseId }: { poId: string; currentStatus: POStatus; warehouseId?: string }) {
+    const [open, setOpen] = useState(false);
+    const updateStatus = useUpdatePurchaseOrderStatus();
+    const nextOptions = NEXT_STATUSES[currentStatus] ?? [];
+
+    if (nextOptions.length === 0) return null;
+
+    async function advance(status: POStatus) {
+        setOpen(false);
+        try {
+            await updateStatus.mutateAsync({ id: poId, status });
+            toast.success(`Status updated to ${STATUS_CONFIG[status].label}`);
+        } catch {
+            toast.error("Failed to update status");
+        }
+    }
 
     return (
-        <div className="flex items-center gap-0">
-            {STATUS_STEPS.map((step, idx) => {
-                const done = !isCancelled && idx <= currentIdx;
-                const active = !isCancelled && idx === currentIdx;
-                return (
-                    <div key={step.key} className="flex items-center">
-                        <div className="flex flex-col items-center">
-                            <div
-                                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-                                    active
-                                        ? "bg-indigo-600 text-white ring-2 ring-indigo-400/40"
-                                        : done
-                                          ? "bg-emerald-600 text-white"
-                                          : "bg-zinc-700 text-zinc-500"
-                                }`}
-                            >
-                                {done && !active ? (
-                                    <CheckCircle2 className="h-4 w-4" />
-                                ) : (
-                                    idx + 1
-                                )}
-                            </div>
-                            <span
-                                className={`mt-1 text-xs ${
-                                    active
-                                        ? "font-medium"
-                                        : done
-                                          ? "text-zinc-400"
-                                          : "text-zinc-600"
-                                }`}
-                            >
-                                {step.label}
-                            </span>
-                        </div>
-                        {idx < STATUS_STEPS.length - 1 && (
-                            <div
-                                className={`mb-4 h-0.5 w-12 transition-colors ${
-                                    !isCancelled && idx < currentIdx
-                                        ? "bg-emerald-600"
-                                        : "bg-zinc-700"
-                                }`}
-                            />
-                        )}
+        <div className="relative">
+            <button
+                onClick={() => setOpen((p) => !p)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+                Advance Status <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-zinc-200 z-20 overflow-hidden">
+                        {nextOptions.map((s) => {
+                            const cfg  = STATUS_CONFIG[s];
+                            const Icon = cfg.icon;
+                            return (
+                                <button
+                                    key={s}
+                                    onClick={() => advance(s)}
+                                    className={`w-full flex items-center gap-2.5 px-4 py-3 text-sm text-left hover:bg-zinc-50 transition-colors ${s === "cancelled" ? "text-red-600 hover:bg-red-50" : "text-zinc-700"}`}
+                                >
+                                    <Icon className="w-4 h-4 shrink-0" />
+                                    Mark as {cfg.label}
+                                </button>
+                            );
+                        })}
                     </div>
-                );
-            })}
-            {isCancelled && (
-                <span className="ml-4 rounded-full bg-red-900/60 px-2.5 py-0.5 text-xs font-medium text-red-400">
-                    Cancelled
-                </span>
+                </>
             )}
         </div>
     );
 }
 
-// ---------------------------------------------------------------------------
-// Receive modal — per-item quantity verification
-// ---------------------------------------------------------------------------
+// ─── Main page ────────────────────────────────────────────────────────────────
 
-interface ReceiveItem {
-    po_item_id: string;
-    item_id: number;
-    item_name: string;
-    quantity_ordered: number;
-    unit_cost_after: number;
-    quantity_received: string; // form field — string for controlled input
-}
-
-function ReceiveModal({
-    poId,
-    items,
-    onClose,
-}: {
-    poId: string;
-    items: ReceiveItem[];
-    onClose: () => void;
+export default function PurchaseOrderDetailPage({
+                                                    params,
+                                                }: {
+    params: Promise<{ id: string }>;
 }) {
-    const { userId } = useAuth();
-    const receivePO = useReceivePurchaseOrder();
-    const [quantities, setQuantities] = useState<Record<string, string>>(
-        Object.fromEntries(
-            items.map((i) => [
-                i.po_item_id,
-                String(i.quantity_ordered), // default = ordered quantity
-            ]),
-        ),
-    );
+    const { id } = use(params);
+    const router = useRouter();
 
-    function setQty(poItemId: string, val: string) {
-        setQuantities((prev) => ({ ...prev, [poItemId]: val }));
-    }
+    const { data: po, isLoading } = usePurchaseOrder(id);
+    const deletePO = useDeletePurchaseOrder();
 
-    const hasDiscrepancy = items.some(
-        (i) =>
-            parseFloat(quantities[i.po_item_id] || "0") !== i.quantity_ordered,
-    );
-
-    async function handleConfirm() {
-        if (!userId) return;
+    async function handleDelete() {
+        if (!confirm("Delete this purchase order? This cannot be undone.")) return;
         try {
-            await receivePO.mutateAsync({
-                purchaseOrderId: poId,
-                userId,
-                receivedItems: items.map((i) => ({
-                    item_id: i.item_id,
-                    quantity_received:
-                        parseFloat(quantities[i.po_item_id]) || 0,
-                })),
-            });
-            toast.success("Shipment received — warehouse stock updated");
-            onClose();
-        } catch (err: any) {
-            toast.error(err.message || "Failed to receive shipment");
+            await deletePO.mutateAsync(id);
+            toast.success("Purchase order deleted");
+            router.push(`/super-admin/purchase-orders`);
+        } catch {
+            toast.error("Failed to delete");
         }
     }
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-            <div className="w-full max-w-2xl rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl">
-                <div className="border-b border-zinc-800 px-6 py-4">
-                    <h2 className="text-base font-semibold text-white">
-                        Confirm Received Quantities
-                    </h2>
-                    <p className="mt-0.5 text-xs text-zinc-400">
-                        Verify the physical count for each item. Adjust any
-                        discrepancies before confirming.
-                    </p>
-                </div>
-
-                <div className="max-h-[50vh] overflow-y-auto px-6 py-4">
-                    {/* Headers */}
-                    <div className="mb-2 grid grid-cols-[2fr_1fr_1fr_1fr] gap-3 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                        <span>Item</span>
-                        <span className="text-right">Ordered</span>
-                        <span className="text-right">Received</span>
-                        <span className="text-right">Unit Cost</span>
-                    </div>
-                    <div className="space-y-2">
-                        {items.map((item) => {
-                            const received = parseFloat(
-                                quantities[item.po_item_id] || "0",
-                            );
-                            const diff = received - item.quantity_ordered;
-                            const hasGap = diff !== 0;
-                            return (
-                                <div
-                                    key={item.po_item_id}
-                                    className="grid grid-cols-[2fr_1fr_1fr_1fr] items-center gap-3"
-                                >
-                                    <span className="text-sm text-white">
-                                        {item.item_name}
-                                    </span>
-                                    <span className="text-right text-sm text-zinc-400">
-                                        {item.quantity_ordered}
-                                    </span>
-                                    <div className="flex flex-col items-end gap-0.5">
-                                        <input
-                                            type="number"
-                                            step="any"
-                                            min="0"
-                                            value={quantities[item.po_item_id]}
-                                            onChange={(e) =>
-                                                setQty(
-                                                    item.po_item_id,
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={`w-24 rounded-md border py-1.5 text-right text-sm focus:outline-none ${
-                                                hasGap
-                                                    ? "border-amber-600 bg-amber-950/30 text-amber-300 focus:border-amber-400"
-                                                    : "border-zinc-700 bg-zinc-800 text-white focus:border-indigo-500"
-                                            }`}
-                                        />
-                                        {hasGap && (
-                                            <span className="text-xs text-amber-400">
-                                                {diff > 0 ? "+" : ""}
-                                                {diff} vs ordered
-                                            </span>
-                                        )}
-                                    </div>
-                                    <span className="text-right text-sm text-zinc-400">
-                                        {fmtUnitCost(item.unit_cost_after)}
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Discrepancy warning */}
-                {hasDiscrepancy && (
-                    <div className="mx-6 mb-3 flex items-center gap-2 rounded-lg border border-amber-800/40 bg-amber-950/20 px-3 py-2">
-                        <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-amber-400" />
-                        <p className="text-xs text-amber-300">
-                            Some quantities differ from the ordered amounts. The
-                            warehouse stock will be updated with your received
-                            quantities.
-                        </p>
-                    </div>
-                )}
-
-                <div className="flex justify-end gap-3 border-t border-zinc-800 px-6 py-4">
-                    <button
-                        onClick={onClose}
-                        className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-800"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleConfirm}
-                        disabled={receivePO.isPending}
-                        className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-                    >
-                        {receivePO.isPending
-                            ? "Updating warehouse…"
-                            : "Confirm Receipt"}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Status transition buttons (for draft → submitted → in_transit → arrived)
-// ---------------------------------------------------------------------------
-
-const NEXT_STATUS: Record<string, { label: string; next: string }> = {
-    draft: { label: "Submit PO", next: "submitted" },
-    submitted: { label: "Mark In Transit", next: "in_transit" },
-    in_transit: { label: "Mark Arrived", next: "arrived" },
-};
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
-
-export default function PurchaseOrderDetailPage() {
-    const { id } = useParams<{ id: string }>();
-    const router = useRouter();
-    const { userId } = useAuth();
-
-    const { data: po, isLoading } = usePurchaseOrder(id);
-    const updatePO = useUpdatePurchaseOrder();
-
-    const [showReceiveModal, setShowReceiveModal] = useState(false);
-
-    // ── Loading ───────────────────────────────────────────────────────────────
     if (isLoading) {
         return (
-            <div className="mx-auto max-w-4xl space-y-6 p-6">
-                {[1, 2, 3].map((i) => (
-                    <div
-                        key={i}
-                        className="h-24 animate-pulse rounded-xl bg-zinc-800"
-                    />
-                ))}
+            <div className="space-y-4 max-w-4xl">
+                <LoadingSkeleton className="h-8 w-40" />
+                <LoadingSkeleton className="h-40 w-full rounded-xl" />
+                <LoadingSkeleton className="h-64 w-full rounded-xl" />
             </div>
         );
     }
 
     if (!po) {
         return (
-            <div className="flex flex-col items-center gap-3 p-12 text-center">
-                <Package className="h-8 w-8 text-zinc-600" />
-                <p className="text-sm text-zinc-400">
-                    Purchase order not found
-                </p>
+            <div className="text-center py-16">
+                <Ship className="w-full h-12 text-zinc-300 mx-auto mb-3" />
+                <p className="text-zinc-500 font-medium">Purchase order not found</p>
+                <Link href={`/super-admin/purchase-orders`} className="mt-4 inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                    <ArrowLeft className="w-4 h-4" /> Back to Warehouse
+                </Link>
             </div>
         );
     }
 
-    const items: ReceiveItem[] = (po.purchase_order_items ?? []).map(
-        (i: any) => ({
-            po_item_id: i.id,
-            item_id: i.item_id,
-            item_name: i.items?.name ?? `Item ${i.item_id}`,
-            quantity_ordered: i.quantity_ordered,
-            unit_cost_after: i.unit_cost_after,
-            quantity_received: String(i.quantity_ordered),
-        }),
-    );
+    const status     = po.status as POStatus;
+    const grandTotal = (Number(po.subtotal_before) || 0) + (Number(po.office_fee) || 0) + (Number(po.shipping_fee) || 0);
+    const items      = po.purchase_order_items ?? [];
 
-    const nextStatusCfg = NEXT_STATUS[po.status];
-    const canReceive = po.status === "arrived";
-    const isDraft = po.status === "draft";
-
-    async function handleStatusAdvance() {
-        if (!nextStatusCfg) return;
-        try {
-            await updatePO.mutateAsync({
-                id: po?.id || "",
-                updates: { status: nextStatusCfg.next },
-            });
-            toast.success(`Status updated to ${nextStatusCfg.next}`);
-        } catch {
-            toast.error("Failed to update status");
+    // Parse free-text items from notes JSON (set in new PO page)
+    const freeTextItems: {
+        item_name: string;
+        quantity_ordered: number;
+        unit_price_before: number;
+        pieces_per_box: number | null;
+        cbm: number | null;
+        total_price_before: number;
+        items: {
+            name: string;
+            sku: string;
         }
-    }
+    }[] = items;
 
-    // Grand total from line items
-    const grandTotal = items.reduce(
-        (sum, i) => sum + i.unit_cost_after * i.quantity_ordered,
-        0,
-    );
+
+
+    const displayItems = freeTextItems.length > 0 ? freeTextItems : [];
+
+    console.log(displayItems)
 
     return (
-        <div className="mx-auto max-w-4xl space-y-8 p-6">
-            {/* ── Back + header ─────────────────────────────────────── */}
-            <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() =>
-                            router.push("/super-admin/purchase-orders")
-                        }
-                        className="rounded-lg p-1.5 text-zinc-400  hover:bg-zinc-100 transition-all duration-300"
-                    >
-                        <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    <div>
-                        <h1 className="text-xl font-semibold">
-                            {po.po_number}
-                        </h1>
-                        {po.supplier_name && (
-                            <p className="text-sm text-zinc-400">
-                                {po.supplier_name}
-                            </p>
+        <div className="space-y-6 max-w-6xl">
+            {/* Back */}
+            <Link
+                href={`/super-admin/purchase-orders`}
+                className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-700 transition-colors"
+            >
+                <ArrowLeft className="w-4 h-4" /> Back to Purchase orders
+            </Link>
+
+            {/* Header */}
+            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-6">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+                            <Ship className="w-6 h-6 text-violet-500" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <h1 className="text-2xl font-semibold text-zinc-900">{po.po_number}</h1>
+                                <StatusBadge status={status} />
+                            </div>
+                            <p className="text-sm text-zinc-400 mt-1">{po.supplier_name ?? "No supplier"}</p>
+                        </div>
+                    </div>
+
+                    {/* ── Action buttons ── */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Receive Shipment — shown for in_transit and arrived only */}
+                        {RECEIVABLE_STATUSES.includes(status) && (
+                            <button
+                                onClick={() =>
+                                    router.push(
+                                        `/super-admin/purchase-orders/${id}/receive`
+                                    )
+                                }
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                                <PackageCheck className="w-4 h-4" />
+                                Receive Shipment
+                            </button>
                         )}
+
+                        {/* Advance Status dropdown — unchanged */}
+                        <StatusActions poId={po.id} currentStatus={status} />
                     </div>
                 </div>
 
-                {/* Action buttons */}
-                <div className="flex gap-2">
-                    {nextStatusCfg && (
-                        <button
-                            onClick={handleStatusAdvance}
-                            disabled={updatePO.isPending}
-                            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
-                        >
-                            {nextStatusCfg.label}
-                        </button>
-                    )}
-                    {canReceive && (
-                        <button
-                            onClick={() => setShowReceiveModal(true)}
-                            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
-                        >
-                            Mark as Received
-                        </button>
-                    )}
-                    {isDraft && (
-                        <button
-                            onClick={() =>
-                                router.push(
-                                    `/super-admin/purchase-orders/${po.id}/edit`,
-                                )
-                            }
-                            className="rounded-lg border border-zinc-600 px-4 py-2 text-sm font-medium"
-                        >
-                            Edit PO
-                        </button>
-                    )}
+                {/* Meta grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-6 pt-5 border-t border-zinc-100">
+                    <div>
+                        <p className="text-xs text-zinc-400 flex items-center gap-1"><Warehouse className="w-3 h-3" /> Warehouse Name</p>
+                        <p className="text-sm font-medium text-zinc-900 mt-1">{po.warehouse.name}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-zinc-400 flex items-center gap-1"><Calendar className="w-3 h-3" /> Order Date</p>
+                        <p className="text-sm font-medium text-zinc-900 mt-1">{fmtDate(po.order_date)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-zinc-400 flex items-center gap-1"><Calendar className="w-3 h-3" /> Expected</p>
+                        <p className="text-sm font-medium text-zinc-900 mt-1">{fmtDate(po.expected_arrival)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-zinc-400 flex items-center gap-1"><Calendar className="w-3 h-3" /> Arrived</p>
+                        <p className="text-sm font-medium text-zinc-900 mt-1">{fmtDate(po.actual_arrival)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-zinc-400 flex items-center gap-1"><Boxes className="w-3 h-3" /> Total CBM</p>
+                        <p className="text-sm font-medium text-zinc-900 mt-1">{fmtNum(po.total_cbm, 4)}</p>
+                    </div>
                 </div>
             </div>
 
-            {/* ── Status timeline ───────────────────────────────────── */}
-            <div className="rounded-xl border border-gray-200 p-6">
-                <StatusTimeline current={po.status} />
-                <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-zinc-500 sm:grid-cols-4">
-                    {po.order_date && (
-                        <div>
-                            <span className="block text-zinc-400">
-                                Order Date
-                            </span>
-                            {new Date(po.order_date).toLocaleDateString(
-                                "en-US",
-                                {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                },
-                            )}
-                        </div>
-                    )}
-                    {po.expected_arrival && (
-                        <div>
-                            <span className="block text-zinc-400">
-                                Expected Arrival
-                            </span>
-                            {new Date(po.expected_arrival).toLocaleDateString(
-                                "en-US",
-                                {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                },
-                            )}
-                        </div>
-                    )}
-                    {po.actual_arrival && (
-                        <div>
-                            <span className="block text-zinc-400">
-                                Actual Arrival
-                            </span>
-                            {new Date(po.actual_arrival).toLocaleDateString(
-                                "en-US",
-                                {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                },
-                            )}
-                        </div>
-                    )}
-                    {po.total_pallets && (
-                        <div>
-                            <span className="block text-zinc-400">Pallets</span>
-                            {po.total_pallets}
-                        </div>
-                    )}
+            {/* Line items table */}
+            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-zinc-100 flex items-center gap-2">
+                    <Package className="w-4 h-4 text-zinc-400" />
+                    <h2 className="text-sm font-semibold text-zinc-700">Line Items</h2>
+                    <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-zinc-100 text-zinc-500 text-xs">{displayItems.length}</span>
+                </div>
+
+                {displayItems.length === 0 ? (
+                    <div className="py-12 text-center">
+                        <Package className="w-10 h-10 text-zinc-300 mx-auto mb-2" />
+                        <p className="text-sm text-zinc-400">No line items</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                            <tr className="bg-zinc-50 border-b border-zinc-100 text-left">
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">Item</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Qty Ordered</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Unit Price</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Total Before</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Pcs/Box</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">CBM</th>
+                            </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100">
+                            {displayItems.map((item, idx) => (
+                                <tr key={idx} className="hover:bg-zinc-50 transition-colors">
+                                    <td className="px-4 py-3 font-medium text-zinc-900">{item?.items?.name} | {item?.items?.sku}</td>
+                                    <td className="px-4 py-3 text-right text-zinc-600">{item.quantity_ordered?.toLocaleString()}</td>
+                                    <td className="px-4 py-3 text-right text-zinc-600">${Number(item.unit_price_before).toFixed(4)}</td>
+                                    <td className="px-4 py-3 text-right text-zinc-700 font-medium">{fmt(item.total_price_before)}</td>
+                                    <td className="px-4 py-3 text-right text-zinc-600">{item.pieces_per_box ?? "—"}</td>
+                                    <td className="px-4 py-3 text-right text-zinc-600">{item.cbm != null ? Number(item.cbm).toFixed(4) : "—"}</td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* Cost summary */}
+                <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-100 space-y-1.5">
+                    <div className="flex justify-between text-sm text-zinc-500">
+                        <span>Subtotal (before fees)</span>
+                        <span className="font-medium text-zinc-700">{fmt(po.subtotal_before)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-zinc-500">
+                        <span>Office / Agent fee</span>
+                        <span>{fmt(po.office_fee)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-zinc-500">
+                        <span>Shipping / Freight fee</span>
+                        <span>{fmt(po.shipping_fee)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-semibold text-zinc-900 pt-1.5 border-t border-zinc-200">
+                        <span>Grand Total</span>
+                        <span>{fmt(grandTotal)}</span>
+                    </div>
                 </div>
             </div>
 
-            {/* ── Cost summary cards ────────────────────────────────── */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-lg border border-gray-200 px-4 py-3">
-                    <p className="text-xs text-zinc-500">
-                        Subtotal (before fees)
-                    </p>
-                    <p className="mt-0.5 text-base font-semibold">
-                        {fmtMoney(po.subtotal_before ?? 0)}
-                    </p>
-                </div>
-                <div className="rounded-lg border border-gray-200 px-4 py-3">
-                    <p className="text-xs text-zinc-500">Office Fee</p>
-                    <p className="mt-0.5 text-base font-semibold">
-                        {fmtMoney(po.office_fee ?? 0)}
-                    </p>
-                </div>
-                <div className="rounded-lg border border-gray-200 px-4 py-3">
-                    <p className="text-xs text-zinc-500">Shipping Fee</p>
-                    <p className="mt-0.5 text-base font-semibold">
-                        {fmtMoney(po.shipping_fee ?? 0)}
-                    </p>
-                </div>
-                <div className="rounded-lg border border-emerald-800/40 px-4 py-3">
-                    <p className="text-xs text-emerald-400">
-                        Grand Total (landed)
-                    </p>
-                    <p className="mt-0.5 text-base font-semibold text-emerald-300">
-                        {fmtMoney(grandTotal)}
-                    </p>
-                </div>
-            </div>
+            {/* Notes */}
+            {po.notes && (() => {
+                // Show plain notes only — hide if notes is the items JSON blob
+                try {
+                    const parsed = JSON.parse(po.notes);
+                    if (parsed?.items) return null; // stored as JSON, not for display
+                } catch { /* fall through */ }
+                return (
+                    <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-6">
+                        <h2 className="text-sm font-semibold text-zinc-700 mb-2 flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-zinc-400" /> Notes
+                        </h2>
+                        <p className="text-sm text-zinc-600 whitespace-pre-wrap">{po.notes}</p>
+                    </div>
+                );
+            })()}
 
-            {/* ── Line items table ──────────────────────────────────── */}
-            <div className="rounded-xl border border-gray-200">
-                <div className="border-b border-gray-200 px-5 py-3">
-                    <h2 className="text-sm font-semibold text-white">
-                        Line Items
-                    </h2>
+            {/* Danger zone — only for draft */}
+            {status === "draft" && (
+                <div className="flex justify-end pb-8">
+                    <button
+                        onClick={handleDelete}
+                        disabled={deletePO.isPending}
+                        className="px-4 py-2 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                        Delete Draft
+                    </button>
                 </div>
-                {/* Column headers */}
-                <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] gap-3 border-b border-gray-200 px-5 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                    <span>Item</span>
-                    <span className="text-right">Qty</span>
-                    <span className="text-right">Unit (before)</span>
-                    <span className="text-right">CBM</span>
-                    <span className="text-right">Total (before)</span>
-                    <span className="text-right">Landed Cost / unit</span>
-                </div>
-                <div className="divide-y divide-gray-200">
-                    {(po.purchase_order_items ?? []).map((item: any) => (
-                        <div
-                            key={item.id}
-                            className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] gap-3 items-center px-5 py-3"
-                        >
-                            <div>
-                                <p className="text-sm font-medium">
-                                    {item.items?.name ?? `Item ${item.item_id}`}
-                                </p>
-                                {item.items?.sku && (
-                                    <p className="text-xs text-zinc-500">
-                                        {item.items.sku}
-                                    </p>
-                                )}
-                            </div>
-                            <span className="text-right text-sm text-zinc-500">
-                                {item.quantity_ordered}
-                            </span>
-                            <span className="text-right text-sm text-zinc-500">
-                                {fmtUnitCost(item.unit_price_before)}
-                            </span>
-                            <span className="text-right text-sm text-zinc-600">
-                                {item.cbm ?? "—"}
-                            </span>
-                            <span className="text-right text-sm text-zinc-500">
-                                {fmtMoney(item.total_price_before)}
-                            </span>
-                            <span className="text-right text-sm font-medium text-emerald-400">
-                                {fmtUnitCost(item.unit_cost_after)}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* ── Notes ────────────────────────────────────────────── */}
-            {po.notes && (
-                <div className="rounded-xl border border-gray-200 p-5">
-                    <h2 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                        Notes
-                    </h2>
-                    <p className="text-sm text-zinc-500">{po.notes}</p>
-                </div>
-            )}
-
-            {/* ── Receive modal ─────────────────────────────────────── */}
-            {showReceiveModal && (
-                <ReceiveModal
-                    poId={po.id}
-                    items={items}
-                    onClose={() => setShowReceiveModal(false)}
-                />
             )}
         </div>
     );

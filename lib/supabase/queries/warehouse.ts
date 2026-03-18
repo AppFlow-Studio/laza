@@ -306,7 +306,8 @@ export async function getPallets(
         .select(
             `
         *,
-        storage_spaces ( id, name, temperature_type )
+        storage_spaces ( id, name, temperature_type ),
+        warehouse:locations(name),
       `,
         )
         .eq("warehouse_location_id", warehouseLocationId)
@@ -333,6 +334,7 @@ export async function getPalletById(palletId: string) {
             `
         *,
         storage_spaces ( id, name, temperature_type ),
+        warehouse:locations(name),
         pallet_inventory (
           *,
           items ( id, name, short_label, sku, unit_of_measure )

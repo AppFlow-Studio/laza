@@ -7,7 +7,7 @@ import {
     ArrowLeft, Ship, Package, ChevronDown,
     CheckCircle2, XCircle, Clock, Anchor,
     FileText, DollarSign, Calendar, Hash,
-    Boxes, AlertCircle, Pencil, PackageCheck,
+    Boxes, AlertCircle, Pencil, PackageCheck, Warehouse,
 } from "lucide-react";
 import { usePurchaseOrder, useUpdatePurchaseOrderStatus, useDeletePurchaseOrder } from "@/lib/hooks/queries/usePurchaseOrders";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
@@ -31,7 +31,7 @@ const NEXT_STATUSES: Record<POStatus, POStatus[]> = {
     draft:      ["submitted", "cancelled"],
     submitted:  ["in_transit", "cancelled"],
     in_transit: ["arrived", "cancelled"],
-    arrived:    ["received", "cancelled"],
+    arrived:    ["cancelled"],
     received:   [],
     cancelled:  [],
 };
@@ -68,8 +68,8 @@ function StatusBadge({ status }: { status: string }) {
 
 function StatusActions({ poId, currentStatus, warehouseId }: { poId: string; currentStatus: POStatus; warehouseId: string }) {
     const [open, setOpen] = useState(false);
-    const updateStatus    = useUpdatePurchaseOrderStatus();
-    const nextOptions     = NEXT_STATUSES[currentStatus] ?? [];
+    const updateStatus = useUpdatePurchaseOrderStatus();
+    const nextOptions = NEXT_STATUSES[currentStatus] ?? [];
 
     if (nextOptions.length === 0) return null;
 
@@ -153,7 +153,7 @@ export default function PurchaseOrderDetailPage({
     if (!po) {
         return (
             <div className="text-center py-16">
-                <Ship className="w-12 h-12 text-zinc-300 mx-auto mb-3" />
+                <Ship className="w-full h-12 text-zinc-300 mx-auto mb-3" />
                 <p className="text-zinc-500 font-medium">Purchase order not found</p>
                 <Link href={`/super-admin/warehouse/${warehouseId}`} className="mt-4 inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 font-medium">
                     <ArrowLeft className="w-4 h-4" /> Back to Warehouse
@@ -174,21 +174,24 @@ export default function PurchaseOrderDetailPage({
         pieces_per_box: number | null;
         cbm: number | null;
         total_price_before: number;
+        items: {
+            name: string;
+            sku: string;
+        }
     }[] = items;
 
-    console.log(freeTextItems)
 
 
     const displayItems = freeTextItems.length > 0 ? freeTextItems : [];
 
     return (
-        <div className="space-y-6 max-w-4xl">
+        <div className="space-y-6 max-w-6xl">
             {/* Back */}
             <Link
-                href={`/super-admin/warehouse/${warehouseId}`}
+                href={`/super-admin/purchase-orders`}
                 className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-700 transition-colors"
             >
-                <ArrowLeft className="w-4 h-4" /> Back to Warehouse
+                <ArrowLeft className="w-4 h-4" /> Back to Purchase orders
             </Link>
 
             {/* Header */}
@@ -230,7 +233,11 @@ export default function PurchaseOrderDetailPage({
                 </div>
 
                 {/* Meta grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5 border-t border-zinc-100">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-6 pt-5 border-t border-zinc-100">
+                    <div>
+                        <p className="text-xs text-zinc-400 flex items-center gap-1"><Warehouse className="w-3 h-3" /> Warehouse Name</p>
+                        <p className="text-sm font-medium text-zinc-900 mt-1">{po.warehouse.name}</p>
+                    </div>
                     <div>
                         <p className="text-xs text-zinc-400 flex items-center gap-1"><Calendar className="w-3 h-3" /> Order Date</p>
                         <p className="text-sm font-medium text-zinc-900 mt-1">{fmtDate(po.order_date)}</p>
@@ -279,7 +286,7 @@ export default function PurchaseOrderDetailPage({
                             <tbody className="divide-y divide-zinc-100">
                             {displayItems.map((item, idx) => (
                                 <tr key={idx} className="hover:bg-zinc-50 transition-colors">
-                                    <td className="px-4 py-3 font-medium text-zinc-900">{item.item_name}</td>
+                                    <td className="px-4 py-3 font-medium text-zinc-900">{item?.items?.name} | {item?.items?.sku}</td>
                                     <td className="px-4 py-3 text-right text-zinc-600">{item.quantity_ordered?.toLocaleString()}</td>
                                     <td className="px-4 py-3 text-right text-zinc-600">${Number(item.unit_price_before).toFixed(4)}</td>
                                     <td className="px-4 py-3 text-right text-zinc-700 font-medium">{fmt(item.total_price_before)}</td>

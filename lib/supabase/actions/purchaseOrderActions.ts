@@ -11,6 +11,12 @@ const PO_ITEM_FULL = `
     id,
     purchase_order_id,
     item_id,
+    items (
+        id,
+        name,
+        sku,
+        short_label
+    ),
     quantity_ordered,
     unit_price_before,
     total_price_before,
@@ -27,12 +33,13 @@ const PO_ITEM_FULL = `
 
 // ─── Reads (service role — bypasses RLS, safe for SELECT) ─────────────────────
 
-export async function getPurchaseOrdersAction(organizationId: string) {
+export async function getPurchaseOrdersAction(organizationId: string, warehouseLocationId?: string | null) {
 	const supabase = createServiceRoleClient();
-	const { data, error } = await supabase
+	let query = supabase
 		.from('purchase_orders')
 		.select(`
             *,
+            warehouse:locations(id, name),
             purchase_order_items (
                 id,
                 item_id,
@@ -46,6 +53,12 @@ export async function getPurchaseOrdersAction(organizationId: string) {
 		.eq('organization_id', organizationId)
 		.order('created_at', { ascending: false });
 
+	if (warehouseLocationId) {
+		query = query.eq('warehouse_location_id', warehouseLocationId);
+	}
+
+	const { data, error } = await query;
+
 	if (error) throw new Error(error.message);
 	return data ?? [];
 }
@@ -56,6 +69,7 @@ export async function getPurchaseOrderByIdAction(id: string) {
 		.from('purchase_orders')
 		.select(`
             *,
+            warehouse:locations(id, name),
             purchase_order_items ( ${PO_ITEM_FULL} )
         `)
 		.eq('id', id)
@@ -76,6 +90,22 @@ export async function getItemCostHistoryAction(organizationId: string, itemId?: 
 	if (itemId) query = query.eq('item_id', itemId);
 
 	const { data, error } = await query;
+	if (error) throw new Error(error.message);
+	return data ?? [];
+}
+
+// ─── NEW: fetch warehouse locations for dropdown ──────────────────────────────
+
+export async function getWarehouseLocationsAction(organizationId: string) {
+	const supabase = createServiceRoleClient();
+	const { data, error } = await supabase
+		.from('locations')
+		.select('id, name')
+		.eq('organization_id', organizationId)
+		.eq('location_type', 'warehouse')
+		.eq('is_active', true)
+		.order('name', { ascending: true });
+
 	if (error) throw new Error(error.message);
 	return data ?? [];
 }

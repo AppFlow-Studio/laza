@@ -34,9 +34,14 @@ export default function PalletDetailPage() {
 	}
 
 	const totalCapacity = (pallet.pallet_inventory ?? []).reduce(
-		(s, r) => s + (r.initial_box_count ?? 0),
+		(s: number, r: { initial_box_count: number; }) => s + (r.initial_box_count ?? 0),
 		0
 	);
+
+	const params = new URLSearchParams({
+		source:    pallet.id,
+		warehouse: pallet.warehouse_location_id,
+	});
 
 	return (
 		<div className="flex flex-col gap-6 p-6">
@@ -57,9 +62,7 @@ export default function PalletDetailPage() {
 				<div className="flex gap-2">
 					<button
 						onClick={() =>
-							router.push(
-								`/super-admin/warehouse/pallets/reorganize?source=${pallet.id}`
-							)
+							router.push(`/super-admin/warehouse/pallets/reorganize?${params.toString()}`)
 						}
 						className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
 					>

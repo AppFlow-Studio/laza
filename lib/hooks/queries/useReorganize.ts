@@ -15,7 +15,7 @@ export const reorganizeKeys = {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export function usePalletsForReorganization(warehouseLocationId: string | undefined) {
+export function usePalletsForReorganization(warehouseLocationId: string | undefined | null) {
     return useQuery({
         queryKey:  reorganizeKeys.pallets(warehouseLocationId ?? ''),
         queryFn:   () => getPalletsForReorganizationAction(warehouseLocationId!),
