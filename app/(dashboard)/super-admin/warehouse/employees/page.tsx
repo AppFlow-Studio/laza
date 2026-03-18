@@ -87,8 +87,8 @@ export default function WarehouseEmployeesPage() {
 
             {/* Panel */}
             <WarehouseEmployeePanel
-                warehouseLocationId={warehouse.id}
-                warehouseLocationName={warehouse.name}
+                // warehouseLocationId={warehouse.id}
+                // warehouseLocationName={warehouse.name}
                 organizationId={orgId}
             />
         </div>
