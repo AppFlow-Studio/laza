@@ -21,7 +21,7 @@ import {
     ChevronDown,
     Building2,
     Thermometer,
-    Receipt,
+    Receipt, ArrowsUpFromLine,
 } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
@@ -90,7 +90,7 @@ const warehouseChildren = [
     {
         name: "Pallets",
         href: "/super-admin/warehouse/pallets",
-        icon: Receipt,
+        icon: ArrowsUpFromLine,
     },
 ];
 

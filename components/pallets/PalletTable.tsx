@@ -1,3 +1,4 @@
+//super-admin/purchase_orders/new
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -22,6 +23,8 @@ export function PalletTable({ pallets, isLoading }: PalletTableProps) {
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey>("received_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  console.log(pallets)
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -90,6 +93,7 @@ export function PalletTable({ pallets, isLoading }: PalletTableProps) {
           <thead>
             <tr className="bg-gray-50">
               <Th>Pallet ID</Th>
+              <Th>Warehouse Name</Th>
               <Th>Storage Space</Th>
               <Th>Shipment (PO)</Th>
               <Th>Items</Th>
@@ -134,6 +138,13 @@ export function PalletTable({ pallets, isLoading }: PalletTableProps) {
                 <td className="whitespace-nowrap px-4 py-3">
                   <span className="font-mono text-sm font-semibold text-gray-900">
                     {pallet.pallet_label}
+                  </span>
+                </td>
+
+                {/* warehouse name */}
+                <td className="whitespace-nowrap px-4 py-3">
+                  <span className="font-mono text-sm font-semibold text-gray-900">
+                    {pallet?.warehouse?.name}
                   </span>
                 </td>
 

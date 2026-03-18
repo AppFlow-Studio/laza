@@ -21,6 +21,7 @@ export type PalletWithDetails = WarehousePallet & {
 	purchase_orders: { po_number: string; supplier_name: string | null } | null;
 	item_count: number;
 	total_boxes: number;
+	warehouse: { name: string } | null;
 	pallet_inventory: (PalletInventory & {
 		items: { name: string; short_label: string | null; sku: string | null } | null;
 		purchase_order_items: { pieces_per_box: number } | null;
@@ -55,6 +56,7 @@ export async function getPallets(
       *,
       storage_spaces ( name, temperature_type ),
       purchase_orders ( po_number, supplier_name ),
+      warehouse:locations(name),
       pallet_inventory (
         *,
         items ( name, short_label, sku ),
@@ -127,6 +129,7 @@ export async function getPalletById(
       *,
       storage_spaces ( name, temperature_type ),
       purchase_orders ( po_number, supplier_name ),
+      warehouse:locations(name),
       pallet_inventory (
         *,
         items ( name, short_label, sku, unit_of_measure, current_unit_cost ),

@@ -1,11 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser, useOrganization } from '@clerk/nextjs';
 
-// Everything goes through server actions — Clerk JWT attached, RLS passes for all operations
 import {
     getPurchaseOrdersAction,
     getPurchaseOrderByIdAction,
     getItemCostHistoryAction,
+    getWarehouseLocationsAction,
     createPurchaseOrderAction,
     updatePurchaseOrderAction,
     updatePurchaseOrderStatusAction,
@@ -23,17 +23,18 @@ type PurchaseOrderItemInsert = Database['public']['Tables']['purchase_order_item
 // ─── Query keys ───────────────────────────────────────────────────────────────
 
 export const purchaseOrderKeys = {
-    all:    (orgId: string)                  => ['purchaseOrders', orgId] as const,
-    detail: (id: string)                     => ['purchaseOrders', 'detail', id] as const,
-    costs:  (orgId: string, itemId?: number) => ['itemCostHistory', orgId, itemId] as const,
+    all:        (orgId: string)                  => ['purchaseOrders', orgId] as const,
+    detail:     (id: string)                     => ['purchaseOrders', 'detail', id] as const,
+    costs:      (orgId: string, itemId?: number) => ['itemCostHistory', orgId, itemId] as const,
+    warehouses: (orgId: string)                  => ['warehouseLocations', orgId] as const,
 };
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export function usePurchaseOrders(organizationId?: string) {
+export function usePurchaseOrders(organizationId?: string, warehouseLocationId?: string | null) {
     return useQuery({
         queryKey:  purchaseOrderKeys.all(organizationId ?? ''),
-        queryFn:   () => getPurchaseOrdersAction(organizationId!),
+        queryFn:   () => getPurchaseOrdersAction(organizationId!, warehouseLocationId),
         enabled:   !!organizationId,
         staleTime: 60 * 1000,
     });
@@ -52,6 +53,17 @@ export function useItemCostHistory(organizationId?: string, itemId?: number) {
     return useQuery({
         queryKey:  purchaseOrderKeys.costs(organizationId ?? '', itemId),
         queryFn:   () => getItemCostHistoryAction(organizationId!, itemId),
+        enabled:   !!organizationId,
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
+// ─── NEW: warehouse locations for dropdown ────────────────────────────────────
+
+export function useWarehouseLocations(organizationId?: string) {
+    return useQuery({
+        queryKey:  purchaseOrderKeys.warehouses(organizationId ?? ''),
+        queryFn:   () => getWarehouseLocationsAction(organizationId!),
         enabled:   !!organizationId,
         staleTime: 5 * 60 * 1000,
     });

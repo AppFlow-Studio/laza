@@ -1,3 +1,5 @@
+//super-admin/warehouse/[id]/purchase_orders/new
+
 "use client";
 
 import { useState, use, useRef, useEffect } from "react";
@@ -5,13 +7,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
     ArrowLeft, Plus, Trash2, Ship,
-    Calendar, DollarSign, Package, Hash, Search, ChevronDown,
+    Calendar, DollarSign, Package, Hash, Search, ChevronDown, Warehouse,
 } from "lucide-react";
 import {
     useCreatePurchaseOrder,
     useUpsertPurchaseOrderItems,
 } from "@/lib/hooks/queries/usePurchaseOrders";
 import { useItems } from "@/lib/hooks/queries/useItems";
+import { useWarehouseById } from "@/lib/hooks/queries/useWarehouse";
 import { useUser, useOrganization } from "@clerk/nextjs";
 import toast from "react-hot-toast";
 
@@ -19,8 +22,8 @@ import toast from "react-hot-toast";
 
 interface LineItem {
     _key:              string;
-    item_id:           number | null;   // FK → items table
-    item_name:         string;          // display only, derived from picker
+    item_id:           number | null;
+    item_name:         string;
     quantity_ordered:  string;
     unit_price_before: string;
     pieces_per_box:    string;
@@ -52,7 +55,7 @@ interface Item {
 interface ItemPickerProps {
     items: Item[];
     selectedId: number | null;
-    usedIds: number[];           // already used in other rows — greyed out
+    usedIds: number[];
     onSelect: (item: Item) => void;
     placeholder?: string;
 }
@@ -73,7 +76,6 @@ function ItemPicker({ items, selectedId, usedIds, onSelect, placeholder = "Searc
         );
     });
 
-    // Close on outside click
     useEffect(() => {
         function handle(e: MouseEvent) {
             if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -94,16 +96,13 @@ function ItemPicker({ items, selectedId, usedIds, onSelect, placeholder = "Searc
                 }`}
             >
                 <span className="truncate">
-                    {selected
-                        ? (selected.short_label ?? selected.name)
-                        : placeholder}
+                    {selected ? (selected.short_label ?? selected.name) : placeholder}
                 </span>
                 <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
             </button>
 
             {open && (
                 <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-xl border border-zinc-200 bg-white shadow-lg overflow-hidden">
-                    {/* Search */}
                     <div className="flex items-center gap-2 border-b border-zinc-100 px-3 py-2">
                         <Search className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
                         <input
@@ -114,13 +113,9 @@ function ItemPicker({ items, selectedId, usedIds, onSelect, placeholder = "Searc
                             className="flex-1 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none"
                         />
                     </div>
-
-                    {/* List */}
                     <ul className="max-h-52 overflow-y-auto divide-y divide-zinc-50">
                         {filtered.length === 0 ? (
-                            <li className="px-4 py-3 text-sm text-zinc-400 text-center">
-                                No items found
-                            </li>
+                            <li className="px-4 py-3 text-sm text-zinc-400 text-center">No items found</li>
                         ) : (
                             filtered.map((item) => {
                                 const isUsed     = usedIds.includes(item.id) && item.id !== selectedId;
@@ -140,17 +135,11 @@ function ItemPicker({ items, selectedId, usedIds, onSelect, placeholder = "Searc
                                             }`}
                                         >
                                             <div className="min-w-0">
-                                                <p className="font-medium truncate">
-                                                    {item.short_label ?? item.name}
-                                                </p>
-                                                {item.sku && (
-                                                    <p className="text-xs text-zinc-400 truncate">{item.sku}</p>
-                                                )}
+                                                <p className="font-medium truncate">{item.short_label ?? item.name}</p>
+                                                {item.sku && <p className="text-xs text-zinc-400 truncate">{item.sku}</p>}
                                             </div>
                                             {item.box_quantity && (
-                                                <span className="flex-shrink-0 text-xs text-zinc-400">
-                                                    {item.box_quantity}/box
-                                                </span>
+                                                <span className="flex-shrink-0 text-xs text-zinc-400">{item.box_quantity}/box</span>
                                             )}
                                         </button>
                                     </li>
@@ -158,6 +147,82 @@ function ItemPicker({ items, selectedId, usedIds, onSelect, placeholder = "Searc
                             })
                         )}
                     </ul>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── NumInput ─────────────────────────────────────────────────────────────────
+
+function NumInput({
+                      value,
+                      onChange,
+                      placeholder,
+                      prefix,
+                      step = "any",
+                      min = "0",
+                      presets,
+                      className = "",
+                  }: {
+    value: string;
+    onChange: (v: string) => void;
+    placeholder: string;
+    prefix?: string;
+    step?: string;
+    min?: string;
+    presets?: number[];
+    className?: string;
+}) {
+    const [open, setOpen]    = useState(false);
+    const closeTimer         = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    function handleFocus() {
+        if (closeTimer.current) clearTimeout(closeTimer.current);
+        if (presets && presets.length > 0) setOpen(true);
+    }
+
+    function handleBlur() {
+        closeTimer.current = setTimeout(() => setOpen(false), 150);
+    }
+
+    function handlePresetClick(preset: number) {
+        const current = parseFloat(value) || 0;
+        onChange(String(current + preset));
+        if (closeTimer.current) clearTimeout(closeTimer.current);
+    }
+
+    return (
+        <div className={`relative ${className}`}>
+            {prefix && (
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
+                    {prefix}
+                </span>
+            )}
+            <input
+                type="number"
+                step={step}
+                min={min}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
+                placeholder={placeholder}
+                className={`w-full rounded-lg border border-zinc-200 bg-white py-2 text-right text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition ${prefix ? "pl-7 pr-3" : "px-3"}`}
+            />
+            {open && presets && presets.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg">
+                    {presets.map((preset) => (
+                        <button
+                            key={preset}
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); handlePresetClick(preset); }}
+                            className="flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-indigo-50"
+                        >
+                            <span className="text-xs text-zinc-400">+</span>
+                            <span className="font-medium text-zinc-700">{preset.toLocaleString()}</span>
+                        </button>
+                    ))}
                 </div>
             )}
         </div>
@@ -177,8 +242,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     );
 }
 
-const inputCls    = "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition";
-const numInputCls = `${inputCls} text-right`;
+const inputCls = "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition";
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -188,7 +252,9 @@ export default function NewPurchaseOrderPage({ params }: { params: Promise<{ id:
     const { user }            = useUser();
     const { organization }    = useOrganization();
 
-    // ── PO header state ───────────────────────────────────────────────────────
+    // Fetch warehouse name to display as read-only label
+    const { data: warehouse } = useWarehouseById(warehouseId);
+
     const [poNumber,        setPoNumber]        = useState("");
     const [supplierName,    setSupplierName]    = useState("China Supplier");
     const [orderDate,       setOrderDate]       = useState("");
@@ -196,19 +262,14 @@ export default function NewPurchaseOrderPage({ params }: { params: Promise<{ id:
     const [officeFee,       setOfficeFee]       = useState("");
     const [shippingFee,     setShippingFee]     = useState("");
     const [notes,           setNotes]           = useState("");
+    const [lines,           setLines]           = useState<LineItem[]>([emptyLine()]);
 
-    // ── Line items state ──────────────────────────────────────────────────────
-    const [lines, setLines] = useState<LineItem[]>([emptyLine()]);
-
-    // ── Data ──────────────────────────────────────────────────────────────────
     const { data: allItems = [] } = useItems();
 
-    // ── Mutations ─────────────────────────────────────────────────────────────
-    const createPO        = useCreatePurchaseOrder();
-    const upsertItems     = useUpsertPurchaseOrderItems();
-    const isSubmitting    = createPO.isPending || upsertItems.isPending;
+    const createPO     = useCreatePurchaseOrder();
+    const upsertItems  = useUpsertPurchaseOrderItems();
+    const isSubmitting = createPO.isPending || upsertItems.isPending;
 
-    // ── Line helpers ──────────────────────────────────────────────────────────
     function updateLine(key: string, patch: Partial<LineItem>) {
         setLines((prev) => prev.map((l) => l._key === key ? { ...l, ...patch } : l));
     }
@@ -219,19 +280,16 @@ export default function NewPurchaseOrderPage({ params }: { params: Promise<{ id:
 
     function handleItemSelect(key: string, item: Item) {
         updateLine(key, {
-            item_id:        item.id,
-            item_name:      item.short_label ?? item.name,
-            // Pre-fill pieces_per_box from item catalog if set
+            item_id:       item.id,
+            item_name:     item.short_label ?? item.name,
             pieces_per_box: item.box_quantity ? String(item.box_quantity) : "",
         });
     }
 
-    // IDs already used in other rows (prevent duplicate items)
     const usedItemIds = lines
         .filter((l) => l.item_id !== null)
         .map((l) => l.item_id as number);
 
-    // ── Live totals ───────────────────────────────────────────────────────────
     const subtotalBefore = lines.reduce((sum, l) => {
         const qty   = parseFloat(l.quantity_ordered)  || 0;
         const price = parseFloat(l.unit_price_before) || 0;
@@ -242,52 +300,33 @@ export default function NewPurchaseOrderPage({ params }: { params: Promise<{ id:
     const shipFee    = parseFloat(shippingFee) || 0;
     const grandTotal = subtotalBefore + offFee + shipFee;
 
-    // ── Submit ────────────────────────────────────────────────────────────────
     async function handleSubmit(saveAsDraft: boolean) {
-        if (!user?.id || !organization?.id) {
-            toast.error("Not authenticated");
-            return;
-        }
-        if (!poNumber.trim()) {
-            toast.error("PO number is required");
-            return;
-        }
+        if (!user?.id || !organization?.id) { toast.error("Not authenticated"); return; }
+        if (!poNumber.trim()) { toast.error("PO number is required"); return; }
 
-        const validLines = lines.filter(
-            (l) => l.item_id !== null && l.quantity_ordered && l.unit_price_before
-        );
-        if (validLines.length === 0) {
-            toast.error("Add at least one line item with an item selected");
-            return;
-        }
+        const validLines = lines.filter((l) => l.item_id !== null && l.quantity_ordered && l.unit_price_before);
+        if (validLines.length === 0) { toast.error("Add at least one line item with an item selected"); return; }
 
-        // Check all lines have an item selected
         const missingItem = lines.some((l) => l.quantity_ordered && !l.item_id);
-        if (missingItem) {
-            toast.error("Each row with a quantity must have an item selected");
-            return;
-        }
+        if (missingItem) { toast.error("Each row with a quantity must have an item selected"); return; }
 
         try {
-            // ── Step 1: Create the PO header ──────────────────────────────────
-            // Keep notes as plain text only — no more items JSON
             const po = await createPO.mutateAsync({
-                organization_id:  organization.id,
-                po_number:        poNumber.trim(),
-                supplier_name:    supplierName.trim() || "China Supplier",
-                status:           saveAsDraft ? "draft" : "submitted",
-                order_date:       orderDate       || null,
-                expected_arrival: expectedArrival || null,
-                office_fee:       offFee,
-                shipping_fee:     shipFee,
-                subtotal_before:  subtotalBefore,
-                total_cbm:        totalCBM || null,
-                notes:            notes.trim() || null,
-                created_by:       user.id,
+                organization_id:      organization.id,
+                po_number:            poNumber.trim(),
+                supplier_name:        supplierName.trim() || "China Supplier",
+                status:               saveAsDraft ? "draft" : "submitted",
+                order_date:           orderDate       || null,
+                expected_arrival:     expectedArrival || null,
+                office_fee:           offFee,
+                shipping_fee:         shipFee,
+                subtotal_before:      subtotalBefore,
+                total_cbm:            totalCBM || null,
+                notes:                notes.trim() || null,
+                created_by:           user.id,
+                warehouse_location_id: warehouseId,   // ← auto from URL param
             });
 
-            // ── Step 2: Insert purchase_order_items rows ──────────────────────
-            // Calculate CBM share and allocated fees per line
             const poItems = validLines.map((l) => {
                 const qty           = parseFloat(l.quantity_ordered);
                 const unitPrice     = parseFloat(l.unit_price_before);
@@ -302,20 +341,20 @@ export default function NewPurchaseOrderPage({ params }: { params: Promise<{ id:
                 const cartons       = ppb && qty ? qty / ppb : null;
 
                 return {
-                    purchase_order_id:     po.id,
-                    item_id:               l.item_id as number,
-                    quantity_ordered:      qty,
-                    unit_price_before:     unitPrice,
-                    total_price_before:    totalBefore,
-                    pieces_per_box:        ppb ?? 0,  // NOT NULL in schema
-                    cartons:               cartons,
-                    cbm:                   cbm,
-                    cbm_share:             cbmShare,
-                    allocated_office_fee:  allocOffice,
+                    purchase_order_id:      po.id,
+                    item_id:                l.item_id as number,
+                    quantity_ordered:       qty,
+                    unit_price_before:      unitPrice,
+                    total_price_before:     totalBefore,
+                    pieces_per_box:         ppb ?? 0,
+                    cartons,
+                    cbm,
+                    cbm_share:              cbmShare,
+                    allocated_office_fee:   allocOffice,
                     allocated_shipping_fee: allocShipping,
-                    total_cost_after:      totalAfter,
-                    unit_cost_after:       unitAfter,
-                    quantity_received:     null,
+                    total_cost_after:       totalAfter,
+                    unit_cost_after:        unitAfter,
+                    quantity_received:      null,
                 };
             });
 
@@ -356,6 +395,15 @@ export default function NewPurchaseOrderPage({ params }: { params: Promise<{ id:
                     <Hash className="w-4 h-4 text-zinc-400" /> Order Details
                 </h2>
 
+                {/* Warehouse — read-only, auto from URL */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg">
+                    <Warehouse className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <span className="text-xs text-indigo-500 font-medium">Warehouse</span>
+                    <span className="text-sm text-indigo-700 font-semibold ml-1">
+                        {warehouse?.name ?? "Loading…"}
+                    </span>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label="PO Number" required>
                         <input
@@ -394,30 +442,36 @@ export default function NewPurchaseOrderPage({ params }: { params: Promise<{ id:
                 {/* Shared fees */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-zinc-100">
                     <Field label="Office / Agent Fee ($)">
-                        <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
-                            <input
-                                type="number" min="0" step="0.01"
-                                value={officeFee}
-                                onChange={(e) => setOfficeFee(e.target.value)}
-                                placeholder="5400.00"
-                                className={`${inputCls} pl-8`}
-                            />
-                        </div>
+                        <NumInput
+                            value={officeFee}
+                            onChange={setOfficeFee}
+                            placeholder="5400.00"
+                            prefix="$"
+                            step="0.01"
+                            presets={[1000, 5000, 10000]}
+                        />
                     </Field>
                     <Field label="Shipping / Freight Fee ($)">
-                        <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
-                            <input
-                                type="number" min="0" step="0.01"
-                                value={shippingFee}
-                                onChange={(e) => setShippingFee(e.target.value)}
-                                placeholder="37500.00"
-                                className={`${inputCls} pl-8`}
-                            />
-                        </div>
+                        <NumInput
+                            value={shippingFee}
+                            onChange={setShippingFee}
+                            placeholder="37500.00"
+                            prefix="$"
+                            step="0.01"
+                            presets={[1000, 5000, 10000]}
+                        />
                     </Field>
                 </div>
+
+                {(offFee > 0 || shipFee > 0) && (
+                    <p className="text-xs text-zinc-500">
+                        Total fees:{" "}
+                        <span className="font-medium text-zinc-900">
+                            ${(offFee + shipFee).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        </span>{" "}
+                        — allocated proportionally by CBM across all line items
+                    </p>
+                )}
 
                 <Field label="Notes">
                     <textarea
@@ -431,7 +485,7 @@ export default function NewPurchaseOrderPage({ params }: { params: Promise<{ id:
             </div>
 
             {/* ── Line Items ─────────────────────────────────────────────────── */}
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
                     <h2 className="text-sm font-semibold text-zinc-700 flex items-center gap-2">
                         <Package className="w-4 h-4 text-zinc-400" /> Line Items
@@ -463,11 +517,8 @@ export default function NewPurchaseOrderPage({ params }: { params: Promise<{ id:
                             key={line._key}
                             className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-3 px-6 py-4 items-start"
                         >
-                            {/* ── Item picker ── */}
                             <div>
-                                <label className="sm:hidden block text-xs text-zinc-400 mb-1">
-                                    Item *
-                                </label>
+                                <label className="sm:hidden block text-xs text-zinc-400 mb-1">Item *</label>
                                 <ItemPicker
                                     items={allItems as Item[]}
                                     selectedId={line.item_id}
@@ -479,59 +530,49 @@ export default function NewPurchaseOrderPage({ params }: { params: Promise<{ id:
                                     <p className="mt-1 text-xs text-red-500">Item required</p>
                                 )}
                             </div>
-
-                            {/* Quantity */}
                             <div>
                                 <label className="sm:hidden block text-xs text-zinc-400 mb-1">Qty Ordered *</label>
-                                <input
-                                    type="number" min="0" step="1"
+                                <NumInput
                                     value={line.quantity_ordered}
-                                    onChange={(e) => updateLine(line._key, { quantity_ordered: e.target.value })}
+                                    onChange={(v) => updateLine(line._key, { quantity_ordered: v })}
                                     placeholder="100000"
-                                    className={numInputCls}
+                                    step="1"
+                                    presets={[100, 1000, 10000]}
                                 />
                             </div>
-
-                            {/* Unit price */}
                             <div>
                                 <label className="sm:hidden block text-xs text-zinc-400 mb-1">Unit Price ($) *</label>
-                                <input
-                                    type="number" min="0" step="0.0001"
+                                <NumInput
                                     value={line.unit_price_before}
-                                    onChange={(e) => updateLine(line._key, { unit_price_before: e.target.value })}
+                                    onChange={(v) => updateLine(line._key, { unit_price_before: v })}
                                     placeholder="0.0900"
-                                    className={numInputCls}
+                                    prefix="$"
+                                    step="0.0001"
                                 />
                             </div>
-
-                            {/* Pieces per box — pre-filled from item catalog */}
                             <div>
                                 <label className="sm:hidden block text-xs text-zinc-400 mb-1">Pcs / Box</label>
-                                <input
-                                    type="number" min="1" step="1"
+                                <NumInput
                                     value={line.pieces_per_box}
-                                    onChange={(e) => updateLine(line._key, { pieces_per_box: e.target.value })}
+                                    onChange={(v) => updateLine(line._key, { pieces_per_box: v })}
                                     placeholder="250"
-                                    className={numInputCls}
+                                    step="1"
+                                    min="1"
+                                    presets={[100, 250, 500]}
                                 />
                                 {line.item_id && !line.pieces_per_box && (
                                     <p className="mt-1 text-xs text-amber-500">Required for receiving</p>
                                 )}
                             </div>
-
-                            {/* CBM */}
                             <div>
                                 <label className="sm:hidden block text-xs text-zinc-400 mb-1">CBM</label>
-                                <input
-                                    type="number" min="0" step="0.001"
+                                <NumInput
                                     value={line.cbm}
-                                    onChange={(e) => updateLine(line._key, { cbm: e.target.value })}
+                                    onChange={(v) => updateLine(line._key, { cbm: v })}
                                     placeholder="22.4"
-                                    className={numInputCls}
+                                    step="0.001"
                                 />
                             </div>
-
-                            {/* Delete */}
                             <button
                                 onClick={() => removeLine(line._key)}
                                 disabled={lines.length === 1}

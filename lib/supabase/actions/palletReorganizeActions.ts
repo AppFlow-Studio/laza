@@ -1,15 +1,13 @@
 'use server';
 
-import { createServerSupabaseClient, createServiceRoleClient } from '../server';
+import { createServiceRoleClient } from '../server';
 
 // ─── Reads ────────────────────────────────────────────────────────────────────
 
-/** All non-retired pallets with their contents — used to populate
- *  the source/destination selectors in the reorganization UI. */
-export async function getPalletsForReorganizationAction(warehouseLocationId: string) {
+export async function getPalletsForReorganizationAction(warehouseLocationId?: string) {
     const supabase = createServiceRoleClient();
 
-    const { data, error } = await supabase
+    let query = supabase
         .from('warehouse_pallets')
         .select(`
             id,
@@ -17,6 +15,7 @@ export async function getPalletsForReorganizationAction(warehouseLocationId: str
             status,
             storage_space_id,
             storage_spaces ( id, name, temperature_type ),
+            warehouse:locations(name),
             pallet_inventory (
                 id,
                 item_id,
@@ -28,10 +27,14 @@ export async function getPalletsForReorganizationAction(warehouseLocationId: str
                 purchase_order_items ( pieces_per_box )
             )
         `)
-        .eq('warehouse_location_id', warehouseLocationId)
         .neq('status', 'retired')
         .order('pallet_label');
 
+    if (warehouseLocationId) {
+        query = query.eq('warehouse_location_id', warehouseLocationId);
+    }
+
+    const { data, error } = await query;
     if (error) throw new Error(error.message);
     return (data ?? []).map((p) => ({
         ...p,
@@ -45,32 +48,35 @@ export async function getPalletsForReorganizationAction(warehouseLocationId: str
 // ─── Mutation ─────────────────────────────────────────────────────────────────
 
 export type MoveBoxesPayload = {
-    sourcePalletId:           string;
-    targetPalletId:           string | null;  // null = create new pallet
-    targetStorageSpaceId:     string;
+    sourcePalletId:       string;
+    targetPalletId:       string | null;
+    targetStorageSpaceId: string;
     itemsToMove: {
-        item_id:                number;
-        pallet_inventory_id:    string;        // source pallet_inventory row id
-        box_count:              number;
+        item_id:             number;
+        pallet_inventory_id: string;
+        box_count:           number;
     }[];
-    newPalletLabel?:          string;         // required when targetPalletId = null
-    userId:                   string;
+    newPalletLabel?: string;
+    userId:          string;
 };
 
-/** Calls move_boxes_between_pallets RPC for each item.
- *  If targetPalletId is null, creates a new pallet first then moves into it. */
 export async function moveBoxesBetweenPalletsAction(payload: MoveBoxesPayload) {
-    const supabase = createServerSupabaseClient();
+    // Use service role to bypass RLS — RLS policies cast auth.uid() to uuid
+    // which fails for Clerk text IDs like "user_3ARZei..."
+    const supabase = createServiceRoleClient();
+
+    if (!payload.userId) {
+        throw new Error('User ID is required to move boxes.');
+    }
 
     let targetId = payload.targetPalletId;
 
-    // ── If new pallet requested, create it first ──────────────────────────────
+    // ── Create new pallet if requested ───────────────────────────────────────
     if (!targetId) {
         if (!payload.newPalletLabel) {
             throw new Error('New pallet label is required when no target pallet is selected.');
         }
 
-        // Get org from source pallet
         const { data: sourcePallet, error: srcErr } = await supabase
             .from('warehouse_pallets')
             .select('organization_id, warehouse_location_id')
@@ -82,12 +88,12 @@ export async function moveBoxesBetweenPalletsAction(payload: MoveBoxesPayload) {
         const { data: newPallet, error: createErr } = await supabase
             .from('warehouse_pallets')
             .insert({
-                organization_id:      sourcePallet.organization_id,
+                organization_id:       sourcePallet.organization_id,
                 warehouse_location_id: sourcePallet.warehouse_location_id,
-                storage_space_id:     payload.targetStorageSpaceId,
-                pallet_label:         payload.newPalletLabel,
-                status:               'active',
-                received_at:          new Date().toISOString(),
+                storage_space_id:      payload.targetStorageSpaceId,
+                pallet_label:          payload.newPalletLabel,
+                status:                'active',
+                received_at:           new Date().toISOString(),
             })
             .select('id')
             .single();
@@ -95,18 +101,24 @@ export async function moveBoxesBetweenPalletsAction(payload: MoveBoxesPayload) {
         if (createErr || !newPallet) throw new Error(createErr?.message ?? 'Failed to create new pallet.');
         targetId = newPallet.id;
     } else {
-        // If moving to existing pallet, update its storage space if it changed
         const { error: moveErr } = await supabase
             .from('warehouse_pallets')
-            .update({ storage_space_id: payload.targetStorageSpaceId, updated_at: new Date().toISOString() })
+            .update({ storage_space_id: payload.targetStorageSpaceId })
             .eq('id', targetId);
 
         if (moveErr) throw new Error(moveErr.message);
     }
 
-    // ── Call RPC once per item ────────────────────────────────────────────────
-    // The RPC handles: deducting from source, adding to target, preserving
-    // purchase_order_item_id, logging to pallet_operations_log.
+    // ── Get org_id for logging ────────────────────────────────────────────────
+    const { data: sourcePalletMeta } = await supabase
+        .from('warehouse_pallets')
+        .select('organization_id')
+        .eq('id', payload.sourcePalletId)
+        .single();
+
+    const organizationId = sourcePalletMeta?.organization_id ?? '';
+
+    // ── Call RPC per item ─────────────────────────────────────────────────────
     const errors: string[] = [];
 
     for (const item of payload.itemsToMove) {
@@ -118,7 +130,21 @@ export async function moveBoxesBetweenPalletsAction(payload: MoveBoxesPayload) {
             p_user_id:          payload.userId,
         });
 
-        if (error) errors.push(`${item.item_id}: ${error.message}`);
+        if (error) {
+            errors.push(`Item ${item.item_id}: ${error.message}`);
+            continue;
+        }
+
+        await supabase.from('pallet_operations_log').insert({
+            organization_id:   organizationId,
+            pallet_id:         payload.sourcePalletId,
+            related_pallet_id: targetId,
+            item_id:           item.item_id,
+            operation_type:    'moved',
+            box_count_change:  -item.box_count,
+            performed_by:      payload.userId,
+            notes:             `Moved ${item.box_count} box${item.box_count !== 1 ? 'es' : ''} to pallet ${targetId}`,
+        });
     }
 
     if (errors.length > 0) {

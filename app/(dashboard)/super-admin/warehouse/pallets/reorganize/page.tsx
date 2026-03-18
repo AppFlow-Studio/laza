@@ -1,28 +1,24 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
 import { usePalletsForReorganization } from "@/lib/hooks/queries/useReorganize";
-import { ReorganizePanel } from "./_components/ReorganizePanel";
+import { ReorganizePanel } from "@/components/super-admin/pallets/ReorganizePanel";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import { MoveRight } from "lucide-react";
 
 export default function PalletReorganizePage() {
-    const router       = useRouter();
-    const searchParams = useSearchParams();
-    const sourceParam  = searchParams.get("source"); // pre-selected source pallet id
-
-    const { data: warehouseLocation, isLoading: whLoading } = useWarehouseLocation();
+    const router        = useRouter();
+    const searchParams  = useSearchParams();
+    const sourceParam   = searchParams.get("source");
+    const warehouseParam = searchParams.get("warehouse") ?? "";
 
     const {
         data:      pallets = [],
         isLoading: palletsLoading,
         refetch,
-    } = usePalletsForReorganization(warehouseLocation?.id);
+    } = usePalletsForReorganization(warehouseParam || undefined);
 
-    const isLoading = whLoading || palletsLoading;
-
-    if (isLoading) {
+    if (palletsLoading) {
         return (
             <div className="space-y-4 p-6">
                 <LoadingSkeleton className="h-8 w-48" />
@@ -36,7 +32,6 @@ export default function PalletReorganizePage() {
 
     return (
         <div className="flex flex-col gap-6 p-6">
-            {/* Header */}
             <div className="flex items-center gap-3">
                 <div className="rounded-xl bg-indigo-50 p-2.5">
                     <MoveRight className="h-5 w-5 text-indigo-600" />
@@ -54,7 +49,7 @@ export default function PalletReorganizePage() {
             <ReorganizePanel
                 pallets={pallets}
                 preselectedSourceId={sourceParam}
-                warehouseLocationId={warehouseLocation?.id ?? ""}
+                warehouseLocationId={warehouseParam}
                 onComplete={() => {
                     refetch();
                     router.push("/super-admin/warehouse/pallets");

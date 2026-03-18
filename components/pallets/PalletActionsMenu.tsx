@@ -48,6 +48,11 @@ export function PalletActionsMenu({ pallet }: PalletActionsMenuProps) {
     }
   };
 
+  const params = new URLSearchParams({
+    source:    pallet.id,
+    warehouse: pallet.warehouse_location_id,
+  });
+
   return (
     <div ref={menuRef} className="relative">
       <button
@@ -73,9 +78,8 @@ export function PalletActionsMenu({ pallet }: PalletActionsMenuProps) {
 
           <button
             onClick={() => {
-              router.push(
-                `/super-admin/warehouse/pallets/reorganize?source=${pallet.id}`
-              );
+              router.push(`/super-admin/warehouse/pallets/reorganize?${params.toString()}`);
+
               setOpen(false);
             }}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
