@@ -1,5 +1,6 @@
 import type { Database } from "@/lib/supabase/types";
 import { createClient } from "@supabase/supabase-js";
+import { createWarehouseExpenseAction, getWarehouseExpensesAction } from "../actions/warehouseExpenseActions";
 
 type WarehouseExpense =
     Database["public"]["Tables"]["warehouse_expenses"]["Row"];
@@ -37,33 +38,7 @@ export async function getWarehouseExpenses(
     organizationId: string,
     filters?: WarehouseExpenseFilters,
 ): Promise<WarehouseExpense[]> {
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    );
-
-    let query = supabase
-        .from("warehouse_expenses")
-        .select("*")
-        .eq("organization_id", organizationId)
-        .order("expense_date", { ascending: false });
-
-    if (filters?.expenseType) {
-        query = query.eq("expense_type", filters.expenseType);
-    }
-    if (filters?.purchaseOrderId) {
-        query = query.eq("purchase_order_id", filters.purchaseOrderId);
-    }
-    if (filters?.dateFrom) {
-        query = query.gte("expense_date", filters.dateFrom);
-    }
-    if (filters?.dateTo) {
-        query = query.lte("expense_date", filters.dateTo);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data ?? [];
+    return getWarehouseExpensesAction(organizationId, filters);
 }
 
 /**
@@ -74,19 +49,7 @@ export async function getWarehouseExpenses(
 export async function createWarehouseExpense(
     expense: Omit<WarehouseExpenseInsert, "id" | "created_at" | "updated_at">,
 ): Promise<WarehouseExpense> {
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    );
-
-    const { data, error } = await supabase
-        .from("warehouse_expenses")
-        .insert(expense)
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
+    return createWarehouseExpenseAction(expense);
 }
 
 /**

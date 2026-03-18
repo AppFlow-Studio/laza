@@ -593,7 +593,7 @@ function ManageRatesPanel({
         );
     };
 
-    const editableTypes = EXPENSE_TYPES.filter((t) => t.value !== "other");
+    const editableTypes = EXPENSE_TYPES.filter((t) => t.value === "pallet_rent");
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -847,7 +847,7 @@ export default function WarehouseExpensesPage() {
                                     key={expense.id}
                                     className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors"
                                 >
-                                    <div className="shrink-0 w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+                                    <div className="shrink-0 w-18 h-18 rounded-xl bg-gray-100 flex items-center justify-center">
                                         {EXPENSE_TYPES.find(
                                             (t) =>
                                                 t.value ===
@@ -913,7 +913,7 @@ export default function WarehouseExpensesPage() {
                                         </div>
                                         {expense.notes && (
                                             <p className="text-xs text-gray-400 mt-0.5 truncate">
-                                                {expense.notes}
+                                               Note: {expense.notes}
                                             </p>
                                         )}
                                     </div>
