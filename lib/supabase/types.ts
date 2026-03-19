@@ -129,6 +129,7 @@ export type Database = {
           include_storage_utilization: boolean
           include_trending_items: boolean
           include_updated_items: boolean
+          location_id: string | null
           locations_to_include: Json | null
           min_significance_threshold: number
           organization_id: string
@@ -147,6 +148,7 @@ export type Database = {
           include_storage_utilization?: boolean
           include_trending_items?: boolean
           include_updated_items?: boolean
+          location_id?: string | null
           locations_to_include?: Json | null
           min_significance_threshold?: number
           organization_id: string
@@ -165,6 +167,7 @@ export type Database = {
           include_storage_utilization?: boolean
           include_trending_items?: boolean
           include_updated_items?: boolean
+          location_id?: string | null
           locations_to_include?: Json | null
           min_significance_threshold?: number
           organization_id?: string
@@ -173,6 +176,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "daily_summary_preferences_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "daily_summary_preferences_organization_id_fkey"
             columns: ["organization_id"]
@@ -479,12 +489,15 @@ export type Database = {
           barcode_text: string | null
           box_quantity: number | null
           category_id: number | null
+          cbm_per_carton: number | null
           cost_per_unit: number | null
           created_at: string
+          current_unit_cost: number | null
           id: number
           min_quantity: number | null
           name: string | null
           organization_id: string | null
+          short_label: string | null
           sku: string | null
           unit_of_measure: string | null
           updated_at: string | null
@@ -493,12 +506,15 @@ export type Database = {
           barcode_text?: string | null
           box_quantity?: number | null
           category_id?: number | null
+          cbm_per_carton?: number | null
           cost_per_unit?: number | null
           created_at?: string
+          current_unit_cost?: number | null
           id?: number
           min_quantity?: number | null
           name?: string | null
           organization_id?: string | null
+          short_label?: string | null
           sku?: string | null
           unit_of_measure?: string | null
           updated_at?: string | null
@@ -507,12 +523,15 @@ export type Database = {
           barcode_text?: string | null
           box_quantity?: number | null
           category_id?: number | null
+          cbm_per_carton?: number | null
           cost_per_unit?: number | null
           created_at?: string
+          current_unit_cost?: number | null
           id?: number
           min_quantity?: number | null
           name?: string | null
           organization_id?: string | null
+          short_label?: string | null
           sku?: string | null
           unit_of_measure?: string | null
           updated_at?: string | null
@@ -632,7 +651,9 @@ export type Database = {
           group_id: string | null
           id: string
           is_active: boolean | null
+          latitude: number | null
           location_type: string
+          longitude: number | null
           name: string | null
           organization_id: string | null
         }
@@ -642,7 +663,9 @@ export type Database = {
           group_id?: string | null
           id?: string
           is_active?: boolean | null
+          latitude?: number | null
           location_type?: string
+          longitude?: number | null
           name?: string | null
           organization_id?: string | null
         }
@@ -652,7 +675,9 @@ export type Database = {
           group_id?: string | null
           id?: string
           is_active?: boolean | null
+          latitude?: number | null
           location_type?: string
+          longitude?: number | null
           name?: string | null
           organization_id?: string | null
         }
@@ -865,6 +890,7 @@ export type Database = {
           daily_summary_schedule: string
           email_format: string
           id: string
+          location_id: string | null
           low_stock_alerts_enabled: boolean
           low_stock_delivery_mode: string
           low_stock_digest_schedule: string | null
@@ -884,6 +910,7 @@ export type Database = {
           daily_summary_schedule?: string
           email_format?: string
           id?: string
+          location_id?: string | null
           low_stock_alerts_enabled?: boolean
           low_stock_delivery_mode?: string
           low_stock_digest_schedule?: string | null
@@ -903,6 +930,7 @@ export type Database = {
           daily_summary_schedule?: string
           email_format?: string
           id?: string
+          location_id?: string | null
           low_stock_alerts_enabled?: boolean
           low_stock_delivery_mode?: string
           low_stock_digest_schedule?: string | null
@@ -917,11 +945,80 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "notification_preferences_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "notification_preferences_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: true
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_ticket_fulfillment_lines: {
+        Row: {
+          boxes_deducted: number
+          created_at: string
+          id: string
+          order_ticket_item_id: string
+          pallet_id: string
+          pallet_inventory_id: string
+          pieces_per_box_at_time: number
+          total_pieces: number
+        }
+        Insert: {
+          boxes_deducted: number
+          created_at?: string
+          id?: string
+          order_ticket_item_id: string
+          pallet_id: string
+          pallet_inventory_id: string
+          pieces_per_box_at_time: number
+          total_pieces: number
+        }
+        Update: {
+          boxes_deducted?: number
+          created_at?: string
+          id?: string
+          order_ticket_item_id?: string
+          pallet_id?: string
+          pallet_inventory_id?: string
+          pieces_per_box_at_time?: number
+          total_pieces?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_ticket_fulfillment_lines_order_ticket_item_id_fkey"
+            columns: ["order_ticket_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_ticket_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_ticket_fulfillment_lines_pallet_id_fkey"
+            columns: ["pallet_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_pallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_ticket_fulfillment_lines_pallet_inventory_id_fkey"
+            columns: ["pallet_inventory_id"]
+            isOneToOne: false
+            referencedRelation: "pallet_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_ticket_fulfillment_lines_pallet_inventory_id_fkey"
+            columns: ["pallet_inventory_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_inventory_overview"
+            referencedColumns: ["pallet_inventory_id"]
           },
         ]
       }
@@ -931,27 +1028,33 @@ export type Database = {
           fulfilled_units: number | null
           id: string
           item_id: number
+          line_total: number | null
           quantity_boxes: number
           quantity_units: number
           ticket_id: string
+          unit_cost_at_time: number | null
         }
         Insert: {
           fulfilled_boxes?: number | null
           fulfilled_units?: number | null
           id?: string
           item_id: number
+          line_total?: number | null
           quantity_boxes: number
           quantity_units: number
           ticket_id: string
+          unit_cost_at_time?: number | null
         }
         Update: {
           fulfilled_boxes?: number | null
           fulfilled_units?: number | null
           id?: string
           item_id?: number
+          line_total?: number | null
           quantity_boxes?: number
           quantity_units?: number
           ticket_id?: string
+          unit_cost_at_time?: number | null
         }
         Relationships: [
           {
@@ -1020,6 +1123,7 @@ export type Database = {
           confirmed_at: string | null
           confirmed_by: string | null
           created_at: string
+          delivery_type: string | null
           fulfilled_at: string | null
           id: string
           is_auto_approved: boolean
@@ -1039,6 +1143,7 @@ export type Database = {
           confirmed_at?: string | null
           confirmed_by?: string | null
           created_at?: string
+          delivery_type?: string | null
           fulfilled_at?: string | null
           id?: string
           is_auto_approved?: boolean
@@ -1058,6 +1163,7 @@ export type Database = {
           confirmed_at?: string | null
           confirmed_by?: string | null
           created_at?: string
+          delivery_type?: string | null
           fulfilled_at?: string | null
           id?: string
           is_auto_approved?: boolean
@@ -1212,6 +1318,149 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      pallet_inventory: {
+        Row: {
+          box_count: number
+          created_at: string
+          id: string
+          initial_box_count: number
+          item_id: number
+          pallet_id: string
+          pieces_per_box_override: number | null
+          purchase_order_item_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          box_count: number
+          created_at?: string
+          id?: string
+          initial_box_count: number
+          item_id: number
+          pallet_id: string
+          pieces_per_box_override?: number | null
+          purchase_order_item_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          box_count?: number
+          created_at?: string
+          id?: string
+          initial_box_count?: number
+          item_id?: number
+          pallet_id?: string
+          pieces_per_box_override?: number | null
+          purchase_order_item_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pallet_inventory_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallet_inventory_pallet_id_fkey"
+            columns: ["pallet_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_pallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallet_inventory_purchase_order_item_id_fkey"
+            columns: ["purchase_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pallet_operations_log: {
+        Row: {
+          box_count_change: number | null
+          created_at: string
+          id: string
+          item_id: number | null
+          notes: string | null
+          operation_type: string
+          organization_id: string
+          pallet_id: string
+          performed_by: string
+          related_pallet_id: string | null
+          related_ticket_id: string | null
+        }
+        Insert: {
+          box_count_change?: number | null
+          created_at?: string
+          id?: string
+          item_id?: number | null
+          notes?: string | null
+          operation_type: string
+          organization_id: string
+          pallet_id: string
+          performed_by: string
+          related_pallet_id?: string | null
+          related_ticket_id?: string | null
+        }
+        Update: {
+          box_count_change?: number | null
+          created_at?: string
+          id?: string
+          item_id?: number | null
+          notes?: string | null
+          operation_type?: string
+          organization_id?: string
+          pallet_id?: string
+          performed_by?: string
+          related_pallet_id?: string | null
+          related_ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pallet_operations_log_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallet_operations_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallet_operations_log_pallet_id_fkey"
+            columns: ["pallet_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_pallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallet_operations_log_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallet_operations_log_related_pallet_id_fkey"
+            columns: ["related_pallet_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_pallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallet_operations_log_related_ticket_id_fkey"
+            columns: ["related_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "order_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_holds: {
         Row: {
@@ -1372,6 +1621,7 @@ export type Database = {
           cbm_share: number | null
           id: string
           item_id: number
+          pieces_per_box: number | null
           pieces_per_carton: number | null
           purchase_order_id: string
           quantity_ordered: number
@@ -1389,6 +1639,7 @@ export type Database = {
           cbm_share?: number | null
           id?: string
           item_id: number
+          pieces_per_box?: number | null
           pieces_per_carton?: number | null
           purchase_order_id: string
           quantity_ordered: number
@@ -1406,6 +1657,7 @@ export type Database = {
           cbm_share?: number | null
           id?: string
           item_id?: number
+          pieces_per_box?: number | null
           pieces_per_carton?: number | null
           purchase_order_id?: string
           quantity_ordered?: number
@@ -1539,6 +1791,75 @@ export type Database = {
           },
         ]
       }
+      ticket_deliveries: {
+        Row: {
+          actual_cost: number | null
+          actual_pallet_count: number | null
+          created_at: string
+          delivered_at: string | null
+          delivered_by: string | null
+          delivery_rate_at_time: number
+          delivery_type: string
+          dispatched_at: string | null
+          estimated_cost: number | null
+          estimated_pallet_count: number | null
+          id: string
+          notes: string | null
+          payment_status: string
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          actual_cost?: number | null
+          actual_pallet_count?: number | null
+          created_at?: string
+          delivered_at?: string | null
+          delivered_by?: string | null
+          delivery_rate_at_time: number
+          delivery_type: string
+          dispatched_at?: string | null
+          estimated_cost?: number | null
+          estimated_pallet_count?: number | null
+          id?: string
+          notes?: string | null
+          payment_status?: string
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          actual_cost?: number | null
+          actual_pallet_count?: number | null
+          created_at?: string
+          delivered_at?: string | null
+          delivered_by?: string | null
+          delivery_rate_at_time?: number
+          delivery_type?: string
+          dispatched_at?: string | null
+          estimated_cost?: number | null
+          estimated_pallet_count?: number | null
+          id?: string
+          notes?: string | null
+          payment_status?: string
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_deliveries_delivered_by_fkey"
+            columns: ["delivered_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_deliveries_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "order_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       update_limits: {
         Row: {
           created_at: string | null
@@ -1665,6 +1986,42 @@ export type Database = {
             columns: ["storage_space_id"]
             isOneToOne: false
             referencedRelation: "storage_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_location_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          location_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_location_assignments_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_location_assignments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -1843,9 +2200,197 @@ export type Database = {
           },
         ]
       }
+      warehouse_pallets: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string
+          pallet_label: string
+          purchase_order_id: string | null
+          received_at: string | null
+          retired_at: string | null
+          status: string
+          storage_space_id: string | null
+          updated_at: string
+          warehouse_location_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id: string
+          pallet_label: string
+          purchase_order_id?: string | null
+          received_at?: string | null
+          retired_at?: string | null
+          status?: string
+          storage_space_id?: string | null
+          updated_at?: string
+          warehouse_location_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string
+          pallet_label?: string
+          purchase_order_id?: string | null
+          received_at?: string | null
+          retired_at?: string | null
+          status?: string
+          storage_space_id?: string | null
+          updated_at?: string
+          warehouse_location_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_pallets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_pallets_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_pallets_storage_space_id_fkey"
+            columns: ["storage_space_id"]
+            isOneToOne: false
+            referencedRelation: "storage_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_pallets_warehouse_location_id_fkey"
+            columns: ["warehouse_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouse_rent_snapshots: {
+        Row: {
+          active_pallet_count: number
+          created_at: string
+          id: string
+          notes: string | null
+          organization_id: string
+          rate_per_pallet: number
+          snapshot_date: string
+          total_cost: number
+        }
+        Insert: {
+          active_pallet_count: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          rate_per_pallet: number
+          snapshot_date: string
+          total_cost: number
+        }
+        Update: {
+          active_pallet_count?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          rate_per_pallet?: number
+          snapshot_date?: string
+          total_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_rent_snapshots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      warehouse_inventory_overview: {
+        Row: {
+          box_count: number | null
+          category_id: number | null
+          display_label: string | null
+          effective_pieces_per_box: number | null
+          initial_box_count: number | null
+          inventory_created_at: string | null
+          inventory_updated_at: string | null
+          item_id: number | null
+          item_name: string | null
+          pallet_id: string | null
+          pallet_inventory_id: string | null
+          pallet_label: string | null
+          pallet_received_at: string | null
+          pallet_status: string | null
+          pieces_per_box_override: number | null
+          purchase_order_id: string | null
+          purchase_order_item_id: string | null
+          sku: string | null
+          storage_space_id: string | null
+          total_pieces: number | null
+          unit_of_measure: string | null
+          warehouse_location_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "category"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallet_inventory_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallet_inventory_pallet_id_fkey"
+            columns: ["pallet_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_pallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallet_inventory_purchase_order_item_id_fkey"
+            columns: ["purchase_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_pallets_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_pallets_storage_space_id_fkey"
+            columns: ["storage_space_id"]
+            isOneToOne: false
+            referencedRelation: "storage_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_pallets_warehouse_location_id_fkey"
+            columns: ["warehouse_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       are_low_stock_alerts_enabled: {
@@ -1872,6 +2417,25 @@ export type Database = {
         }
         Returns: Json
       }
+      get_effective_notification_preferences: {
+        Args: { p_location_id: string; p_organization_id: string }
+        Returns: {
+          delivery_mode: string
+          low_stock_alerts_enabled: boolean
+          notifications_enabled: boolean
+          primary_email: string
+          quiet_hours_end: string
+          quiet_hours_start: string
+          secondary_emails: Json
+          source: string
+          timezone: string
+        }[]
+      }
+      get_effective_pieces_per_box: {
+        Args: { p_pallet_inventory_id: string }
+        Returns: number
+      }
+      get_jwt_debug: { Args: never; Returns: Json }
       get_my_claim: { Args: { claim: string }; Returns: string }
       get_organization_id_from_location: {
         Args: { p_location_id: string }
@@ -1935,6 +2499,16 @@ export type Database = {
         Args: { p_organization_id: string; p_queue_ids: string[] }
         Returns: number
       }
+      move_boxes_between_pallets: {
+        Args: {
+          p_box_count: number
+          p_item_id: number
+          p_source_pallet_id: string
+          p_target_pallet_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       queue_low_stock: {
         Args: {
           p_alert_id: number
@@ -1961,7 +2535,31 @@ export type Database = {
         }
         Returns: string
       }
+      recalculate_po_costs: {
+        Args: { p_purchase_order_id: string }
+        Returns: undefined
+      }
+      receive_purchase_order: {
+        Args: {
+          p_purchase_order_id: string
+          p_received_items: Json
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      receive_shipment_to_pallets: {
+        Args: {
+          p_pallet_assignments: Json
+          p_purchase_order_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       requesting_user_id: { Args: never; Returns: string }
+      take_warehouse_rent_snapshot: {
+        Args: { p_organization_id: string }
+        Returns: undefined
+      }
       trigger_scheduled_emails_now: {
         Args: never
         Returns: {

@@ -136,7 +136,7 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
+            <div className='space-y-2'>
                 <Label htmlFor="name">Item Name</Label>
                 <Input
                     id="name"
@@ -148,7 +148,7 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                 )}
             </div>
 
-            <div>
+            <div className='space-y-2'>
                 <Label htmlFor="sku">SKU (Optional)</Label>
                 <Input
                     id="sku"
@@ -156,7 +156,7 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                 />
             </div>
 
-            <div>
+            <div className='space-y-2'>
                 <Label htmlFor="category">Category</Label>
                 <select
                     id="category"
@@ -178,7 +178,7 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                 )}
             </div>
 
-            <div>
+            <div className='space-y-2'>
                 <Label htmlFor="unit_of_measure">Unit of Measure</Label>
                 <select
                     id="unit_of_measure"
@@ -193,7 +193,7 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                 </select>
             </div>
 
-            <div>
+            <div className='space-y-2'>
                 <Label htmlFor="min_quantity">Minimum Quantity</Label>
                 <Input
                     id="min_quantity"
@@ -211,8 +211,8 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                 {onCancel && (
                     <Button
                         type="button"
-                        variant="outline"
-                        className="flex-1"
+                        variant="ghost"
+                        className="flex-1 hover:bg-zinc-100/50 text-zinc-600"
                         onClick={onCancel}
                         disabled={createMutation.isPending || updateMutation.isPending}
                     >
@@ -221,7 +221,7 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                 )}
                 <Button
                     type="submit"
-                    className={onCancel ? "flex-1" : "w-full"}
+                    className={onCancel ? "flex-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]" : "w-full"}
                     disabled={createMutation.isPending || updateMutation.isPending}
                 >
                     {createMutation.isPending || updateMutation.isPending

@@ -42,7 +42,6 @@ export type WarehouseCatalogItem = {
     sku: string | null;
     unit_of_measure: "pcs" | "kg" | "liters" | "lbs" | "oz";
     box_quantity: number | null;
-    // Supabase returns nested one-to-many as array even for single records
     category:
         | {
               id: number;
@@ -84,9 +83,59 @@ export type WarehouseStats = {
 };
 
 // ============================================================
+// getWarehouses
+// Returns ALL warehouse locations for an organization.
+// Used for multi-warehouse list view.
+// ============================================================
+
+export async function getWarehouses(organizationId: string) {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase
+        .from("locations")
+        .select(
+            `
+            *,
+            storage_spaces (*)
+        `,
+        )
+        .eq("organization_id", organizationId)
+        .eq("location_type", "warehouse")
+        .eq("is_active", true)
+        .order("created_at", { ascending: true });
+
+    if (error) throw error;
+    return (data ?? []) as WarehouseLocation[];
+}
+
+// ============================================================
+// getWarehouseById
+// Returns a single warehouse location by its ID.
+// Used for the warehouse detail page.
+// ============================================================
+
+export async function getWarehouseById(warehouseId: string) {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase
+        .from("locations")
+        .select(
+            `
+            *,
+            storage_spaces (*)
+        `,
+        )
+        .eq("id", warehouseId)
+        .eq("location_type", "warehouse")
+        .single();
+
+    if (error) throw error;
+    return data as WarehouseLocation;
+}
+
+// ============================================================
 // getWarehouseLocation
-// Returns the single warehouse location for an organization.
-// Every other warehouse function depends on this ID.
+// Returns the FIRST/primary warehouse for an organization.
+// Kept for backwards compatibility — prefer getWarehouses()
+// for new multi-warehouse-aware code.
 // ============================================================
 
 export async function getWarehouseLocation(organizationId: string) {
@@ -102,8 +151,12 @@ export async function getWarehouseLocation(organizationId: string) {
         .eq("organization_id", organizationId)
         .eq("location_type", "warehouse")
         .eq("is_active", true)
+        .order("created_at", { ascending: true })
+        .limit(1)
         .single();
 
+    // PGRST116 = no rows found — return null gracefully
+    if (error?.code === "PGRST116") return null;
     if (error) throw error;
     return data as WarehouseLocation;
 }
@@ -188,7 +241,6 @@ export async function getWarehouseStats(
 ): Promise<WarehouseStats> {
     const supabase = await createServerSupabaseClient();
 
-    // Fetch all item_locations for the warehouse with item min quantities
     const { data: inventory, error: inventoryError } = await supabase
         .from("item_locations")
         .select(
@@ -204,7 +256,6 @@ export async function getWarehouseStats(
 
     if (inventoryError) throw inventoryError;
 
-    // Fetch storage spaces count
     const { data: storageSpaces, error: storageError } = await supabase
         .from("storage_spaces")
         .select("id")
@@ -212,7 +263,6 @@ export async function getWarehouseStats(
 
     if (storageError) throw storageError;
 
-    // Calculate stats
     const total_items = inventory?.length || 0;
     const total_storage_spaces = storageSpaces?.length || 0;
 
@@ -236,4 +286,222 @@ export async function getWarehouseStats(
         out_of_stock_count,
         total_storage_spaces,
     };
+}
+
+// ── Pallets ───────────────────────────────────────────────────────────
+
+export type PalletFilters = {
+    status?: "active" | "empty" | "retired";
+    storageSpaceId?: string;
+};
+
+export async function getPallets(
+    warehouseLocationId: string,
+    filters?: PalletFilters,
+) {
+    const supabase = await createServerSupabaseClient();
+
+    let query = supabase
+        .from("warehouse_pallets")
+        .select(
+            `
+        *,
+        storage_spaces ( id, name, temperature_type ),
+        warehouse:locations(name),
+      `,
+        )
+        .eq("warehouse_location_id", warehouseLocationId)
+        .order("received_at", { ascending: true });
+
+    if (filters?.status) {
+        query = query.eq("status", filters.status);
+    }
+    if (filters?.storageSpaceId) {
+        query = query.eq("storage_space_id", filters.storageSpaceId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+}
+
+export async function getPalletById(palletId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("warehouse_pallets")
+        .select(
+            `
+        *,
+        storage_spaces ( id, name, temperature_type ),
+        warehouse:locations(name),
+        pallet_inventory (
+          *,
+          items ( id, name, short_label, sku, unit_of_measure )
+        )
+      `,
+        )
+        .eq("id", palletId)
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
+// ── Pallet Inventory ──────────────────────────────────────────────────
+
+export async function getPalletInventory(palletId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("pallet_inventory")
+        .select(
+            `
+        *,
+        items ( id, name, short_label, sku, unit_of_measure, box_quantity ),
+        purchase_order_items ( id, pieces_per_box )
+      `,
+        )
+        .eq("pallet_id", palletId)
+        .gt("box_count", 0);
+
+    if (error) throw error;
+    return data;
+}
+
+// ── Warehouse Overview (uses the view from 1.46) ──────────────────────
+
+export type WarehouseViewMode = "pallet" | "box" | "master";
+
+export async function getWarehouseOverview(
+    warehouseLocationId: string,
+    mode: WarehouseViewMode = "pallet",
+) {
+    const supabase = await createServerSupabaseClient();
+
+    const baseQuery = supabase
+        .from("warehouse_inventory_overview")
+        .select("*")
+        .eq("warehouse_location_id", warehouseLocationId);
+
+    if (mode === "pallet") {
+        const { data, error } = await baseQuery
+            .order("pallet_label")
+            .order("display_label");
+        if (error) throw error;
+        return data;
+    }
+
+    if (mode === "box") {
+        // Box view: total boxes per item — aggregate client-side
+        // (Supabase JS doesn't support GROUP BY natively)
+        const { data, error } = await baseQuery;
+        if (error) throw error;
+
+        const grouped = data.reduce(
+            (acc, row) => {
+                const key = String(row.item_id);
+                if (!acc[key]) {
+                    acc[key] = {
+                        item_id: row.item_id,
+                        display_label: row.display_label,
+                        sku: row.sku,
+                        unit_of_measure: row.unit_of_measure,
+                        total_boxes: 0,
+                    };
+                }
+                acc[key].total_boxes += row.box_count;
+                return acc;
+            },
+            {} as Record<string, any>,
+        );
+
+        return Object.values(grouped);
+    }
+
+    if (mode === "master") {
+        // Master view: total pieces per item
+        const { data, error } = await baseQuery;
+        if (error) throw error;
+
+        const grouped = data.reduce(
+            (acc, row) => {
+                const key = String(row.item_id);
+                if (!acc[key]) {
+                    acc[key] = {
+                        item_id: row.item_id,
+                        display_label: row.display_label,
+                        sku: row.sku,
+                        unit_of_measure: row.unit_of_measure,
+                        total_pieces: 0,
+                    };
+                }
+                acc[key].total_pieces += row.total_pieces ?? 0;
+                return acc;
+            },
+            {} as Record<string, any>,
+        );
+
+        return Object.values(grouped);
+    }
+}
+
+// ── Pallet Summary (quick stats for dashboard cards) ─────────────────
+
+export async function getPalletSummary(warehouseLocationId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("warehouse_pallets")
+        .select("status")
+        .eq("warehouse_location_id", warehouseLocationId);
+
+    if (error) throw error;
+
+    return {
+        active: data.filter((p) => p.status === "active").length,
+        empty: data.filter((p) => p.status === "empty").length,
+        retired: data.filter((p) => p.status === "retired").length,
+        total: data.length,
+    };
+}
+
+// ── Pallet Operations Log ─────────────────────────────────────────────
+
+export async function getPalletOperationsLog(palletId: string, limit = 50) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("pallet_operations_log")
+        .select(
+            `
+        *,
+        users ( id, first_name, last_name, email )
+      `,
+        )
+        .eq("pallet_id", palletId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+    if (error) throw error;
+    return data;
+}
+
+// ── Rent Snapshots ────────────────────────────────────────────────────
+
+export async function getRentSnapshots(
+    organizationId: string,
+    limit = 24, // 2 years of monthly snapshots by default
+) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("warehouse_rent_snapshots")
+        .select("*")
+        .eq("organization_id", organizationId)
+        .order("snapshot_date", { ascending: false })
+        .limit(limit);
+
+    if (error) throw error;
+    return data;
 }

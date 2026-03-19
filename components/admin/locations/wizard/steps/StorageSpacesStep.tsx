@@ -125,7 +125,7 @@ export default function StorageSpacesStep({ storageSpaces, onAdd, onRemove }: St
                         </div>
 
                         <div className="flex gap-2">
-                            <Button type="submit" size="sm" disabled={!isValid}>
+                            <Button className='bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]' type="submit" size="sm" disabled={!isValid}>
                                 <Plus className="w-4 h-4 mr-1" />
                                 Add
                             </Button>

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { 
-    useDailySummaryPreferences, 
+import {
+    useDailySummaryPreferences,
     useUpdateDailySummaryPreferences,
     useNotificationPreferences,
-    useUpdateNotificationPreferences 
+    useUpdateNotificationPreferences
 } from '@/lib/hooks/queries/useNotificationPreferences';
 import { useLocations } from '@/lib/hooks/queries/useLocations';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { Clock, Calendar } from 'lucide-react';
 
 interface DailySummaryPreferencesProps {
     organizationId: string;
+    locationId?: string;
 }
 
 const DAYS_OF_WEEK = [
@@ -30,9 +31,9 @@ const DAYS_OF_WEEK = [
     { value: 6, label: 'Saturday' },
 ];
 
-export default function DailySummaryPreferences({ organizationId }: DailySummaryPreferencesProps) {
-    const { data: preferences, isLoading: isLoadingSummary } = useDailySummaryPreferences(organizationId);
-    const { data: notificationPrefs, isLoading: isLoadingNotification } = useNotificationPreferences(organizationId);
+export default function DailySummaryPreferences({ organizationId, locationId }: DailySummaryPreferencesProps) {
+    const { data: preferences, isLoading: isLoadingSummary } = useDailySummaryPreferences(organizationId, locationId);
+    const { data: notificationPrefs, isLoading: isLoadingNotification } = useNotificationPreferences(organizationId, locationId);
     const { data: locations } = useLocations(organizationId);
     const updateSummaryMutation = useUpdateDailySummaryPreferences();
     const updateNotificationMutation = useUpdateNotificationPreferences();
@@ -61,8 +62,8 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
             }
             // Parse JSONB array of days
             if (notificationPrefs.daily_summary_days) {
-                const days = Array.isArray(notificationPrefs.daily_summary_days) 
-                    ? notificationPrefs.daily_summary_days 
+                const days = Array.isArray(notificationPrefs.daily_summary_days)
+                    ? notificationPrefs.daily_summary_days
                     : JSON.parse(notificationPrefs.daily_summary_days as any);
                 setSummaryDays(days.map((d: any) => typeof d === 'string' ? parseInt(d) : d));
             }
@@ -87,13 +88,14 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
     const handleSave = async () => {
         try {
             // Convert HH:MM to HH:MM:SS format for database
-            const scheduleTime = summarySchedule.length === 5 
-                ? `${summarySchedule}:00` 
+            const scheduleTime = summarySchedule.length === 5
+                ? `${summarySchedule}:00`
                 : summarySchedule;
 
             // Save notification preferences (schedule and days)
             await updateNotificationMutation.mutateAsync({
                 organizationId,
+                locationId,
                 updates: {
                     daily_summary_enabled: dailySummaryEnabled,
                     daily_summary_schedule: scheduleTime,
@@ -104,6 +106,7 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
             // Save daily summary content preferences
             await updateSummaryMutation.mutateAsync({
                 organizationId,
+                locationId,
                 updates: {
                     include_updated_items: includeUpdatedItems,
                     include_storage_utilization: includeStorageUtilization,
@@ -132,11 +135,11 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
         }
     };
 
-    const toggleLocation = (locationId: string) => {
-        if (locationsToInclude.includes(locationId)) {
-            setLocationsToInclude(locationsToInclude.filter(id => id !== locationId));
+    const toggleLocation = (locId: string) => {
+        if (locationsToInclude.includes(locId)) {
+            setLocationsToInclude(locationsToInclude.filter(id => id !== locId));
         } else {
-            setLocationsToInclude([...locationsToInclude, locationId]);
+            setLocationsToInclude([...locationsToInclude, locId]);
         }
     };
 
@@ -159,7 +162,7 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
                         <Calendar className="w-5 h-5 text-zinc-600" />
                         <Label className="text-base font-medium">Schedule</Label>
                     </div>
-                    
+
                     {/* Enable/Disable Toggle */}
                     <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
                         <div>
@@ -207,8 +210,8 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
                                         <label
                                             key={day.value}
                                             className={`flex items-center gap-2 p-2 border rounded-lg cursor-pointer transition-colors ${summaryDays.includes(day.value)
-                                                    ? 'bg-indigo-50 border-indigo-300'
-                                                    : 'bg-white border-zinc-200 hover:bg-zinc-50'
+                                                ? 'bg-indigo-50 border-indigo-300'
+                                                : 'bg-white border-zinc-200 hover:bg-zinc-50'
                                             }`}
                                         >
                                             <input
@@ -339,12 +342,12 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
 
                 {/* Save Button */}
                 <div className="flex justify-end pt-4 border-t">
-                    <Button 
-                        onClick={handleSave} 
+                    <Button
+                        onClick={handleSave}
                         disabled={updateSummaryMutation.isPending || updateNotificationMutation.isPending}
                     >
-                        {updateSummaryMutation.isPending || updateNotificationMutation.isPending 
-                            ? 'Saving...' 
+                        {updateSummaryMutation.isPending || updateNotificationMutation.isPending
+                            ? 'Saving...'
                             : 'Save Preferences'}
                     </Button>
                 </div>
@@ -352,4 +355,3 @@ export default function DailySummaryPreferences({ organizationId }: DailySummary
         </Card>
     );
 }
-

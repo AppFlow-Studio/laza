@@ -143,7 +143,7 @@ export default function ItemsPage() {
                             <List className="w-4 h-4" />
                         </button>
                     </div>
-                    <Button onClick={() => setShowAddForm(true)}>
+                    <Button className='bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]' onClick={() => setShowAddForm(true)}>
                         <Plus className="w-4 h-4 mr-2" />
                         Add Item
                     </Button>

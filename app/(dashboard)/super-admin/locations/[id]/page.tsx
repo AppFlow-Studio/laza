@@ -1,200 +1,174 @@
 "use client";
 
-import { useState, useMemo } from 'react';
-import { useLocationWithDetails } from '@/lib/hooks/queries/useLocations';
-import { useEmployeesByLocation } from '@/lib/hooks/queries/useEmployees';
-import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
-import { ArrowLeft, Plus, Package } from 'lucide-react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { useParams } from 'next/navigation';
-import MobileSheet from '@/components/admin/shared/MobileSheet';
-import StorageSetupWizard from '@/components/admin/locations/StorageSetupWizard';
-import UpdateLimitsManager from '@/components/admin/locations/UpdateLimitsManager';
-import { StorageSpace } from '@/lib/supabase/types';
-import SearchBar from '@/components/admin/shared/SearchBar';
+import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
+import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
+import { useLocationWithDetails } from "@/lib/hooks/queries/useLocations";
+import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
+import { Package, Thermometer, Snowflake, Wind } from "lucide-react";
+import Link from "next/link";
+import { StorageSpace } from "@/lib/supabase/types";
 
-export default function LocationDetailPage() {
-    const params = useParams();
-    const locationId = params.id as string;
-    const { data: location, isLoading, refetch: refetchLocation } = useLocationWithDetails(locationId);
-    const { data: employees } = useEmployeesByLocation(locationId);
-    const [showStorageSetup, setShowStorageSetup] = useState(false);
-    const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
+const TEMP_CONFIG: Record<
+    string,
+    { label: string; icon: React.ElementType; className: string }
+> = {
+    frozen: {
+        label: "Frozen",
+        icon: Snowflake,
+        className: "bg-blue-100 text-blue-700",
+    },
+    refrigerated: {
+        label: "Refrigerated",
+        icon: Thermometer,
+        className: "bg-cyan-100 text-cyan-700",
+    },
+    dry: {
+        label: "Dry",
+        icon: Wind,
+        className: "bg-amber-100 text-amber-700",
+    },
+};
 
-    // Filter employees based on search query
-    const filteredEmployees = useMemo(() => {
-        if (!employees) return [];
-        if (!employeeSearchQuery) return employees;
+function TempBadge({ type }: { type: string }) {
+    const config = TEMP_CONFIG[type] ?? {
+        label: type,
+        icon: Package,
+        className: "bg-zinc-100 text-zinc-600",
+    };
+    const Icon = config.icon;
+    return (
+        <span
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium capitalize ${config.className}`}
+        >
+            <Icon className="w-3 h-3" />
+            {config.label}
+        </span>
+    );
+}
 
-        const query = employeeSearchQuery.toLowerCase();
-        return employees.filter((employee) => {
-            const fullName = employee.first_name && employee.last_name
-                ? `${employee.first_name} ${employee.last_name}`.toLowerCase()
-                : (employee.first_name || '').toLowerCase();
-            const email = (employee.email || '').toLowerCase();
-            return fullName.includes(query) || email.includes(query);
+export default function WarehouseInventoryPage() {
+    const { data: userInfo } = useUserInfo();
+    const orgId = userInfo?.members?.organization_id;
+
+    const { data: warehouse, isLoading: warehouseLoading } =
+        useWarehouseLocation();
+
+    const { data: warehouseDetails, isLoading: detailsLoading } =
+        useLocationWithDetails(warehouse?.id ?? "", {
+            enabled: !!warehouse?.id,
         });
-    }, [employees, employeeSearchQuery]);
+
+    const isLoading = warehouseLoading || detailsLoading;
+    const storageSpaces: StorageSpace[] =
+        warehouseDetails?.storage_spaces ?? [];
 
     if (isLoading) {
         return (
             <div className="space-y-4">
-                <LoadingSkeleton className="h-12 w-64" />
-                <LoadingSkeleton className="h-96 w-full" />
+                <LoadingSkeleton className="h-10 w-48" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <LoadingSkeleton key={i} className="h-32 w-full rounded-xl" />
+                    ))}
+                </div>
             </div>
         );
     }
 
-    if (!location) {
+    if (!warehouse) {
         return (
-            <div className="text-center py-12">
-                <p className="text-zinc-500">Location not found</p>
-                <Link href="/admin/locations">
-                    <Button className="mt-4">Back to Locations</Button>
-                </Link>
+            <div className="text-center py-16">
+                <Package className="w-12 h-12 text-zinc-300 mx-auto mb-3" />
+                <p className="text-zinc-500 font-medium">No warehouse configured</p>
+                <p className="text-zinc-400 text-sm mt-1">
+                    A warehouse location hasn&apos;t been set up yet.
+                </p>
             </div>
         );
     }
 
-    const address = typeof location.address === 'string'
-        ? JSON.parse(location.address)
-        : location.address;
+    const address =
+        typeof warehouse.address === "string"
+            ? JSON.parse(warehouse.address)
+            : warehouse.address;
 
     return (
         <div className="space-y-6">
-            <nav className="mb-6" aria-label="Breadcrumb">
-                <ol className="flex items-center text-sm text-zinc-600 space-x-2">
-                    <li>
-                        <Link href="/admin/locations" className="flex items-center hover:underline">
-                            <ArrowLeft className="w-4 h-4 mr-1" />
-                            Locations
-                        </Link>
-                    </li>
-                    <li>
-                        <span className="mx-2 text-zinc-400">/</span>
-                    </li>
-                    <li className="truncate font-semibold text-zinc-900">
-                        {location.name}
-                    </li>
-                </ol>
-            </nav>
-
+            {/* Warehouse header */}
             <div className="bg-white rounded-xl shadow-sm p-6 border border-zinc-200">
-                <h1 className="text-2xl font-semibold text-zinc-900 mb-2">{location.name}</h1>
-                <p className="text-zinc-600">
-                    {address.street}, {address.city}, {address.state} {address.zip}
-                </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-xl shadow-sm p-6 border border-zinc-200">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-zinc-900">Storage Spaces</h2>
-                        <Button
-                            onClick={() => setShowStorageSetup(true)}
-                            size="sm"
-                            className="flex items-center gap-2"
-                        >
-                            <Plus className="w-4 h-4" />
-                            Setup Storage
-                        </Button>
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-2xl font-semibold text-zinc-900">
+                            {warehouse.name}
+                        </h1>
+                        {address && (
+                            <p className="text-zinc-500 text-sm mt-1">
+                                {address.street}, {address.city}, {address.state}{" "}
+                                {address.zip}
+                            </p>
+                        )}
                     </div>
-                    {location.storage_spaces && location.storage_spaces.length > 0 ? (
-                        <div className="space-y-2">
-                            {location.storage_spaces.map((space: StorageSpace) => (
-                                <Link
-                                    key={space.id}
-                                    href={`/admin/locations/${locationId}/storage-spaces/${space.id}`}
-                                    className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <Package className="w-4 h-4 text-zinc-400" />
-                                        <span className="font-medium">{space.name}</span>
-                                    </div>
-                                    <span className="text-sm text-zinc-600 capitalize">{space.temperature_type}</span>
-                                </Link>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-8">
-                            <Package className="w-12 h-12 text-zinc-300 mx-auto mb-3" />
-                            <p className="text-zinc-500 mb-4">No storage spaces configured</p>
-                            <Button
-                                onClick={() => setShowStorageSetup(true)}
-                                variant="outline"
-                                size="sm"
-                            >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Setup Storage
-                            </Button>
-                        </div>
-                    )}
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                        Warehouse
+                    </span>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm p-6 border border-zinc-200">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-zinc-900">Employees</h2>
+                {/* Summary counts */}
+                <div className="flex gap-6 mt-4 pt-4 border-t border-zinc-100">
+                    <div>
+                        <p className="text-2xl font-semibold text-zinc-900">
+                            {storageSpaces.length}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-0.5">Storage Spaces</p>
                     </div>
-                    {employees && employees.length > 0 ? (
-                        <>
-                            <div className="mb-4">
-                                <SearchBar
-                                    placeholder="Search employees by name or email..."
-                                    onSearch={setEmployeeSearchQuery}
-                                />
+                    {Object.keys(TEMP_CONFIG).map((type) => {
+                        const count = storageSpaces.filter(
+                            (s) => s.temperature_type === type
+                        ).length;
+                        if (count === 0) return null;
+                        return (
+                            <div key={type}>
+                                <p className="text-2xl font-semibold text-zinc-900">{count}</p>
+                                <p className="text-xs text-zinc-500 mt-0.5 capitalize">{type}</p>
                             </div>
-                            {filteredEmployees.length > 0 ? (
-                                <div className="space-y-2">
-                                    {filteredEmployees.map((employee) => (
-                                        <div key={employee.id} className="flex items-center gap-3 p-3 bg-zinc-50 rounded-lg">
-                                            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-semibold">
-                                                {employee.first_name?.[0] || employee.email[0]?.toUpperCase() || 'U'}
-                                            </div>
-                                            <div>
-                                                <p className="font-medium">
-                                                    {employee.first_name && employee.last_name
-                                                        ? `${employee.first_name} ${employee.last_name}`
-                                                        : employee.first_name || employee.email}
-                                                </p>
-                                                <p className="text-xs text-zinc-500">{employee.email}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-zinc-500 text-center py-4">No employees found matching your search</p>
-                            )}
-                        </>
-                    ) : (
-                        <p className="text-zinc-500">No employees assigned</p>
-                    )}
+                        );
+                    })}
                 </div>
             </div>
 
-            {/* Update Limits Section */}
-            <UpdateLimitsManager
-                locationId={locationId}
-                storageSpaces={location.storage_spaces || []}
-            />
-
-            {/* Storage Setup Wizard */}
-            <MobileSheet
-                isOpen={showStorageSetup}
-                onClose={() => setShowStorageSetup(false)}
-                title="Setup Storage Space"
-                snapPoints={[0.7, 0.95]}
-            >
-                <StorageSetupWizard
-                    locationId={locationId}
-                    onComplete={() => {
-                        refetchLocation();
-                        setShowStorageSetup(false);
-                    }}
-                    onClose={() => setShowStorageSetup(false)}
-                />
-            </MobileSheet>
+            {/* Storage spaces grid */}
+            {storageSpaces.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {storageSpaces.map((space) => (
+                        <Link
+                            key={space.id}
+                            href={`/app/(dashboard)/super-admin/warehouse/%5Bid%5D/storage-spaces/${space.id}`}
+                            className="bg-white rounded-xl shadow-sm border border-zinc-200 p-5 hover:shadow-md hover:border-zinc-300 transition-all group"
+                        >
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
+                                    <Package className="w-5 h-5 text-zinc-400 group-hover:text-indigo-500 transition-colors" />
+                                </div>
+                                <TempBadge type={space.temperature_type} />
+                            </div>
+                            <p className="font-semibold text-zinc-900">{space.name}</p>
+                            <p className="text-xs text-zinc-400 mt-1">
+                                Click to manage inventory
+                            </p>
+                        </Link>
+                    ))}
+                </div>
+            ) : (
+                <div className="bg-white rounded-xl shadow-sm border border-zinc-200 py-16 text-center">
+                    <Package className="w-12 h-12 text-zinc-300 mx-auto mb-3" />
+                    <p className="text-zinc-500 font-medium">
+                        No storage spaces configured
+                    </p>
+                    <p className="text-zinc-400 text-sm mt-1">
+                        Add storage spaces to start tracking warehouse inventory.
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
-

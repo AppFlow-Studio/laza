@@ -4,24 +4,63 @@ import { createServerSupabaseClient } from '../server';
 import { Location, StorageSpace } from '../types';
 
 export async function getAllLocations(organizationId: string) {
-    const supabase = await createServerSupabaseClient();
+    const { auth } = await import('@clerk/nextjs/server');
+    const { createServiceRoleClient } = await import('../server');
+
+    const { userId } = await auth();
+    if (!userId) return [];
+
+    const supabase = createServiceRoleClient();
+
+    // Get caller role and location assignments
+    const { data: caller } = await supabase
+        .from('users')
+        .select('role, assigned_location_id')
+        .eq('id', userId)
+        .single();
+
     const { data, error } = await supabase
         .from('locations')
-        .select(
-            `
+        .select(`
             *,
             storage_spaces (id),
             employees:users (
                 id,
                 assigned_location:locations (id)
             )
-            `
-        )
+        `)
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data as Location[];
+    if (!data) return [];
+
+    const callerRole = caller?.role;
+
+    // Super admin sees everything
+    if (callerRole === 'super_admin') return data as Location[];
+
+    // Admin: scope to assigned locations, or all if unscoped
+    if (callerRole === 'admin') {
+        const { data: assignments } = await supabase
+            .from('user_location_assignments')
+            .select('location_id')
+            .eq('user_id', userId);
+
+        const assignedIds = assignments?.map((a: any) => a.location_id) ?? [];
+
+        // No assignments = unscoped admin, sees all
+        if (assignedIds.length === 0) return data as Location[];
+
+        return data.filter((l: any) => assignedIds.includes(l.id)) as Location[];
+    }
+
+    // Employee: only their single assigned location
+    if (callerRole === 'employee' && caller?.assigned_location_id) {
+        return data.filter((l: any) => l.id === caller.assigned_location_id) as Location[];
+    }
+
+    return [];
 }
 
 export async function getLocationById(id: string) {
@@ -230,4 +269,3 @@ export async function getStorageSpaceById(id: string) {
         location: location as Location,
     };
 }
-

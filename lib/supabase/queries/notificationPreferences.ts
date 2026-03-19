@@ -2,10 +2,13 @@
 
 import { createServerSupabaseClient } from '../server';
 
-// Types
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 export interface NotificationPreferences {
     id: string;
     organization_id: string;
+    /** NULL = org-wide default row. Non-null = location-specific override. */
+    location_id: string | null;
     primary_email: string;
     secondary_emails: string[];
     timezone: string;
@@ -39,6 +42,8 @@ export interface LowStockThreshold {
 export interface DailySummaryPreferences {
     id: string;
     organization_id: string;
+    /** NULL = org-wide default row. Non-null = location-specific override. */
+    location_id: string | null;
     include_inventory_value: boolean;
     include_updated_items: boolean;
     include_storage_utilization: boolean;
@@ -55,37 +60,55 @@ export interface DailySummaryPreferences {
     updated_at: string;
 }
 
-// Get notification preferences
-export async function getNotificationPreferences(organizationId: string): Promise<NotificationPreferences | null> {
+// ─── Notification Preferences ─────────────────────────────────────────────────
+
+/**
+ * Get the preferences row for a given scope.
+ * - Pass `locationId` → location-specific override row (null if not yet created).
+ * - Omit/null → org-wide default row (original behaviour).
+ */
+export async function getNotificationPreferences(
+    organizationId: string,
+    locationId?: string | null,
+): Promise<NotificationPreferences | null> {
     const supabase = createServerSupabaseClient();
 
-    const { data, error } = await supabase
+    let query = supabase
         .from('notification_preferences')
         .select('*')
-        .eq('organization_id', organizationId)
-        .single();
+        .eq('organization_id', organizationId);
+
+    if (locationId) {
+        query = query.eq('location_id', locationId);
+    } else {
+        query = query.is('location_id', null);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
-        console.log(error, 'error1')
-        if (error.code === 'PGRST116') return null; // Not found
+        console.log(error, 'error1');
         throw error;
     }
 
-    // console.log(data, 'Get Notification Preferences: data')
-
-    return data as NotificationPreferences;
+    return data as NotificationPreferences | null;
 }
 
-// Create notification preferences
+/**
+ * Create a preferences row.
+ * Pass `locationId` for a location-specific override; omit for org-wide default.
+ */
 export async function createNotificationPreferences(
     organizationId: string,
-    data: Partial<Omit<NotificationPreferences, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
+    data: Partial<Omit<NotificationPreferences, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>,
+    locationId?: string | null,
 ): Promise<NotificationPreferences> {
     const supabase = createServerSupabaseClient();
     const { data: preferences, error } = await supabase
         .from('notification_preferences')
         .insert({
             organization_id: organizationId,
+            location_id: locationId ?? null,
             primary_email: data.primary_email || '',
             secondary_emails: data.secondary_emails || [],
             timezone: data.timezone || 'America/New_York',
@@ -103,30 +126,69 @@ export async function createNotificationPreferences(
         .select()
         .single();
 
-
     if (error) throw error;
-    console.log(error)
     return preferences as NotificationPreferences;
 }
 
-// Update notification preferences
+/**
+ * Update a preferences row for the given scope.
+ * - Pass `locationId` → upserts the location-specific row.
+ * - Omit → updates the org-wide default row (original behaviour).
+ */
 export async function updateNotificationPreferences(
     organizationId: string,
-    updates: Partial<Omit<NotificationPreferences, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
+    updates: Partial<Omit<NotificationPreferences, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>,
+    locationId?: string | null,
 ): Promise<NotificationPreferences> {
     const supabase = await createServerSupabaseClient();
+
+    if (locationId) {
+        // Upsert the location-specific override row
+        const { data: preferences, error } = await supabase
+            .from('notification_preferences')
+            .upsert(
+                { organization_id: organizationId, location_id: locationId, ...updates },
+                { onConflict: 'organization_id,location_id' },
+            )
+            .select()
+            .single();
+
+        if (error) { console.log(error, 'error2'); throw error; }
+        return preferences as NotificationPreferences;
+    }
+
+    // Original behaviour: update the org-wide row
     const { data: preferences, error } = await supabase
         .from('notification_preferences')
         .update(updates)
         .eq('organization_id', organizationId)
+        .is('location_id', null)
         .select()
         .single();
 
-    if (error) { console.log(error, 'error2'); throw error };
+    if (error) { console.log(error, 'error2'); throw error; }
     return preferences as NotificationPreferences;
 }
 
-// Get low stock thresholds
+/**
+ * Returns all location-specific preference rows for an org, joined with
+ * location name. Used by the Super Admin settings page.
+ */
+export async function getAllLocationNotificationPreferences(organizationId: string) {
+    const supabase = createServerSupabaseClient();
+    const { data, error } = await supabase
+        .from('notification_preferences')
+        .select('*, locations(id, name, address)')
+        .eq('organization_id', organizationId)
+        .not('location_id', 'is', null)
+        .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data ?? [];
+}
+
+// ─── Low Stock Thresholds (unchanged) ────────────────────────────────────────
+
 export async function getLowStockThresholds(
     organizationId: string,
     filters?: {
@@ -142,26 +204,17 @@ export async function getLowStockThresholds(
         .select('*')
         .eq('organization_id', organizationId);
 
-    if (filters?.itemId) {
-        query = query.eq('item_id', filters.itemId);
-    }
-    if (filters?.categoryId) {
-        query = query.eq('category_id', filters.categoryId);
-    }
-    if (filters?.locationId) {
-        query = query.eq('location_id', filters.locationId);
-    }
-    if (filters?.isActive !== undefined) {
-        query = query.eq('is_active', filters.isActive);
-    }
+    if (filters?.itemId) query = query.eq('item_id', filters.itemId);
+    if (filters?.categoryId) query = query.eq('category_id', filters.categoryId);
+    if (filters?.locationId) query = query.eq('location_id', filters.locationId);
+    if (filters?.isActive !== undefined) query = query.eq('is_active', filters.isActive);
 
     const { data, error } = await query.order('created_at', { ascending: false });
 
-    if (error) { console.log(error, 'error3'); throw error };
+    if (error) { console.log(error, 'error3'); throw error; }
     return data as LowStockThreshold[];
 }
 
-// Create low stock threshold
 export async function createLowStockThreshold(
     data: Omit<LowStockThreshold, 'id' | 'created_at' | 'updated_at'>
 ): Promise<LowStockThreshold> {
@@ -180,11 +233,10 @@ export async function createLowStockThreshold(
         .select()
         .single();
 
-    if (error) { console.log(error, 'error3'); throw error };
+    if (error) { console.log(error, 'error3'); throw error; }
     return threshold as LowStockThreshold;
 }
 
-// Update low stock threshold
 export async function updateLowStockThreshold(
     id: string,
     updates: Partial<Omit<LowStockThreshold, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
@@ -197,11 +249,10 @@ export async function updateLowStockThreshold(
         .select()
         .single();
 
-    if (error) { console.log(error, 'error3'); throw error };
+    if (error) { console.log(error, 'error3'); throw error; }
     return threshold as LowStockThreshold;
 }
 
-// Delete low stock threshold
 export async function deleteLowStockThreshold(id: string): Promise<void> {
     const supabase = await createServerSupabaseClient();
     const { error } = await supabase
@@ -209,42 +260,61 @@ export async function deleteLowStockThreshold(id: string): Promise<void> {
         .delete()
         .eq('id', id);
 
-    if (error) { console.log(error, 'error3'); throw error };
+    if (error) { console.log(error, 'error3'); throw error; }
 }
 
-// Get daily summary preferences
-export async function getDailySummaryPreferences(organizationId: string): Promise<DailySummaryPreferences | null> {
+// ─── Daily Summary Preferences ────────────────────────────────────────────────
+
+/**
+ * Get daily summary preferences for the given scope.
+ * Pass `locationId` for a location-specific row; omit for org-wide default.
+ */
+export async function getDailySummaryPreferences(
+    organizationId: string,
+    locationId?: string | null,
+): Promise<DailySummaryPreferences | null> {
     const supabase = await createServerSupabaseClient();
-    const { data, error } = await supabase
+
+    let query = supabase
         .from('daily_summary_preferences')
         .select('*')
-        .eq('organization_id', organizationId)
-        .single();
+        .eq('organization_id', organizationId);
+
+    if (locationId) {
+        query = query.eq('location_id', locationId);
+    } else {
+        query = query.is('location_id', null);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
-        if (error.code === 'PGRST116') return null; // Not found
+        if (error.code === 'PGRST116') return null;
         throw error;
     }
 
-    return data as DailySummaryPreferences;
+    return data as DailySummaryPreferences | null;
 }
 
-// Update daily summary preferences
+/**
+ * Update (or create) daily summary preferences for the given scope.
+ * Preserves the original create-if-not-exists pattern.
+ */
 export async function updateDailySummaryPreferences(
     organizationId: string,
-    updates: Partial<Omit<DailySummaryPreferences, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
+    updates: Partial<Omit<DailySummaryPreferences, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>,
+    locationId?: string | null,
 ): Promise<DailySummaryPreferences> {
     const supabase = await createServerSupabaseClient();
 
-    // Check if preferences exist
-    const existing = await getDailySummaryPreferences(organizationId);
+    const existing = await getDailySummaryPreferences(organizationId, locationId);
 
     if (!existing) {
-        // Create if doesn't exist
         const { data: preferences, error } = await supabase
             .from('daily_summary_preferences')
             .insert({
                 organization_id: organizationId,
+                location_id: locationId ?? null,
                 include_inventory_value: updates.include_inventory_value ?? true,
                 include_updated_items: updates.include_updated_items ?? true,
                 include_storage_utilization: updates.include_storage_utilization ?? true,
@@ -265,15 +335,14 @@ export async function updateDailySummaryPreferences(
         return preferences as DailySummaryPreferences;
     }
 
-    // Update existing
+    // Use .eq('id', existing.id) to be unambiguous — works regardless of location scope
     const { data: preferences, error } = await supabase
         .from('daily_summary_preferences')
         .update(updates)
-        .eq('organization_id', organizationId)
+        .eq('id', existing.id)
         .select()
         .single();
 
-    if (error) { console.log(error, 'error3'); throw error };
+    if (error) { console.log(error, 'error3'); throw error; }
     return preferences as DailySummaryPreferences;
 }
-

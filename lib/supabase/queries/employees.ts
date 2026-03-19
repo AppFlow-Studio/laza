@@ -9,19 +9,15 @@ export async function getAllEmployees(organizationId: string) {
         .from('members')
         .select('users(*)')
         .eq('organization_id', organizationId)
+        .eq('users.role', 'employee')
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data as {
-        members: {
-            id: string;
-            organization_id: string;
-            user_id: string;
-            created_at: string;
-            updated_at: string;
-        }
-        users: User;
-    }[];
+
+    // Flatten so consumers get User objects directly
+    return (data ?? [])
+        .map((row: any) => row.users)
+        .filter(Boolean) as User[];
 }
 
 export async function getEmployeeById(id: string) {

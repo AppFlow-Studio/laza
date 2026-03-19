@@ -13,11 +13,12 @@ import { X, Plus } from 'lucide-react';
 
 interface GeneralNotificationPreferencesProps {
     organizationId: string;
+    locationId?: string;
 }
 
-export default function GeneralNotificationPreferences({ organizationId }: GeneralNotificationPreferencesProps) {
+export default function GeneralNotificationPreferences({ organizationId, locationId }: GeneralNotificationPreferencesProps) {
     const { user } = useUser();
-    const { data: preferences, isLoading } = useNotificationPreferences(organizationId);
+    const { data: preferences, isLoading } = useNotificationPreferences(organizationId, locationId);
     const updateMutation = useUpdateNotificationPreferences();
     const createMutation = useCreateNotificationPreferences();
 
@@ -51,11 +52,10 @@ export default function GeneralNotificationPreferences({ organizationId }: Gener
             };
 
             if (preferences) {
-                await updateMutation.mutateAsync({ organizationId, updates });
-                
+                await updateMutation.mutateAsync({ organizationId, updates, locationId });
                 toast.success('Preferences updated successfully');
             } else {
-                await createMutation.mutateAsync({ organizationId, data: updates });
+                await createMutation.mutateAsync({ organizationId, data: updates, locationId });
                 toast.success('Preferences created successfully');
             }
         } catch (error: any) {
@@ -75,7 +75,7 @@ export default function GeneralNotificationPreferences({ organizationId }: Gener
     };
 
     if (isLoading) {
-        return <LoadingSkeleton  className='h-full w-full'/>;
+        return <LoadingSkeleton className='h-full w-full' />;
     }
 
     return (
@@ -215,4 +215,3 @@ export default function GeneralNotificationPreferences({ organizationId }: Gener
         </Card>
     );
 }
-
