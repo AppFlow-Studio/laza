@@ -1,21 +1,19 @@
 "use client";
 
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Store, Warehouse } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Store, Warehouse } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const locationSchema = z.object({
-    name: z.string().min(1, 'Name is required'),
-    location_type: z.enum(['store', 'warehouse']),
+    name: z.string().min(1, "Name is required"),
+    location_type: z.enum(["store", "warehouse"]),
     address: z.object({
-        street: z.string().min(1, 'Street is required'),
-        city: z.string().min(1, 'City is required'),
-        state: z.string().min(1, 'State is required'),
-        zip: z.string().min(1, 'ZIP is required'),
+        street: z.string().min(1, "Street is required"),
+        city: z.string().min(1, "City is required"),
+        state: z.string().min(1, "State is required"),
+        zip: z.string().min(1, "ZIP is required"),
         country: z.string().optional(),
     }),
     is_active: z.boolean(),
@@ -28,7 +26,10 @@ interface LocationDetailsStepProps {
     onSubmit: (data: LocationFormData) => void;
 }
 
-export default function LocationDetailsStep({ defaultValues, onSubmit }: LocationDetailsStepProps) {
+export default function LocationDetailsStep({
+    defaultValues,
+    onSubmit,
+}: LocationDetailsStepProps) {
     const {
         register,
         handleSubmit,
@@ -38,145 +39,207 @@ export default function LocationDetailsStep({ defaultValues, onSubmit }: Locatio
     } = useForm<LocationFormData>({
         resolver: zodResolver(locationSchema),
         defaultValues: defaultValues || {
-            name: '',
-            location_type: 'store',
+            name: "",
+            location_type: "store",
             address: {
-                street: '',
-                city: '',
-                state: '',
-                zip: '',
-                country: 'US',
+                street: "",
+                city: "",
+                state: "",
+                zip: "",
+                country: "US",
             },
             is_active: true,
         },
     });
 
-    const selectedType = watch('location_type');
+    const selectedType = watch("location_type");
+
+    const inputClass = (hasError?: boolean) =>
+        cn(
+            "w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all",
+            hasError
+                ? "border-rose-400 focus:ring-rose-500"
+                : "border-gray-200 focus:ring-indigo-500",
+        );
 
     return (
-        <form id="location-details-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form
+            id="location-details-form"
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-5"
+        >
+            {/* Location Name */}
             <div>
-                <Label className="my-2" htmlFor="name">Location Name</Label>
-                <Input
+                <label
+                    htmlFor="name"
+                    className="block text-sm font-medium text-gray-700 mb-1.5"
+                >
+                    Location Name <span className="text-rose-500">*</span>
+                </label>
+                <input
                     id="name"
-                    {...register('name')}
+                    {...register("name")}
                     placeholder="e.g., Downtown Cafe"
-                    className={errors.name ? 'border-red-500' : ''}
+                    className={inputClass(!!errors.name)}
                 />
                 {errors.name && (
-                    <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
+                    <p className="text-xs text-rose-500 font-medium mt-1">
+                        {errors.name.message}
+                    </p>
                 )}
             </div>
 
             {/* Location Type */}
             <div>
-                <Label className="mb-3 block">Location Type *</Label>
-                <div className="grid grid-cols-2 gap-4">
-                    <button
-                        type="button"
-                        onClick={() => setValue('location_type', 'store')}
-                        className={cn(
-                            "p-4 border-2 rounded-lg text-left transition-all",
-                            selectedType === 'store'
-                                ? "border-indigo-500 bg-indigo-50"
-                                : "border-zinc-200 hover:border-zinc-300"
-                        )}
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-indigo-100 rounded-lg flex-shrink-0">
-                                <Store className="w-5 h-5 text-indigo-600" />
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Location Type <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                    {(
+                        [
+                            {
+                                value: "store",
+                                icon: Store,
+                                label: "Store",
+                                description: "Customer-facing cafe location",
+                            },
+                            {
+                                value: "warehouse",
+                                icon: Warehouse,
+                                label: "Warehouse",
+                                description: "Central supply distribution hub",
+                            },
+                        ] as const
+                    ).map(({ value, icon: Icon, label, description }) => (
+                        <button
+                            key={value}
+                            type="button"
+                            onClick={() => setValue("location_type", value)}
+                            className={cn(
+                                "p-4 border-2 rounded-xl text-left transition-all",
+                                selectedType === value
+                                    ? "border-indigo-500 bg-indigo-50"
+                                    : "border-gray-200 hover:border-gray-300 bg-white",
+                            )}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-indigo-100 rounded-lg shrink-0">
+                                    <Icon className="w-5 h-5 text-indigo-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-900">
+                                        {label}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                        {description}
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="font-semibold text-zinc-900">Store</h3>
-                                <p className="text-xs text-zinc-500">Customer-facing cafe location</p>
-                            </div>
-                        </div>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setValue('location_type', 'warehouse')}
-                        className={cn(
-                            "p-4 border-2 rounded-lg text-left transition-all",
-                            selectedType === 'warehouse'
-                                ? "border-indigo-500 bg-indigo-50"
-                                : "border-zinc-200 hover:border-zinc-300"
-                        )}
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-indigo-100 rounded-lg flex-shrink-0">
-                                <Warehouse className="w-5 h-5 text-indigo-600" />
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-zinc-900">Warehouse</h3>
-                                <p className="text-xs text-zinc-500">Central supply distribution hub</p>
-                            </div>
-                        </div>
-                    </button>
+                        </button>
+                    ))}
                 </div>
                 {errors.location_type && (
-                    <p className="text-sm text-red-500 mt-1">{errors.location_type.message}</p>
+                    <p className="text-xs text-rose-500 font-medium mt-1">
+                        {errors.location_type.message}
+                    </p>
                 )}
             </div>
 
+            {/* Street Address */}
             <div>
-                <Label className="my-2" htmlFor="street">Street Address</Label>
-                <Input
+                <label
+                    htmlFor="street"
+                    className="block text-sm font-medium text-gray-700 mb-1.5"
+                >
+                    Street Address <span className="text-rose-500">*</span>
+                </label>
+                <input
                     id="street"
-                    {...register('address.street')}
+                    {...register("address.street")}
                     placeholder="123 Main St"
-                    className={errors.address?.street ? 'border-red-500' : ''}
+                    className={inputClass(!!errors.address?.street)}
                 />
                 {errors.address?.street && (
-                    <p className="text-sm text-red-500 mt-1">{errors.address.street.message}</p>
+                    <p className="text-xs text-rose-500 font-medium mt-1">
+                        {errors.address.street.message}
+                    </p>
                 )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* City + State */}
+            <div className="grid grid-cols-2 gap-3">
                 <div>
-                    <Label className="my-2" htmlFor="city">City</Label>
-                    <Input
+                    <label
+                        htmlFor="city"
+                        className="block text-sm font-medium text-gray-700 mb-1.5"
+                    >
+                        City <span className="text-rose-500">*</span>
+                    </label>
+                    <input
                         id="city"
-                        {...register('address.city')}
-                        className={errors.address?.city ? 'border-red-500' : ''}
+                        {...register("address.city")}
+                        className={inputClass(!!errors.address?.city)}
                     />
                     {errors.address?.city && (
-                        <p className="text-sm text-red-500 mt-1">{errors.address.city.message}</p>
+                        <p className="text-xs text-rose-500 font-medium mt-1">
+                            {errors.address.city.message}
+                        </p>
                     )}
                 </div>
                 <div>
-                    <Label className="my-2" htmlFor="state">State</Label>
-                    <Input
+                    <label
+                        htmlFor="state"
+                        className="block text-sm font-medium text-gray-700 mb-1.5"
+                    >
+                        State <span className="text-rose-500">*</span>
+                    </label>
+                    <input
                         id="state"
-                        {...register('address.state')}
-                        className={errors.address?.state ? 'border-red-500' : ''}
+                        {...register("address.state")}
+                        className={inputClass(!!errors.address?.state)}
                     />
                     {errors.address?.state && (
-                        <p className="text-sm text-red-500 mt-1">{errors.address.state.message}</p>
+                        <p className="text-xs text-rose-500 font-medium mt-1">
+                            {errors.address.state.message}
+                        </p>
                     )}
                 </div>
             </div>
 
+            {/* ZIP */}
             <div>
-                <Label className="my-2" htmlFor="zip">ZIP Code</Label>
-                <Input
+                <label
+                    htmlFor="zip"
+                    className="block text-sm font-medium text-gray-700 mb-1.5"
+                >
+                    ZIP Code <span className="text-rose-500">*</span>
+                </label>
+                <input
                     id="zip"
-                    {...register('address.zip')}
-                    className={errors.address?.zip ? 'border-red-500' : ''}
+                    {...register("address.zip")}
+                    className={inputClass(!!errors.address?.zip)}
                 />
                 {errors.address?.zip && (
-                    <p className="text-sm text-red-500 mt-1">{errors.address.zip.message}</p>
+                    <p className="text-xs text-rose-500 font-medium mt-1">
+                        {errors.address.zip.message}
+                    </p>
                 )}
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Active toggle */}
+            <div className="flex items-center gap-3">
                 <input
                     type="checkbox"
                     id="is_active"
-                    {...register('is_active')}
-                    className="w-4 h-4 rounded border-zinc-300"
+                    {...register("is_active")}
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                <Label className="my-2" htmlFor="is_active">Active</Label>
+                <label
+                    htmlFor="is_active"
+                    className="text-sm font-medium text-gray-700"
+                >
+                    Active
+                </label>
             </div>
         </form>
     );
