@@ -5,9 +5,11 @@
  * Follows the pattern in lib/supabase/queries/pallets.ts — uses a lazy
  * getClient() factory instead of @/lib/supabase/client.
  */
+"use server"
 
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { createServerSupabaseClient } from "../server";
 
 function getClient() {
 	return createClient<Database>(
@@ -87,7 +89,7 @@ async function insertTicketLog(
 // ─── createTicket ─────────────────────────────────────────────────────────────
 
 export async function createTicket(input: CreateTicketInput) {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	const { data: ticket, error: ticketError } = await supabase
 		.from("order_tickets")
@@ -140,7 +142,7 @@ export async function getTicketsByLocation(
 	locationId: string,
 	filters?: TicketFilters,
 ) {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	let query = supabase
 		.from("order_tickets")
@@ -179,7 +181,7 @@ export async function getAllTickets(
 	organizationId: string,
 	filters?: TicketFilters,
 ) {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	let query = supabase
 		.from("order_tickets")
@@ -220,7 +222,7 @@ export async function getAllTickets(
 // ─── getTicketById ─────────────────────────────────────────────────────────────
 
 export async function getTicketById(id: string) {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	const { data, error } = await supabase
 		.from("order_tickets")
@@ -254,7 +256,7 @@ export async function getTicketById(id: string) {
 // ─── getTicketItems ───────────────────────────────────────────────────────────
 
 export async function getTicketItems(ticketId: string) {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	const { data, error } = await supabase
 		.from("order_ticket_items")
@@ -276,7 +278,7 @@ export async function getTicketItems(ticketId: string) {
 // ─── getTicketLogs ────────────────────────────────────────────────────────────
 
 export async function getTicketLogs(ticketId: string) {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	const { data, error } = await supabase
 		.from("order_ticket_logs")
@@ -300,7 +302,7 @@ export async function updateTicketStatus(
 		deliveryType?: DeliveryType;
 	},
 ) {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	const { data: current, error: fetchError } = await supabase
 		.from("order_tickets")
@@ -371,7 +373,7 @@ export async function rejectTicket(
 // ─── cancelTicket ─────────────────────────────────────────────────────────────
 
 export async function cancelTicket(ticketId: string, userId: string) {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	const { data: ticket, error: fetchError } = await supabase
 		.from("order_tickets")
@@ -411,7 +413,7 @@ export async function confirmTicket(
 	userId: string,
 	receivedItems: ReceivedItem[],
 ): Promise<ConfirmResult> {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	const { data: ticket, error: ticketError } = await supabase
 		.from("order_tickets")
@@ -451,7 +453,7 @@ export async function confirmTicket(
 
 		const expectedBoxes    = ticketItem.fulfilled_boxes ?? 0;
 		const actualBoxes      = received.actualBoxesReceived;
-		const itemName         = ticketItem.items?.name ?? `Item ${received.itemId}`;
+		const itemName: any         = ticketItem.items ?? `Item ${received.itemId}`;
 		const fulfillmentLines = ticketItem.order_ticket_fulfillment_lines ?? [];
 
 		// Calculate pieces to add using ACTUAL count with per-source pieces_per_box_at_time
@@ -559,7 +561,7 @@ export async function confirmTicket(
 // ─── getPendingTicketCount ────────────────────────────────────────────────────
 
 export async function getPendingTicketCount(organizationId: string): Promise<number> {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	const { count, error } = await supabase
 		.from("order_tickets")
@@ -574,7 +576,7 @@ export async function getPendingTicketCount(organizationId: string): Promise<num
 // ─── getTicketsWithDiscrepancies ──────────────────────────────────────────────
 
 export async function getTicketsWithDiscrepancies(organizationId: string) {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	const { data, error } = await supabase
 		.from("order_tickets")
@@ -601,7 +603,7 @@ export async function getTicketsWithDiscrepancies(organizationId: string) {
 // ─── getRemainderTickets ──────────────────────────────────────────────────────
 
 export async function getRemainderTickets(parentTicketId: string) {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	const { data, error } = await supabase
 		.from("order_tickets")
@@ -627,7 +629,7 @@ export async function getAutoApprovedTickets(
 	organizationId: string,
 	daysBack = 30,
 ) {
-	const supabase = getClient();
+	const supabase = createServerSupabaseClient();
 
 	const since = new Date();
 	since.setDate(since.getDate() - daysBack);
