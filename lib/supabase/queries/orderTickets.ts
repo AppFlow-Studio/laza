@@ -10,6 +10,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { createServerSupabaseClient, createServiceRoleClient } from "../server";
+import { sendOrderNotification } from "@/lib/services/orderNotifications";
 
 function getClient() {
     return createClient<Database>(
@@ -134,6 +135,10 @@ export async function createTicket(input: CreateTicketInput) {
             ? "Order submitted to warehouse"
             : "Draft created",
     );
+
+    if (input.initialStatus === "submitted") {
+        await sendOrderNotification("order_submitted", ticket.id, input.organizationId);
+      }
 
     return ticket;
 }
@@ -380,6 +385,23 @@ export async function updateTicketStatus(
             ? `Rejected: ${options.rejectionReason}`
             : options?.notes,
     );
+
+    if (newStatus === "fulfilled") {
+        const { data: org } = await supabase
+          .from("order_tickets")
+          .select("organization_id")
+          .eq("id", ticketId)
+          .single();
+        await sendOrderNotification("order_fulfilled", ticketId, org?.organization_id);
+      }
+      if (newStatus === "rejected") {
+        const { data: org } = await supabase
+          .from("order_tickets")
+          .select("organization_id")
+          .eq("id", ticketId)
+          .single();
+        await sendOrderNotification("order_rejected", ticketId, org?.organization_id);
+      }
 
     return updated;
 }
