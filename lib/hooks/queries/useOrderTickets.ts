@@ -24,6 +24,7 @@ import {
 	cancelTicket,
 	confirmTicket,
 	rejectTicket,
+	updateTicketStatus,
 	type CreateTicketInput,
 	type TicketFilters,
 	type ReceivedItem,
@@ -92,6 +93,24 @@ export function useTicket(id: string | undefined) {
 		staleTime: 15_000,
 	});
 }
+
+// --- useSubmitTicket ----------------------------------------------------------
+
+export function useSubmitTicket() {
+	const queryClient        = useQueryClient();
+	const { data: userInfo } = useUserInfo();
+  
+	return useMutation({
+	  mutationFn: (ticketId: string) =>
+		updateTicketStatus(ticketId, "submitted", userInfo?.id ?? "", {
+		  notes: "Order submitted to warehouse",
+		}),
+	  onSuccess: (_, ticketId) => {
+		queryClient.invalidateQueries({ queryKey: ticketKeys.detail(ticketId) });
+		queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
+	  },
+	});
+  }
 
 // ─── useCancelTicket ──────────────────────────────────────────────────────────
 

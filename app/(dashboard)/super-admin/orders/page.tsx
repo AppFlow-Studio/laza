@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useAllTickets }          from "@/lib/hooks/queries/useOrderTickets";
 import { useUserInfo }            from "@/lib/hooks/queries/useUserInfo";
+import { useOrganization } from "@clerk/nextjs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TicketStatus =
@@ -259,14 +260,16 @@ function StatCard({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function SuperAdminOrdersPage() {
-  const router = useRouter();
-  const { data: userInfo } = useUserInfo();
-  const organizationId = userInfo?.organizationId ?? "";
+    const { organization } = useOrganization();
+    const organizationId = organization?.id ?? "";
 
   // Fetch all tickets across all stores
   // useAllTickets is from lib/hooks/queries/useOrderTickets.ts
   const { data: rawTickets, isLoading } = useAllTickets(organizationId);
   const tickets = (rawTickets ?? []) as QueueTicket[];
+
+  console.log(rawTickets);
+  
 
   // ── Local UI state ──
   // Default to "submitted" — the super admin's action queue

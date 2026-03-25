@@ -1,7 +1,7 @@
 "use client";
 
-import { usePathname } from 'next/navigation';
-import { useUser } from '@clerk/nextjs';
+import { usePathname } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import {
     LayoutDashboard,
     MapPin,
@@ -12,12 +12,13 @@ import {
     LogOut,
     Home,
     Tags,
-    Settings
-} from 'lucide-react';
-import Link from 'next/link';
-import { SignOutButton } from '@clerk/nextjs';
-import ToastProvider from '@/components/admin/shared/ToastProvider';
-import { ErrorBoundary } from '@/components/admin/shared/ErrorBoundary';
+    Settings,
+    StretchHorizontal,
+} from "lucide-react";
+import Link from "next/link";
+import { SignOutButton } from "@clerk/nextjs";
+import ToastProvider from "@/components/admin/shared/ToastProvider";
+import { ErrorBoundary } from "@/components/admin/shared/ErrorBoundary";
 import {
     Sidebar,
     SidebarContent,
@@ -31,20 +32,24 @@ import {
     SidebarMenuItem,
     SidebarProvider,
     SidebarTrigger,
-} from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
+} from "@/components/ui/sidebar";
 
 const navigation = [
-    { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-    { name: 'Locations', href: '/admin/locations', icon: MapPin },
-    { name: 'Users', href: '/admin/users', icon: Users },
-    { name: 'Items', href: '/admin/items', icon: Package },
-    { name: 'Categories', href: '/admin/categories', icon: Tags },
-    { name: 'Inventory', href: '/admin/inventory', icon: BarChart3 },
-    { name: 'Settings', href: '/admin/settings/notifications', icon: Settings },
+    { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+    { name: "Orders", href: "/admin/orders", icon: StretchHorizontal },
+    { name: "Locations", href: "/admin/locations", icon: MapPin },
+    { name: "Users", href: "/admin/users", icon: Users },
+    { name: "Items", href: "/admin/items", icon: Package },
+    { name: "Categories", href: "/admin/categories", icon: Tags },
+    { name: "Inventory", href: "/admin/inventory", icon: BarChart3 },
+    { name: "Settings", href: "/admin/settings/notifications", icon: Settings },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
     const pathname = usePathname();
     const { user } = useUser();
 
@@ -55,15 +60,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <ToastProvider />
 
                     {/* Sidebar */}
-                    <Sidebar variant="floating" collapsible="icon" className=''>
+                    <Sidebar variant="floating" collapsible="icon" className="">
                         <SidebarHeader>
                             <div className="flex items-center gap-2 px-2 py-2">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-indigo-600 text-white text-sm font-semibold truncate">
                                     L
                                 </div>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-semibold">Laza Dessert Cafe</span>
-                                    <span className="truncate text-xs text-muted-foreground">Admin Dashboard</span>
+                                    <span className="truncate font-semibold">
+                                        Laza Dessert Cafe
+                                    </span>
+                                    <span className="truncate text-xs text-muted-foreground">
+                                        Admin Dashboard
+                                    </span>
                                 </div>
                             </div>
                         </SidebarHeader>
@@ -73,9 +82,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                 <SidebarGroupContent>
                                     <SidebarMenu>
                                         {navigation.map((item) => {
-                                            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+                                            const isActive =
+                                                pathname === item.href ||
+                                                pathname?.startsWith(
+                                                    item.href + "/",
+                                                );
                                             return (
-                                                <SidebarMenuItem key={item.name}>
+                                                <SidebarMenuItem
+                                                    key={item.name}
+                                                >
                                                     <SidebarMenuButton
                                                         asChild
                                                         isActive={isActive}
@@ -83,7 +98,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                                     >
                                                         <Link href={item.href}>
                                                             <item.icon className="h-4 w-4" />
-                                                            <span>{item.name}</span>
+                                                            <span>
+                                                                {item.name}
+                                                            </span>
                                                         </Link>
                                                     </SidebarMenuButton>
                                                 </SidebarMenuItem>
@@ -95,10 +112,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </SidebarContent>
 
                         <SidebarFooter>
-
                             <SidebarMenu>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Go to Homepage">
+                                    <SidebarMenuButton
+                                        asChild
+                                        tooltip="Go to Homepage"
+                                    >
                                         <Link href="/">
                                             <Home className="w-4 h-4" />
                                             <span>Home</span>
@@ -108,22 +127,37 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                 <SidebarMenuItem>
                                     <div className="flex items-center gap-2 px-2 py-2 mb-2">
                                         <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-semibold">
-                                            {user?.firstName?.[0] || user?.emailAddresses[0]?.emailAddress[0] || 'U'}
+                                            {user?.firstName?.[0] ||
+                                                user?.emailAddresses[0]
+                                                    ?.emailAddress[0] ||
+                                                "U"}
                                         </div>
                                         <div className="grid flex-1 text-left text-sm leading-tight min-w-0">
                                             <span className="truncate font-semibold">
-                                                {user?.firstName || user?.emailAddresses[0]?.emailAddress || 'User'}
+                                                {user?.firstName ||
+                                                    user?.emailAddresses[0]
+                                                        ?.emailAddress ||
+                                                    "User"}
                                             </span>
                                             <span className="truncate text-xs text-muted-foreground">
-                                                {user?.emailAddresses[0]?.emailAddress}
+                                                {
+                                                    user?.emailAddresses[0]
+                                                        ?.emailAddress
+                                                }
                                             </span>
                                         </div>
                                     </div>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <SignOutButton>
-                                        <SidebarMenuButton asChild tooltip="Sign Out">
-                                            <button type="button" className="flex items-center gap-2 w-full">
+                                        <SidebarMenuButton
+                                            asChild
+                                            tooltip="Sign Out"
+                                        >
+                                            <button
+                                                type="button"
+                                                className="flex items-center gap-2 w-full"
+                                            >
                                                 <LogOut className="h-4 w-4" />
                                                 <span>Sign Out</span>
                                             </button>
@@ -144,7 +178,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             <div className="flex items-center justify-between flex-1">
                                 <div>
                                     <h2 className="text-lg font-semibold text-zinc-900">
-                                        {navigation.find(item => pathname === item.href || pathname?.startsWith(item.href + '/'))?.name || 'Dashboard'}
+                                        {navigation.find(
+                                            (item) =>
+                                                pathname === item.href ||
+                                                pathname?.startsWith(
+                                                    item.href + "/",
+                                                ),
+                                        )?.name || "Dashboard"}
                                     </h2>
                                 </div>
 
@@ -167,4 +207,3 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </ErrorBoundary>
     );
 }
-
