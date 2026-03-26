@@ -21,6 +21,7 @@ export default clerkMiddleware(async (auth, req) => {
     const role = (sessionClaims as any)?.o?.rol as string | undefined;
     // console.log('sessionClaims', sessionClaims);
     
+    
     // Protect /super-admin/* — only super_admin can access
     if (isSuperAdminRoute(req)) {
         if (!userId) {
@@ -48,7 +49,7 @@ export default clerkMiddleware(async (auth, req) => {
         if (!userId) {
             return NextResponse.redirect(new URL('/sign-in', req.url));
         }
-        if (role !== 'employee' && role !== 'admin' && role !== 'super_admin') {
+        if (role !== 'member' && role !== 'admin' && role !== 'super_admin') {
             return new Response('Unauthorized', { status: 403 })
         }
         return NextResponse.next();
@@ -64,7 +65,7 @@ export default clerkMiddleware(async (auth, req) => {
         if (role === 'admin') {
             return NextResponse.redirect(new URL('/admin', req.url));
         }
-        if (role === 'employee') {
+        if (role === 'member') {
             return NextResponse.redirect(new URL('/employee', req.url));
         }
     }
