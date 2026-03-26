@@ -508,7 +508,9 @@ GRANT  EXECUTE ON FUNCTION fulfill_order_ticket(UUID, TEXT, BOOLEAN, TEXT)
 -- ---------------------------------------------------------------------------
 -- get_delivery_pallet_estimate helper (Section 7 — learning-based)
 -- Returns NULL estimated_pallets during cold start (<10 deliveries).
+-- DROP first because CREATE OR REPLACE cannot change a function's return type.
 -- ---------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS get_delivery_pallet_estimate(TEXT, INTEGER);
 CREATE OR REPLACE FUNCTION get_delivery_pallet_estimate(
   p_organization_id TEXT,
   p_total_boxes     INTEGER
@@ -563,20 +565,9 @@ END;
 $$;
 
 
--- ---------------------------------------------------------------------------
--- Indexes to support the FIFO pallet query inside the function
--- (Idempotent — IF NOT EXISTS guards)
--- ---------------------------------------------------------------------------
-CREATE INDEX IF NOT EXISTS idx_pallet_inventory_item_boxes
-    ON pallet_inventory (item_id, box_count)
-    WHERE box_count > 0;
-
-CREATE INDEX IF NOT EXISTS idx_warehouse_pallets_active_received
-    ON warehouse_pallets (warehouse_location_id, received_at)
-    WHERE status = 'active';
-
-CREATE INDEX IF NOT EXISTS idx_fulfillment_lines_ticket_item
-    ON order_ticket_fulfillment_lines (order_ticket_item_id);
-
+-- NOTE: Indexes on pallet_inventory, warehouse_pallets, and
+-- order_ticket_fulfillment_lines are created in the pallet tables migration
+-- (006_warehouse_pallets.sql) where those tables are defined.
+-- order_ticket_logs index:
 CREATE INDEX IF NOT EXISTS idx_order_ticket_logs_ticket
     ON order_ticket_logs (ticket_id, created_at);
