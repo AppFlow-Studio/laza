@@ -20,7 +20,6 @@ export default clerkMiddleware(async (auth, req) => {
     const { userId, sessionClaims } = await auth();
     const role = (sessionClaims as any)?.o?.rol as string | undefined;
     // console.log('sessionClaims', sessionClaims);
-    console.log("role", sessionClaims);
     
     
     // Protect /super-admin/* — only super_admin can access
