@@ -23,7 +23,7 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ItemDetailDrawerProps {
-	itemId: string | null;
+	itemId: number | null;
 	warehouseLocationId: string;
 	open: boolean;
 	onClose: () => void;
@@ -235,7 +235,7 @@ function StockTab({ itemId }: { itemId: number }) {
 											{fmt(p.total_pieces)}
 										</td>
 										<td className="px-3 py-2.5 text-right">
-											<StatusBadge status={p.pallet_status} />
+											<StatusBadge status={p.status} />
 										</td>
 									</tr>
 								))}
@@ -322,23 +322,34 @@ function ShipmentRow({ record }: { record: ItemShipmentRecord }) {
 										</th>
 									</tr>
 									</thead>
-									<tbody  className="divide-y divide-gray-50">
-									<tr
-										className="cursor-pointer transition-colors hover:bg-indigo-50/40 text-xs"
-									>
-										<td className="px-3 py-2 tabular-nums text-xs">
-											{fmt(record.config_pieces_per_box)}
-										</td>
-										<td className="px-3 py-2 text-right tabular-nums text-xs">
-											{fmt(record.config_box_count)}
-										</td>
-										<td className="px-3 py-2 text-right  text-xs">
-											{fmt(record.config_total_pieces)}
-										</td>
-										<td className="px-3 py-2 text-xs">
-											{record.config_notes ?? "—"}
-										</td>
-									</tr>
+									<tbody className="divide-y divide-gray-50">
+									{(record.box_configs && record.box_configs.length > 0
+											? record.box_configs
+											: [{
+												pieces_per_box: record.config_pieces_per_box,
+												box_count:      record.config_box_count,
+												total_pieces:   record.config_total_pieces,
+												notes:          record.config_notes,
+											}]
+									).map((cfg, i) => (
+										<tr
+											key={i}
+											className="transition-colors hover:bg-indigo-50/40 text-xs"
+										>
+											<td className="px-3 py-2 tabular-nums text-xs">
+												{fmt(cfg.pieces_per_box)}
+											</td>
+											<td className="px-3 py-2 text-right tabular-nums text-xs">
+												{fmt(cfg.box_count)}
+											</td>
+											<td className="px-3 py-2 text-right text-xs">
+												{fmt(cfg.total_pieces)}
+											</td>
+											<td className="px-3 py-2 text-xs">
+												{cfg.notes ?? "—"}
+											</td>
+										</tr>
+									))}
 									</tbody>
 								</table>
 							</div>
@@ -576,7 +587,7 @@ function CostHistoryTab({ itemId }: { itemId: number }) {
 						<Tooltip content={<CostTooltip />} />
 						{/* "Before" line — dashed, gray */}
 						<Line
-							type="stepAfter"
+							type="monotone"
 							dataKey="unit_price_before"
 							name="Before"
 							stroke="#d1d5db"
@@ -587,7 +598,7 @@ function CostHistoryTab({ itemId }: { itemId: number }) {
 						/>
 						{/* "After" line — solid, blue */}
 						<Line
-							type="stepAfter"
+							type="monotone"
 							dataKey="unit_cost_after"
 							name="After"
 							stroke="#2563eb"
