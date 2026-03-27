@@ -98,19 +98,24 @@ export function ReceivingWizard({
                 purchaseOrderId:    po.id,
                 organizationId,
                 warehouseLocationId,
-                // Map the new box_configs shape to what the RPC expects
+                // Pass box_configs array per item — D4 RPC format.
+                // No storage_space_id — warehouse pallets are not tied to storage spaces.
                 palletAssignments: data.pallets.map((p) => ({
-                    pallet_label:     p.pallet_label,
-                    storage_space_id: p.storage_space_id,
-                    items: p.items.map((it) => ({
-                        item_id:               it.item_id,
-                        purchase_order_item_id: it.purchase_order_item_id,
-                        // Pass the full box_configs array (D4 RPC format)
-                        box_configs: it.box_configs.map((c) => ({
-                            pieces_per_box: c.pieces_per_box,
-                            box_count:      c.box_count,
+                    pallet_label: p.pallet_label,
+                    items: p.items
+                        .filter((it) =>
+                            it.box_configs.some((c) => (c.box_count ?? 0) > 0)
+                        )
+                        .map((it) => ({
+                            item_id:                it.item_id,
+                            purchase_order_item_id: it.purchase_order_item_id,
+                            box_configs: it.box_configs
+                                .filter((c) => (c.box_count ?? 0) > 0)
+                                .map((c) => ({
+                                    pieces_per_box: c.pieces_per_box,
+                                    box_count:      c.box_count,
+                                })),
                         })),
-                    })),
                 })),
             });
             toast.success(

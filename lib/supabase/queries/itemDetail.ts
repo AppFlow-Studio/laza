@@ -22,6 +22,7 @@ export interface ItemShipmentRecord {
 	config_pieces_per_box: number;
 	config_box_count: number;
 	config_total_pieces: number;
+	config_notes: string;
 	po_line_total_boxes: number;
 	has_mixed_configs: boolean;
 	box_configs?: ItemBoxConfig[];
@@ -116,22 +117,28 @@ export async function getItemOverview(
 		.eq("id", itemId)
 		.single();
 
+	console.log("item",item, itemError)
+
 
 	if (itemError || !item) return null;
 
 	// Fetch warehouse pallet inventory totals
-	const { data: palletRows } = await supabase
+	const { data: palletRows, error: palletError } = await supabase
 		.from("warehouse_inventory_overview")
-		.select("box_count, effective_ppb, total_pieces, status")
+		.select("box_count, effective_ppb, total_pieces, pallet_status")
 		.eq("item_id", itemId)
-		.in("status", ["active", "empty"]);
+		.in("pallet_status", ["active", "empty"]);
 
 	const warehouseBoxes =
 		palletRows?.reduce((sum, r) => sum + (r.box_count ?? 0), 0) ?? 0;
 	const warehousePieces =
 		palletRows?.reduce((sum, r) => sum + (r.total_pieces ?? 0), 0) ?? 0;
 	const activePalletCount =
-		palletRows?.filter((r) => r.status === "active").length ?? 0;
+		palletRows?.filter((r) => r.pallet_status === "active").length ?? 0;
+
+	console.log("palletRows" ,palletRows, palletError)
+
+
 
 	return {
 		item_id: item.id,
@@ -149,6 +156,8 @@ export async function getItemOverview(
 		barcode_text:item.barcode_text,
 		cost_per_unit:item.cost_per_unit,
 		current_unit_cost:item.current_unit_cost,
+		unit_cost: item.current_unit_cost ?? null,
+		cbm: null, // not stored per-item; available per PO line in purchase_order_items
 		active_pallet_count: activePalletCount,
 	};
 }
@@ -174,6 +183,8 @@ export async function getItemPalletStock(itemId: number): Promise<PalletStock[]>
 		.eq("item_id", itemId)
 		.neq("pallet_status", "retired")
 		.order("pallet_label");
+
+	console.log("palletStock", data, error)
 
 	if (error || !data) return [];
 
@@ -203,7 +214,7 @@ export async function getItemPalletStock(itemId: number): Promise<PalletStock[]>
 		box_count: r.box_count,
 		effective_pieces_per_box: r.effective_ppb,
 		total_pieces: r.total_pieces,
-		pallet_status: r.pallet_status as PalletStock["status"],
+		status: r.pallet_status as PalletStock["status"],
 	}));
 }
 
@@ -217,6 +228,7 @@ export async function getItemBoxTotals(itemId: number): Promise<ItemBoxTotals | 
 		.select("*")
 		.eq("item_id", itemId)
 		.single();
+	console.log("item_box_totals ",data, error)
 
 	if (error || !data) return null;
 	return data as ItemBoxTotals;
@@ -234,6 +246,8 @@ export async function getItemShipmentBreakdown(
 		.select("*")
 		.eq("item_id", itemId)
 		.order("po_date", { ascending: false });
+	console.log("item_shipment_breakdown ",data, error)
+
 
 	if (error || !data) return [];
 	return data as ItemShipmentRecord[];
@@ -251,7 +265,7 @@ export async function getItemShipmentHistory(
 		p_item_id: itemId,
 		p_organization_id: organizationId,
 	});
-	console.log(data, error)
+	console.log("shipment history",data, error)
 
 	if (error || !data) {
 		// Graceful fallback to D7 view if RPC not yet deployed
@@ -270,10 +284,31 @@ export async function getItemCostHistory(
 
 	const { data, error } = await supabase
 		.from("item_cost_history")
-		.select("*")
+		.select(`
+      id,
+      item_id,
+      unit_price_before,
+      unit_cost_after,
+      effective_date,
+      created_at,
+      purchase_orders ( po_number, order_date )
+    `)
 		.eq("item_id", itemId)
 		.order("effective_date", { ascending: true });
+	console.log("item_cost_history ",data, error)
 
 	if (error || !data) return [];
-	return data as ItemCostHistoryRecord[];
+
+	return data.map((r: any) => ({
+		id:                r.id,
+		item_id:           r.item_id,
+		po_number:         r.purchase_orders?.po_number ?? null,
+		po_date:           r.purchase_orders?.order_date ?? null,
+		effective_date:    r.effective_date,
+		unit_price_before: r.unit_price_before ?? null,
+		unit_cost_after:   r.unit_cost_after,
+		changed_by:        null, // not stored in current schema
+		notes:             null, // not stored in current schema
+		created_at:        r.created_at,
+	}));
 }

@@ -4,13 +4,15 @@ import { createServerSupabaseClient, createServiceRoleClient } from '../server';
 import type { Database } from '@/lib/supabase/types';
 
 export type PalletAssignment = {
-    pallet_label:     string;
-    storage_space_id: string;
+    pallet_label: string;
+    // No storage_space_id — warehouse items are tracked by pallet, not storage space
     items: {
-        item_id:                 number;
-        purchase_order_item_id:  string;
-        box_count:               number;
-        pieces_per_box_override?: number | null;
+        item_id:                number;
+        purchase_order_item_id: string;
+        box_configs: {
+            pieces_per_box: number;
+            box_count:      number;
+        }[];
     }[];
 };
 
@@ -269,7 +271,7 @@ export async function assignShipmentToPalletsAction(
     userId: string,
     palletAssignments: PalletAssignment[],
 ) {
-    const supabase = createServerSupabaseClient();
+    const supabase = createServiceRoleClient();
     const { data, error } = await supabase.rpc('receive_shipment_to_pallets', {
         p_purchase_order_id:  purchaseOrderId,
         p_pallet_assignments: palletAssignments,
