@@ -1,6 +1,11 @@
 "use client";
 
 import { PalletWithDetails } from "@/lib/supabase/queries/pallets";
+import {ChevronRight} from "lucide-react";
+import Link from "next/link";
+import {useState} from "react";
+import ItemDetailDrawer from "@/components/warehouse/ItemDetailDrawer";
+import {useParams} from "next/navigation";
 
 type InventoryRow = PalletWithDetails["pallet_inventory"][number];
 
@@ -17,6 +22,10 @@ function getEffectivePpb(row: InventoryRow): number {
 }
 
 export function PalletContentsTable({ inventory }: PalletContentsTableProps) {
+  const { id } = useParams<{ id: string }>();
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+
   if (inventory.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-gray-200 py-12 text-center">
@@ -24,6 +33,8 @@ export function PalletContentsTable({ inventory }: PalletContentsTableProps) {
       </div>
     );
   }
+
+  console.log(inventory)
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -58,7 +69,10 @@ export function PalletContentsTable({ inventory }: PalletContentsTableProps) {
               const lineValue = unitCost ? totalUnits * unitCost : null;
 
               return (
-                <tr key={row.id} className="hover:bg-gray-50/50">
+                <tr key={row.id} className="hover:bg-gray-50/50 hover:cursor-pointer" onClick={() => {
+                  setIsOpen(true);
+                  setSelectedItemId(row.item_id)
+                }}>
                   <td className="px-4 py-3">
                     <div>
                       <p className="text-sm font-medium text-gray-900">
@@ -96,6 +110,7 @@ export function PalletContentsTable({ inventory }: PalletContentsTableProps) {
           </tbody>
         </table>
       </div>
+      {isOpen && selectedItemId && (<ItemDetailDrawer itemId={selectedItemId} warehouseLocationId={id} open={isOpen} onClose={() => setIsOpen(false)} />)}
     </div>
   );
 }

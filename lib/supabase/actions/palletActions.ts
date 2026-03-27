@@ -31,6 +31,8 @@ export async function getPOForReceivingAction(purchaseOrderId: string) {
         `)
         .eq('id', purchaseOrderId)
         .single();
+
+    console.log("log", data, error)
     if (error) throw new Error(error.message);
     return data;
 }

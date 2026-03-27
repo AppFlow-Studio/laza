@@ -1,3 +1,4 @@
+// warehouse/[id]/purchase-orders/[poId]/receive/page.tsx
 "use client";
 
 import { use } from "react";
@@ -18,8 +19,6 @@ export default function ReceiveShipmentPage({
 
     const { data: po, isLoading: poLoading } = usePOForReceiving(poId);
     const { data: warehouseLocation, isLoading: whLoading } = useWarehouseLocation();
-
-    console.log(po)
 
 
     const isLoading = poLoading || whLoading;
