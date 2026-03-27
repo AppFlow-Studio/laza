@@ -1,3 +1,4 @@
+// purchase-orders/[id]/receive/page.tsx
 "use client";
 
 import { use } from "react";
@@ -11,15 +12,13 @@ import { ReceivingWizard } from "@/components/super-admin/shipment/ReceivingWiza
 export default function ReceiveShipmentPage({
     params,
 }: {
-    params: Promise<{ poId: string }>;
+    params: Promise<{ id: string }>;
 }) {
-    const { poId } = use(params);
+    const { id } = use(params);
     const router = useRouter();
 
-    const { data: po, isLoading: poLoading } = usePOForReceiving(poId);
+    const { data: po, isLoading: poLoading } = usePOForReceiving(id);
     const { data: warehouseLocation, isLoading: whLoading } = useWarehouseLocation();
-
-    console.log(po)
 
 
     const isLoading = poLoading || whLoading;

@@ -48,25 +48,28 @@ const STEPS = [
 ];
 
 export function ReceivingWizard({
-    po,
-    warehouseLocationId,
-    organizationId,
-    onComplete,
-    onCancel,
-}: ReceivingWizardProps) {
-    const [currentStep, setCurrentStep]   = useState(1);
-    const [direction, setDirection]       = useState(1);
-    const [phaseAData, setPhaseAData]     = useState<PhaseAData | null>(null);
-    const [phaseADone, setPhaseADone]     = useState(false);
+                                    po,
+                                    warehouseLocationId,
+                                    organizationId,
+                                    onComplete,
+                                    onCancel,
+                                }: ReceivingWizardProps) {
+    const [currentStep, setCurrentStep]           = useState(1);
+    const [direction, setDirection]               = useState(1);
+    const [phaseAData, setPhaseAData]             = useState<PhaseAData | null>(null);
+    const [phaseADone, setPhaseADone]             = useState(false);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-    const confirmReceipt      = useConfirmPOReceipt();
-    const assignToPallets     = useAssignShipmentToPallets();
+    const confirmReceipt  = useConfirmPOReceipt();
+    const assignToPallets = useAssignShipmentToPallets();
 
-    const goTo = useCallback((step: number) => {
-        setDirection(step > currentStep ? 1 : -1);
-        setCurrentStep(step);
-    }, [currentStep]);
+    const goTo = useCallback(
+        (step: number) => {
+            setDirection(step > currentStep ? 1 : -1);
+            setCurrentStep(step);
+        },
+        [currentStep]
+    );
 
     // ── Phase A submitted ──────────────────────────────────────────────────
     const handlePhaseASubmit = async (data: PhaseAData) => {
@@ -95,18 +98,29 @@ export function ReceivingWizard({
                 purchaseOrderId:    po.id,
                 organizationId,
                 warehouseLocationId,
-                palletAssignments:  data.pallets.map((p) => ({
-                    pallet_label:      p.pallet_label,
-                    storage_space_id:  p.storage_space_id,
-                    items:             p.items.map((it) => ({
-                        item_id:                  it.item_id,
-                        purchase_order_item_id:   it.purchase_order_item_id,
-                        box_count:                it.box_count,
-                        pieces_per_box_override:  it.pieces_per_box_override ?? null,
-                    })),
+                // Pass box_configs array per item — D4 RPC format.
+                // No storage_space_id — warehouse pallets are not tied to storage spaces.
+                palletAssignments: data.pallets.map((p) => ({
+                    pallet_label: p.pallet_label,
+                    items: p.items
+                        .filter((it) =>
+                            it.box_configs.some((c) => (c.box_count ?? 0) > 0)
+                        )
+                        .map((it) => ({
+                            item_id:                it.item_id,
+                            purchase_order_item_id: it.purchase_order_item_id,
+                            box_configs: it.box_configs
+                                .filter((c) => (c.box_count ?? 0) > 0)
+                                .map((c) => ({
+                                    pieces_per_box: c.pieces_per_box,
+                                    box_count:      c.box_count,
+                                })),
+                        })),
                 })),
             });
-            toast.success(`Shipment received. ${data.pallets.length} pallet${data.pallets.length !== 1 ? "s" : ""} created.`);
+            toast.success(
+                `Shipment received. ${data.pallets.length} pallet${data.pallets.length !== 1 ? "s" : ""} created.`
+            );
             onComplete();
         } catch (err: any) {
             toast.error(err.message ?? "Failed to create pallets. Please try again.");
@@ -115,13 +129,14 @@ export function ReceivingWizard({
 
     // ── Phase B skipped ────────────────────────────────────────────────────
     const handlePhaseBSkip = () => {
-        toast.success("Shipment received. You can assign pallets later from the Pallets page.");
+        toast.success(
+            "Shipment received. You can assign pallets later from the Pallets page."
+        );
         onComplete();
     };
 
     // ── Cancel guard ──────────────────────────────────────────────────────
     const handleCancelClick = () => {
-        // Phase A already committed warehouse stock — warn user
         if (phaseADone) {
             setShowCancelDialog(true);
         } else {
@@ -131,8 +146,6 @@ export function ReceivingWizard({
 
     const isPhaseALoading = confirmReceipt.isPending;
     const isPhaseBLoading = assignToPallets.isPending;
-
-    console.log(po)
 
     return (
         <div className="flex flex-col h-full max-h-[90vh]">
@@ -174,8 +187,8 @@ export function ReceivingWizard({
                                     currentStep === s.num
                                         ? "text-indigo-600"
                                         : currentStep > s.num
-                                        ? "text-zinc-400"
-                                        : "text-zinc-300"
+                                            ? "text-zinc-400"
+                                            : "text-zinc-300"
                                 }`}
                             >
                                 Step {s.num}: {s.label}
@@ -224,8 +237,16 @@ export function ReceivingWizard({
             <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50/50 px-6 py-4 flex-shrink-0">
                 <Button
                     variant="outline"
-                    onClick={() => currentStep > 1 ? goTo(currentStep - 1) : handleCancelClick()}
-                    disabled={isPhaseALoading || isPhaseBLoading || phaseADone && currentStep === 1}
+                    onClick={() =>
+                        currentStep > 1
+                            ? goTo(currentStep - 1)
+                            : handleCancelClick()
+                    }
+                    disabled={
+                        isPhaseALoading ||
+                        isPhaseBLoading ||
+                        (phaseADone && currentStep === 1)
+                    }
                     size="sm"
                 >
                     <ArrowLeft className="mr-1.5 h-4 w-4" />
@@ -237,7 +258,12 @@ export function ReceivingWizard({
                         onClick={() =>
                             document
                                 .getElementById("phase-a-form")
-                                ?.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }))
+                                ?.dispatchEvent(
+                                    new Event("submit", {
+                                        cancelable: true,
+                                        bubbles: true,
+                                    })
+                                )
                         }
                         disabled={isPhaseALoading}
                         size="sm"
@@ -261,7 +287,11 @@ export function ReceivingWizard({
                         <Button
                             variant="outline"
                             onClick={() => {
-                                if (confirm("Skip pallet assignment? You can assign pallets later from the Pallets page. Warehouse stock has already been updated.")) {
+                                if (
+                                    confirm(
+                                        "Skip pallet assignment? You can assign pallets later from the Pallets page. Warehouse stock has already been updated."
+                                    )
+                                ) {
                                     handlePhaseBSkip();
                                 }
                             }}
@@ -274,7 +304,12 @@ export function ReceivingWizard({
                             onClick={() =>
                                 document
                                     .getElementById("phase-b-form")
-                                    ?.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }))
+                                    ?.dispatchEvent(
+                                        new Event("submit", {
+                                            cancelable: true,
+                                            bubbles: true,
+                                        })
+                                    )
                             }
                             disabled={isPhaseBLoading}
                             size="sm"
@@ -305,9 +340,10 @@ export function ReceivingWizard({
                             </h2>
                         </div>
                         <p className="text-sm text-zinc-600">
-                            Phase A (receipt confirmation) has already been committed — warehouse
-                            quantities have been updated. Leaving now will skip pallet assignment.
-                            You can assign pallets later from the Pallets page.
+                            Phase A (receipt confirmation) has already been committed —
+                            warehouse quantities have been updated. Leaving now will skip
+                            pallet assignment. You can assign pallets later from the Pallets
+                            page.
                         </p>
                         <div className="mt-5 flex gap-2">
                             <Button
@@ -319,7 +355,10 @@ export function ReceivingWizard({
                             </Button>
                             <Button
                                 className="flex-1"
-                                onClick={() => { setShowCancelDialog(false); onComplete(); }}
+                                onClick={() => {
+                                    setShowCancelDialog(false);
+                                    onComplete();
+                                }}
                             >
                                 Leave anyway
                             </Button>

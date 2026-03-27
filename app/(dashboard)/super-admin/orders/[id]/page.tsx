@@ -2,7 +2,7 @@
 
 /**
  * TASK 3.6 — Super Admin: Ticket Detail + Fulfillment
- * File: app/(dashboard)/super-admin/orders/[id]/page.tsx
+ * File: app/(dashboard)/super-admin/orders/[palletId]/page.tsx
  *
  * Key design decisions from spec:
  *  - Warehouse stock is fetched at render via useWarehouseInventory()

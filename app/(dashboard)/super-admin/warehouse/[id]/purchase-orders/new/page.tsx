@@ -1,4 +1,4 @@
-//super-admin/warehouse/[id]/purchase_orders/new
+//super-admin/warehouse/[palletId]/purchase_orders/new
 
 "use client";
 
