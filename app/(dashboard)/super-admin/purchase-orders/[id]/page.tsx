@@ -149,6 +149,7 @@ export default function PurchaseOrderDetailPage({
             </div>
         );
     }
+    console.log(po)
 
     if (!po) {
         return (

@@ -2,7 +2,7 @@
 
 /**
  * TASK 3.3 — Store Admin: Ticket Detail Page
- * File: app/(dashboard)/admin/orders/[id]/page.tsx
+ * File: app/(dashboard)/admin/orders/[palletId]/page.tsx
  */
 
 import { useState } from "react";

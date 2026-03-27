@@ -1,4 +1,4 @@
-//super-admin/warehouse/[id]/
+//super-admin/warehouse/[palletId]/
 
 "use client";
 
@@ -456,7 +456,7 @@ function PalletRow({ pallet, warehouseId }: { pallet: PalletWithDetails; warehou
             </td>
             <td className="px-4 py-3 text-right">
                 <Link
-                    href={`/super-admin/warehouse/pallets/${pallet.id}`}
+                    href={`/super-admin/warehouse/${warehouseId}/pallets/${pallet.id}`}
                     className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
                 >
                     View <ChevronRight className="w-3.5 h-3.5" />
