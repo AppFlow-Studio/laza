@@ -24,7 +24,6 @@ export async function getItemShipmentHistory(
         p_item_id: itemId,
         p_organization_id: organizationId,
     });
-    
 
     if (error || !data) return [];
 
