@@ -1,3 +1,4 @@
+// /super-admin/warehouse/pallets/[id]
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
@@ -8,7 +9,6 @@ import { TemperatureBadge } from "@/components/pallets/TemperatureBadge";
 import { FillLevelBar } from "@/components/pallets/FillLevelBar";
 import { PalletContentsTable } from "@/components/pallets/PalletContentsTable";
 import { PalletActivityLog } from "@/components/pallets/PalletActivityLog";
-import { EditStorageSpaceModal } from "@/components/pallets/EditStorageSpaceModal";
 import { format } from "date-fns";
 import { useState } from "react";
 
@@ -42,6 +42,8 @@ export default function PalletDetailPage() {
 		source:    pallet.id,
 		warehouse: pallet.warehouse_location_id,
 	});
+
+	console.log(pallet)
 
 	return (
 		<div className="flex flex-col gap-6 p-6">
@@ -83,11 +85,10 @@ export default function PalletDetailPage() {
 			<div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
 				{/* Location */}
 				<InfoCard label="Location">
-					{pallet.storage_spaces ? (
+					{pallet.warehouse ? (
 						<div className="flex flex-col gap-1">
-							<TemperatureBadge type={pallet.storage_spaces.temperature_type} />
 							<span className="text-sm font-medium text-gray-900">
-                {pallet.storage_spaces.name}
+                {pallet.warehouse.name}
               </span>
 						</div>
 					) : (
@@ -166,13 +167,6 @@ export default function PalletDetailPage() {
 				</div>
 			</div>
 
-			{/* Edit Modal */}
-			{editModalOpen && (
-				<EditStorageSpaceModal
-					pallet={pallet}
-					onClose={() => setEditModalOpen(false)}
-				/>
-			)}
 		</div>
 	);
 }

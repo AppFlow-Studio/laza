@@ -1,3 +1,4 @@
+// /super-admin/warehouse
 "use client";
 
 import { useWarehouses } from "@/lib/hooks/queries/useWarehouse";
@@ -60,7 +61,7 @@ function WarehouseCard({ warehouse }: { warehouse: Location & { storage_spaces?:
 
 	return (
 		<Link
-			href={`/super-admin/warehouse/${warehouse.id}`}
+			href={`/super-admin/warehouse/${warehouse.id}?tab=inventory`}
 			className="bg-white rounded-xl shadow-sm border border-zinc-200 p-5 hover:shadow-md hover:border-zinc-300 transition-all group flex flex-col gap-4"
 		>
 			<div className="flex items-start justify-between">
@@ -82,18 +83,8 @@ function WarehouseCard({ warehouse }: { warehouse: Location & { storage_spaces?:
 				</p>
 			</div>
 
-			<div className="flex items-center justify-between pt-3 border-t border-zinc-100">
-				<div className="flex gap-3 text-xs text-zinc-500">
-					<span className="font-medium text-zinc-700">{spaces.length}</span> spaces
-					{Object.entries(tempCounts).map(([type, count]) =>
-						count > 0 ? (
-							<span key={type} className="flex items-center gap-1">
-                                <span className="font-medium text-zinc-700">{count}</span>
-                                <span className="capitalize">{type}</span>
-                            </span>
-						) : null
-					)}
-				</div>
+			<div className="flex items-center justify-between pt-3">
+
 				<ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-indigo-400 transition-colors" />
 			</div>
 		</Link>

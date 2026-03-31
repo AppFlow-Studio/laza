@@ -1,7 +1,6 @@
 import type { Database } from '@/lib/supabase/types';
 import { createClient } from '@supabase/supabase-js';
 
-// Lazy client — created inside each function to avoid SSR module-load crash
 function getClient() {
 	return createClient<Database>(
 		process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,7 +16,6 @@ type PalletOperationsLog =
 export type PalletStatus = "active" | "empty" | "retired";
 
 export type PalletWithDetails = WarehousePallet & {
-	storage_spaces: { name: string; temperature_type: string } | null;
 	purchase_orders: { po_number: string; supplier_name: string | null } | null;
 	item_count: number;
 	total_boxes: number;
@@ -36,7 +34,6 @@ export type PalletStats = {
 };
 
 export type PalletFilters = {
-	storageSpaceId?: string;
 	status?: PalletStatus | "all";
 	purchaseOrderId?: string;
 	search?: string;
@@ -54,7 +51,6 @@ export async function getPallets(
 		.select(
 			`
       *,
-      storage_spaces ( name, temperature_type ),
       purchase_orders ( po_number, supplier_name ),
       warehouse:locations(name),
       pallet_inventory (
@@ -66,28 +62,20 @@ export async function getPallets(
 		)
 		.eq("warehouse_location_id", warehouseLocationId);
 
-	// Status filter — default excludes retired
 	if (filters?.status && filters.status !== "all") {
 		query = query.eq("status", filters.status);
 	} else if (!filters?.status) {
 		query = query.neq("status", "retired");
 	}
 
-	if (filters?.storageSpaceId) {
-		query = query.eq("storage_space_id", filters.storageSpaceId);
-	}
-
 	if (filters?.purchaseOrderId) {
 		query = query.eq("purchase_order_id", filters.purchaseOrderId);
 	}
 
-	const { data, error } = await query.order("received_at", {
-		ascending: false,
-	});
+	const { data, error } = await query.order("received_at", { ascending: false });
 
 	if (error) throw error;
 
-	// Compute derived fields and apply search filter
 	let pallets = (data ?? []).map((pallet) => {
 		const inventory = pallet.pallet_inventory ?? [];
 		const item_count = inventory.length;
@@ -98,7 +86,6 @@ export async function getPallets(
 		return { ...pallet, item_count, total_boxes };
 	});
 
-	// Search: filter by pallet_label or item name
 	if (filters?.search) {
 		const term = filters.search.toLowerCase();
 		pallets = pallets.filter((p) => {
@@ -127,7 +114,6 @@ export async function getPalletById(
 		.select(
 			`
       *,
-      storage_spaces ( name, temperature_type ),
       purchase_orders ( po_number, supplier_name ),
       warehouse:locations(name),
       pallet_inventory (
@@ -204,39 +190,16 @@ export async function getPalletOperationsLog(
 	return (data ?? []) as ReturnType<typeof getPalletOperationsLog> extends Promise<infer T> ? T : never;
 }
 
-// ── updatePalletStorageSpace ─────────────────────────────────────────────────
-export async function updatePalletStorageSpace(
-	palletId: string,
-	storageSpaceId: string,
-	userId: string
-): Promise<void> {
-	const supabase = getClient();
-
-	const { error } = await supabase
-		.from("warehouse_pallets")
-		.update({ storage_space_id: storageSpaceId, updated_at: new Date().toISOString() })
-		.eq("id", palletId);
-
-	if (error) throw error;
-
-	// Log the operation
-	await supabase.from("pallet_operations_log").insert({
-		organization_id: "", // will be set via RLS context
-		pallet_id: palletId,
-		operation_type: "moved",
-		performed_by: userId,
-		notes: "Storage space reassigned via Pallet Management UI",
-	});
-}
-
-// ── retirePallet ─────────────────────────────────────────────────────────────
+// ── updatePalletStorageSpace → renamed to updatePalletLocation (no-op kept for compat) ──
+// Storage spaces are no longer used. This function is preserved in case
+// anything still references it, but the storage_space_id column is simply
+// left null on all pallets going forward.
 export async function retirePallet(
 	palletId: string,
 	userId: string
 ): Promise<void> {
 	const supabase = getClient();
 
-	// Only allow retiring empty pallets
 	const { data: pallet } = await supabase
 		.from("warehouse_pallets")
 		.select("status, organization_id")

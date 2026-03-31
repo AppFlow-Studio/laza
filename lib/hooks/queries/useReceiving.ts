@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser, useOrganization } from '@clerk/nextjs';
 import {
     getPOForReceivingAction,
-    getWarehouseStorageSpacesAction,
     confirmPOReceiptAction,
     assignShipmentToPalletsAction,
     PalletAssignment,
@@ -14,7 +13,6 @@ import { palletKeys } from '@/lib/hooks/queries/usePallets';
 
 export const receivingKeys = {
     poForReceiving: (poId: string) => ['po-for-receiving', poId] as const,
-    storageSpaces:  (locationId: string) => ['warehouse-storage-spaces', locationId] as const,
 };
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
@@ -25,17 +23,7 @@ export function usePOForReceiving(purchaseOrderId: string | undefined) {
         queryKey:  receivingKeys.poForReceiving(purchaseOrderId ?? ''),
         queryFn:   () => getPOForReceivingAction(purchaseOrderId!),
         enabled:   !!purchaseOrderId,
-        staleTime: 0, // always refetch — data changes as user edits
-    });
-}
-
-/** Warehouse storage spaces for the pallet assignment step. */
-export function useWarehouseStorageSpaces(warehouseLocationId: string | undefined) {
-    return useQuery({
-        queryKey:  receivingKeys.storageSpaces(warehouseLocationId ?? ''),
-        queryFn:   () => getWarehouseStorageSpacesAction(warehouseLocationId!),
-        enabled:   !!warehouseLocationId,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,
     });
 }
 
@@ -43,16 +31,16 @@ export function useWarehouseStorageSpaces(warehouseLocationId: string | undefine
 
 /** Phase A — confirms PO receipt via the receive_purchase_order RPC. */
 export function useConfirmPOReceipt() {
-    const qc                   = useQueryClient();
-    const { user }             = useUser();
-    const { organization }     = useOrganization();
+    const qc               = useQueryClient();
+    const { user }         = useUser();
+    const { organization } = useOrganization();
 
     return useMutation({
         mutationFn: ({
-            purchaseOrderId,
-            receivedItems,
-            actualArrivalDate,
-        }: {
+                         purchaseOrderId,
+                         receivedItems,
+                         actualArrivalDate,
+                     }: {
             purchaseOrderId: string;
             receivedItems: { item_id: number; quantity_received: number }[];
             actualArrivalDate: string;
@@ -65,9 +53,7 @@ export function useConfirmPOReceipt() {
             ),
 
         onSuccess: (_, { purchaseOrderId }) => {
-            // Invalidate PO detail so status badge updates
             qc.invalidateQueries({ queryKey: purchaseOrderKeys.detail(purchaseOrderId) });
-            // Invalidate warehouse inventory — quantities just changed
             qc.invalidateQueries({ queryKey: ['warehouse-inventory'] });
             qc.invalidateQueries({ queryKey: ['inventory'] });
             qc.invalidateQueries({ queryKey: ['alerts'] });
@@ -88,11 +74,11 @@ export function useAssignShipmentToPallets() {
 
     return useMutation({
         mutationFn: ({
-            purchaseOrderId,
-            organizationId,
-            warehouseLocationId,
-            palletAssignments,
-        }: {
+                         purchaseOrderId,
+                         organizationId,
+                         warehouseLocationId,
+                         palletAssignments,
+                     }: {
             purchaseOrderId: string;
             organizationId: string;
             warehouseLocationId: string;
@@ -107,10 +93,8 @@ export function useAssignShipmentToPallets() {
             ),
 
         onSuccess: () => {
-            // Pallets list and stats need to refresh
             qc.invalidateQueries({ queryKey: palletKeys.lists() });
             qc.invalidateQueries({ queryKey: palletKeys.all });
-            // Warehouse stats cards
             qc.invalidateQueries({ queryKey: ['warehouse-stats'] });
         },
     });
