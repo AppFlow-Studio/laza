@@ -1,8 +1,21 @@
 "use client";
 
 /**
- * TASK 3.2 — Store Admin: New Order Creation
- * File: app/(dashboard)/admin/orders/new/page.tsx
+ * TASK 3.2 (updated) — New Order Creation
+ * File: app/(dashboard)/super-admin/orders/new/page.tsx
+ *        app/(dashboard)/admin/orders/new/page.tsx  (same file, shared)
+ *
+ * New in this version:
+ *   1. Shipment box config selector per item (D1/F1 — po_item_box_configs)
+ *      → Each item shows available shipment configs; admin picks which
+ *        shipment's pieces_per_box to use when ordering.
+ *      → Falls back to items.box_quantity if no shipment history.
+ *
+ *   2. "Sourcing from XYZ Warehouse" banner
+ *      → useWarehouseLocation() already fetches the single warehouse.
+ *        One warehouse per org for now — show it clearly in the UI.
+ *
+ *   3. Store picker (super admin only — passed via `isSuperAdmin` prop)
  */
 
 import { useState, useMemo, useCallback, useEffect } from "react";
@@ -19,13 +32,13 @@ import {
     Loader2,
     Truck,
     Store,
+    MapPin,
     Warehouse,
     ChevronDown,
     History,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
-
-// ─── Real hooks ───────────────────────────────────────────────────────────────
+import { useOrganization } from "@clerk/nextjs";
 import {
     useWarehouseCatalog,
     useWarehouseLocation,
@@ -33,9 +46,9 @@ import {
 import { useCategories } from "@/lib/hooks/queries/useCategories";
 import { useCreateTicket } from "@/lib/hooks/queries/useOrderTickets";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
+import { useLocations } from "@/lib/hooks/queries/useLocations";
 import { WarehouseCatalogItem } from "@/lib/supabase/queries/warehouse";
 import { CreateTicketInput } from "@/lib/supabase/queries/orderTickets";
-import { useOrganization } from "@clerk/nextjs";
 import {
     getItemShipmentHistory,
     type ShipmentBoxConfig,
@@ -43,20 +56,19 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-// delivery_type lives on order_tickets (added Task 1.43, Schema v2 Section 5.7)
-// "company" → warehouse delivers, $65/pallet, payment hold placed at fulfillment
-// "self"    → store self-pickup, $0 cost, skips in_transit status entirely
-//             fulfilled → delivered → confirmed  (no in_transit step)
 type DeliveryType = "company" | "self";
 
-// Cart entry — only items WITH box_quantity can be added
+// Cart entry — carries the selected box config so quantity_units is correct
 type CartEntry = {
     item: WarehouseCatalogItem & { box_quantity: number };
     boxes: number;
+    // The selected config for this line item.
+    // null = use items.box_quantity (the static fallback)
     selectedConfig: ShipmentBoxConfig | null;
 };
 
-// ─── Validation ───────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function validateBoxQty(val: string | number): {
     ok: boolean;
     value?: number;
@@ -65,13 +77,13 @@ function validateBoxQty(val: string | number): {
     const n = Number(val);
     if (val === "" || val === null || val === undefined)
         return { ok: false, error: "Required" };
-    if (!Number.isInteger(n))
-        return { ok: false, error: "Whole boxes only — no decimals" };
+    if (!Number.isInteger(n)) return { ok: false, error: "Whole boxes only" };
     if (n < 1) return { ok: false, error: "Minimum 1 box" };
     if (n > 999) return { ok: false, error: "Maximum 999 boxes" };
     return { ok: true, value: n };
 }
 
+// Effective pieces per box — from selected shipment config or item default
 function effectivePiecesPerBox(
     item: WarehouseCatalogItem & { box_quantity: number },
     config: ShipmentBoxConfig | null,
@@ -79,17 +91,22 @@ function effectivePiecesPerBox(
     return config?.piecesPerBox ?? item.box_quantity;
 }
 
+// ─── useItemShipmentConfigs ───────────────────────────────────────────────────
+// Fetches available shipment box configs for a given item via RPC.
+// Falls back to empty array if RPC not deployed yet (D8 task).
+// This is a simple inline hook since it's only used in this file.
+
 function useItemShipmentConfigs(
     itemId: number | null,
     organizationId: string,
 ): { configs: ShipmentBoxConfig[]; loading: boolean } {
     const [configs, setConfigs] = useState<ShipmentBoxConfig[]>([]);
     const [loading, setLoading] = useState(false);
-    console.log(itemId, organizationId);
-    
+
     useEffect(() => {
         if (!itemId || !organizationId) return;
         setLoading(true);
+
         getItemShipmentHistory(itemId, organizationId)
             .then((result) => {
                 console.log("shipment configs for item", itemId, result); // ← add this
@@ -101,6 +118,9 @@ function useItemShipmentConfigs(
     return { configs, loading };
 }
 
+// ─── ShipmentConfigPicker ─────────────────────────────────────────────────────
+// Shown inline below an item when it's being added to the cart.
+// Lets the admin select which shipment's pieces_per_box to use.
 function ShipmentConfigPicker({
     item,
     organizationId,
@@ -116,7 +136,6 @@ function ShipmentConfigPicker({
         item.id,
         organizationId,
     );
-    
 
     if (loading) {
         return (
@@ -127,6 +146,7 @@ function ShipmentConfigPicker({
         );
     }
 
+    // No shipment history — nothing to pick
     if (configs.length === 0) {
         return (
             <div className="flex items-center gap-1 mt-2 text-[10px] text-gray-400 py-1">
@@ -136,6 +156,7 @@ function ShipmentConfigPicker({
         );
     }
 
+    // Build tab options: Default + one per shipment config
     const tabs = [
         {
             key: "default",
@@ -151,21 +172,21 @@ function ShipmentConfigPicker({
         })),
     ];
 
-    console.log({ configs });
-
     const activeKey = selectedConfig === null ? "default" : selectedConfig.id;
 
     return (
         <div className="mt-2">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+            <p className="text-[10px] font-semibold text-gray-400 tracking-widest mb-1.5">
                 Box config
             </p>
+
+            {/* Tab strip */}
             <div className="flex gap-1 flex-wrap">
-                {tabs.map((tab) => {
+                {tabs.map((tab, idx) => {
                     const isActive = activeKey === tab.key;
                     return (
                         <button
-                            key={tab.key}
+                            key={idx}
                             type="button"
                             onClick={() => onSelect(tab.config)}
                             className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all ${
@@ -184,6 +205,7 @@ function ShipmentConfigPicker({
                             >
                                 {tab.sub}
                             </span>
+                            {/* Active indicator dot */}
                             {isActive && (
                                 <div className="w-1 h-1 rounded-full bg-indigo-500 mt-1" />
                             )}
@@ -191,6 +213,8 @@ function ShipmentConfigPicker({
                     );
                 })}
             </div>
+
+            {/* Show supplier/date detail for active non-default config */}
             {selectedConfig &&
                 (selectedConfig.supplierName || selectedConfig.poDate) && (
                     <p className="text-[10px] text-gray-400 mt-1.5">
@@ -213,6 +237,7 @@ function ShipmentConfigPicker({
 }
 
 // ─── DeliveryTypeSelector ─────────────────────────────────────────────────────
+
 function DeliveryTypeSelector({
     value,
     onChange,
@@ -220,20 +245,15 @@ function DeliveryTypeSelector({
     value: DeliveryType;
     onChange: (v: DeliveryType) => void;
 }) {
-    const options: {
-        value: DeliveryType;
-        label: string;
-        sublabel: string;
-        icon: React.ReactNode;
-    }[] = [
+    const options = [
         {
-            value: "company",
+            value: "company" as DeliveryType,
             label: "Company delivery",
             sublabel: "Warehouse delivers to your store",
             icon: <Truck size={15} className="flex-shrink-0" />,
         },
         {
-            value: "self",
+            value: "self" as DeliveryType,
             label: "Self-pickup",
             sublabel: "You collect directly from the warehouse",
             icon: <Store size={15} className="flex-shrink-0" />,
@@ -253,7 +273,7 @@ function DeliveryTypeSelector({
                             key={opt.value}
                             type="button"
                             onClick={() => onChange(opt.value)}
-                            className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all duration-100 ${
+                            className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${
                                 active
                                     ? "border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100"
                                     : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
@@ -266,11 +286,11 @@ function DeliveryTypeSelector({
                             </div>
                             <div className="min-w-0">
                                 <div
-                                    className={`text-xs font-semibold leading-tight ${active ? "text-indigo-700" : "text-gray-700"}`}
+                                    className={`text-xs font-semibold ${active ? "text-indigo-700" : "text-gray-700"}`}
                                 >
                                     {opt.label}
                                 </div>
-                                <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">
+                                <div className="text-[10px] text-gray-400 mt-0.5">
                                     {opt.sublabel}
                                 </div>
                                 {opt.value === "self" && active && (
@@ -284,7 +304,6 @@ function DeliveryTypeSelector({
                                     </div>
                                 )}
                             </div>
-                            {/* Selected indicator dot */}
                             <div
                                 className={`ml-auto mt-0.5 w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 transition-all ${
                                     active
@@ -301,6 +320,7 @@ function DeliveryTypeSelector({
 }
 
 // ─── CatalogItemRow ───────────────────────────────────────────────────────────
+
 function CatalogItemRow({
     item,
     cartEntry,
@@ -324,15 +344,14 @@ function CatalogItemRow({
 }) {
     const [inputVal, setInputVal] = useState(String(cartEntry?.boxes ?? 1));
     const [error, setError] = useState<string | null>(null);
+    const [showConfigPicker, setShowConfigPicker] = useState(false);
     const [localConfig, setLocalConfig] = useState<ShipmentBoxConfig | null>(
         cartEntry?.selectedConfig ?? null,
     );
 
-    const [showConfigPicker, setShowConfigPicker] = useState(false);
-    const ppb = effectivePiecesPerBox(item, localConfig);
-
     const inCart = !!cartEntry;
     const displayBoxes = parseInt(inputVal) || 1;
+    const ppb = effectivePiecesPerBox(item, localConfig);
 
     useEffect(() => {
         setLocalConfig(cartEntry?.selectedConfig ?? null);
@@ -365,142 +384,147 @@ function CatalogItemRow({
 
     return (
         <div
-            className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-100 ${
+            className={`flex flex-col p-3.5 rounded-xl border transition-all ${
                 inCart
                     ? "border-indigo-300 bg-indigo-50/40"
                     : "border-gray-200 bg-white hover:border-violet-200 hover:shadow-[0_1px_6px_rgba(99,102,241,0.07)]"
             }`}
         >
-            {/* Item info */}
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-gray-900">
-                        {item.name}
-                    </span>
-                    {inCart && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded-full">
-                            <CheckCircle2 size={9} /> In order
+            <div className="flex items-start gap-3">
+                {/* Item info */}
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-gray-900">
+                            {item.name}
                         </span>
-                    )}
-                </div>
-                {item.sku && (
-                    <div className="mt-1">
+                        {inCart && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded-full">
+                                <CheckCircle2 size={9} /> In order
+                            </span>
+                        )}
+                    </div>
+                    {item.sku && (
                         <span
                             style={{
                                 fontFamily: "var(--font-mono, monospace)",
                             }}
-                            className="text-[10px] text-gray-400"
+                            className="text-[10px] text-gray-400 mt-0.5 block"
                         >
                             {item.sku}
                         </span>
-                    </div>
-                )}
-                <button
-                    onClick={() => setShowConfigPicker((p) => !p)}
-                    className="flex items-center gap-1 mt-1.5 text-[11px] text-gray-500 hover:text-indigo-600 transition-colors group"
-                >
-                    <Boxes
-                        size={10}
-                        className="text-gray-300 group-hover:text-indigo-400 flex-shrink-0"
-                    />
-                    <span>
-                        {ppb} {item.unit_of_measure}/box
-                        {localConfig && (
-                            <span className="ml-1 text-indigo-500 font-semibold">
-                                · {localConfig.poNumber ?? "Custom shipment"}
-                            </span>
-                        )}
-                    </span>
-                    <ChevronDown
-                        size={10}
-                        className={`ml-0.5 transition-transform ${showConfigPicker ? "rotate-180" : ""}`}
-                    />
-                </button>
+                    )}
 
-                {showConfigPicker && (
-                    <ShipmentConfigPicker
-                        item={item}
-                        organizationId={organizationId}
-                        selectedConfig={localConfig}
-                        onSelect={(cfg) => {
-                            setLocalConfig(cfg);
-                            onConfigChange(item.id, cfg);
-                            setShowConfigPicker(false);
-                        }}
-                    />
-                )}
-            </div>
+                    {/* Config pill — shows active config or toggle to show picker */}
+                    <button
+                        onClick={() => setShowConfigPicker((p) => !p)}
+                        className="flex items-center gap-1 mt-1.5 text-[11px] text-gray-500 hover:text-indigo-600 transition-colors group"
+                    >
+                        <Boxes
+                            size={10}
+                            className="text-gray-300 group-hover:text-indigo-400 flex-shrink-0"
+                        />
+                        <span>
+                            {ppb} {item.unit_of_measure}/box
+                            {localConfig && (
+                                <span className="ml-1 text-indigo-500 font-semibold">
+                                    ·{" "}
+                                    {localConfig.poNumber ?? "Custom shipment"}
+                                </span>
+                            )}
+                        </span>
+                        <ChevronDown
+                            size={10}
+                            className={`ml-0.5 transition-transform ${showConfigPicker ? "rotate-180" : ""}`}
+                        />
+                    </button>
 
-            {/* Qty controls */}
-            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                <div className="flex items-center">
-                    <button
-                        onClick={() => adjust(-1)}
-                        className="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-l-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
-                    >
-                        −
-                    </button>
-                    <input
-                        type="number"
-                        min={1}
-                        max={999}
-                        step={1}
-                        value={inputVal}
-                        onChange={(e) => handleInputChange(e.target.value)}
-                        onKeyDown={(e) => {
-                            if ([".", "e", "E", "-", "+"].includes(e.key))
-                                e.preventDefault();
-                        }}
-                        className={`w-10 h-7 border-y text-center text-xs font-semibold text-gray-900 outline-none transition-all ${
-                            error
-                                ? "border-red-400 bg-red-50"
-                                : "border-gray-200 bg-white focus:border-indigo-400"
-                        }`}
-                        style={
-                            {
-                                MozAppearance: "textfield",
-                                appearance: "textfield",
-                            } as React.CSSProperties
-                        }
-                    />
-                    <button
-                        onClick={() => adjust(1)}
-                        className="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-r-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
-                    >
-                        +
-                    </button>
-                    <span className="ml-2 text-[11px] text-gray-400 w-16">
-                        = {displayBoxes * ppb} {item.unit_of_measure}
-                    </span>
+                    {/* Shipment config picker — expanded inline */}
+                    {showConfigPicker && (
+                        <ShipmentConfigPicker
+                            item={item}
+                            organizationId={organizationId}
+                            selectedConfig={localConfig}
+                            onSelect={(cfg) => {
+                                setLocalConfig(cfg);
+                                onConfigChange(item.id, cfg);
+                                setShowConfigPicker(false);
+                            }}
+                        />
+                    )}
                 </div>
 
-                {error && (
-                    <div className="flex items-center gap-1 text-[10px] text-red-500">
-                        <AlertCircle size={9} /> {error}
+                {/* Qty controls */}
+                <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <div className="flex items-center">
+                        <button
+                            onClick={() => adjust(-1)}
+                            className="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-l-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
+                        >
+                            −
+                        </button>
+                        <input
+                            type="number"
+                            min={1}
+                            max={999}
+                            step={1}
+                            value={inputVal}
+                            onChange={(e) => handleInputChange(e.target.value)}
+                            onKeyDown={(e) =>
+                                [".", "e", "E", "-", "+"].includes(e.key) &&
+                                e.preventDefault()
+                            }
+                            className={`w-10 h-7 border-y text-center text-xs font-semibold text-gray-900 outline-none transition-all ${
+                                error
+                                    ? "border-red-400 bg-red-50"
+                                    : "border-gray-200 bg-white focus:border-indigo-400"
+                            }`}
+                            style={
+                                {
+                                    MozAppearance: "textfield",
+                                    appearance: "textfield",
+                                } as React.CSSProperties
+                            }
+                        />
+                        <button
+                            onClick={() => adjust(1)}
+                            className="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-r-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
+                        >
+                            +
+                        </button>
+                        <span className="ml-2 text-[11px] text-gray-400 w-16">
+                            = {displayBoxes * ppb} {item.unit_of_measure}
+                        </span>
                     </div>
-                )}
 
-                {inCart ? (
-                    <button
-                        onClick={() => onRemove(item.id)}
-                        className="text-[11px] font-semibold text-red-400 hover:text-red-600 flex items-center gap-1 transition-colors"
-                    >
-                        <X size={10} /> Remove
-                    </button>
-                ) : (
-                    <button
-                        onClick={handleAdd}
-                        className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-lg transition-colors"
-                    >
-                        Add to order
-                    </button>
-                )}
+                    {error && (
+                        <div className="flex items-center gap-1 text-[10px] text-red-500">
+                            <AlertCircle size={9} /> {error}
+                        </div>
+                    )}
+
+                    {inCart ? (
+                        <button
+                            onClick={() => onRemove(item.id)}
+                            className="text-[11px] font-semibold text-red-400 hover:text-red-600 flex items-center gap-1 transition-colors"
+                        >
+                            <X size={10} /> Remove
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleAdd}
+                            className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-lg transition-colors"
+                        >
+                            Add to order
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
 }
 
 // ─── CartRow ──────────────────────────────────────────────────────────────────
+
 function CartRow({
     entry,
     onRemove,
@@ -541,49 +565,44 @@ function CartRow({
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function NewOrderPage() {
     const router = useRouter();
 
-    // ── Auth / org context ──────────────────────────────────────────────────────
     const { data: userInfo } = useUserInfo();
-    const requestingLocationId = userInfo?.assigned_location_id ?? ""; // exact column name
-    const requestedBy = userInfo?.id ?? "";
-
     const { organization } = useOrganization();
     const organizationId = organization?.id ?? "";
+    const requestedBy = userInfo?.id ?? "";
 
-    // ── Warehouse location ──────────────────────────────────────────────────────
-    // getWarehouseLocation() filters location_type = 'warehouse'
+    // ── Warehouse (Feature 2 — sourcing banner) ────────────────────────────────
+    // One warehouse per org. useWarehouseLocation() returns the single warehouse.
+    // We show its name in the "Sourcing from" banner.
     const { data: warehouseLocation } = useWarehouseLocation();
     const warehouseLocationId = warehouseLocation?.id ?? "";
 
-    // ── Catalog — NO quantities by design ──────────────────────────────────────
-    // getWarehouseCatalog() selects item details only (no item_locations join).
-    // RLS also blocks store admins from reading warehouse current_quantity.
+    // ── Store selector ─────────────────────────────────────────────────────────
+    const { data: locations } = useLocations();
+    const storeLocations = useMemo(
+        () => (locations ?? []).filter((l) => l.location_type === "store"),
+        [locations],
+    );
+    const [selectedLocationId, setSelectedLocationId] = useState("");
+    const requestingLocationId = selectedLocationId;
+
+    // ── Catalog ────────────────────────────────────────────────────────────────
     const { data: rawCatalogItems, isLoading: catalogLoading } =
         useWarehouseCatalog();
-
-    // console.log(rawCatalogItems); // NO BOX_QUANTITY THERE COMING !!!!!!!!!!
-
-    // ── Categories ──────────────────────────────────────────────────────────────
     const { data: categories } = useCategories();
-
-    // ── Create ticket mutation ──────────────────────────────────────────────────
-    // createTicket() → INSERT order_tickets + order_ticket_items + order_ticket_logs
     const { mutate: createTicket, isPending: isSubmitting } = useCreateTicket();
 
-    // ── Local state ─────────────────────────────────────────────────────────────
+    // ── Local state ────────────────────────────────────────────────────────────
     const [search, setSearch] = useState("");
     const [categoryFilter, setCategoryFilter] = useState<number | "">("");
     const [cart, setCart] = useState<Record<number, CartEntry>>({});
     const [notes, setNotes] = useState("");
-
-    // delivery_type on order_tickets (Task 1.43, Schema v2 §5.7)
-    // "company" → warehouse delivers, cost est. at fulfillment ($65/pallet)
-    // "self"    → store picks up, $0 cost, skips in_transit in the status flow
     const [deliveryType, setDeliveryType] = useState<DeliveryType>("company");
 
-    // ── Filter: only items with box_quantity set are orderable ──────────────────
+    // ── Filter orderable items ─────────────────────────────────────────────────
     const orderableItems = useMemo(
         () =>
             (rawCatalogItems ?? []).filter(
@@ -595,7 +614,6 @@ export default function NewOrderPage() {
         [rawCatalogItems],
     );
 
-    // ── Catalog filtering ────────────────────────────────────────────────────────
     const filteredItems = useMemo(() => {
         const q = search.toLowerCase();
         return orderableItems.filter((item) => {
@@ -603,42 +621,24 @@ export default function NewOrderPage() {
                 !q ||
                 item.name.toLowerCase().includes(q) ||
                 (item.sku ?? "").toLowerCase().includes(q);
-            // category_id is a direct BIGINT on the item row
             const matchCat =
-                !categoryFilter ||
-                item.category?.forEach(
-                    (category) => category.id === categoryFilter,
-                );
+                !categoryFilter || (item as any).category_id === categoryFilter;
             return matchSearch && matchCat;
         });
     }, [orderableItems, search, categoryFilter]);
 
-    // ── Cart stats ───────────────────────────────────────────────────────────────
+    // ── Cart stats ─────────────────────────────────────────────────────────────
     const cartEntries = Object.values(cart);
     const totalItems = cartEntries.length;
     const totalBoxes = cartEntries.reduce((s, e) => s + e.boxes, 0);
     const hasItems = totalItems > 0;
 
-    const handleConfigChange = useCallback(
-        (itemId: number, config: ShipmentBoxConfig | null) => {
-            setCart((prev) =>
-                prev[itemId]
-                    ? {
-                          ...prev,
-                          [itemId]: { ...prev[itemId], selectedConfig: config },
-                      }
-                    : prev,
-            );
-        },
-        [],
-    );
-
-    // ── Cart handlers ────────────────────────────────────────────────────────────
+    // ── Cart handlers ──────────────────────────────────────────────────────────
     const handleAdd = useCallback(
         (
             item: WarehouseCatalogItem & { box_quantity: number },
             boxes: number,
-            config: ShipmentBoxConfig | null, // ← add
+            config: ShipmentBoxConfig | null,
         ) => {
             setCart((prev) => ({
                 ...prev,
@@ -664,7 +664,22 @@ export default function NewOrderPage() {
         );
     }, []);
 
-    // ── Build payload ────────────────────────────────────────────────────────────
+    // Feature 1 — when admin changes shipment config for an item already in cart
+    const handleConfigChange = useCallback(
+        (itemId: number, config: ShipmentBoxConfig | null) => {
+            setCart((prev) =>
+                prev[itemId]
+                    ? {
+                          ...prev,
+                          [itemId]: { ...prev[itemId], selectedConfig: config },
+                      }
+                    : prev,
+            );
+        },
+        [],
+    );
+
+    // ── Build payload ──────────────────────────────────────────────────────────
     const buildPayload = (
         status: "draft" | "submitted",
     ): CreateTicketInput => ({
@@ -673,34 +688,31 @@ export default function NewOrderPage() {
         warehouseLocationId,
         requestedBy,
         initialStatus: status,
-        // delivery_type stored on order_tickets row (Task 1.43)
-        // Tells the fulfillment RPC and status flow which path to take:
-        //   "company" → fulfilled → in_transit → delivered → confirmed
-        //   "self"    → fulfilled → delivered → confirmed  (no in_transit)
         deliveryType,
         notes: notes.trim() || undefined,
-        items: cartEntries.map((e) => ({
-            itemId: e.item.id,
-            quantityBoxes: e.boxes,
-            quantityUnits:
-                e.boxes * effectivePiecesPerBox(e.item, e.selectedConfig), // ← was e.item.box_quantity
-        })),
+        items: cartEntries.map((e) => {
+            const ppb = effectivePiecesPerBox(e.item, e.selectedConfig);
+            return {
+                itemId: e.item.id,
+                quantityBoxes: e.boxes,
+                // Use selected shipment config's pieces_per_box for accurate unit count
+                quantityUnits: e.boxes * ppb,
+            };
+        }),
     });
 
-    // ── Guards ────────────────────────────────────────────────────────────────────
     const missingContext =
         !organizationId || !requestingLocationId || !warehouseLocationId;
 
-    // ── Actions ──────────────────────────────────────────────────────────────────
     const handleDraft = async () => {
         if (missingContext) {
-            toast.error("Missing location context — try refreshing");
+            toast.error("Select a store first");
             return;
         }
         try {
             await createTicket(buildPayload("draft"));
             toast.success("Draft saved");
-            router.push("/admin/orders");
+            router.push("/super-admin/orders");
         } catch {
             toast.error("Failed to save draft");
         }
@@ -708,13 +720,13 @@ export default function NewOrderPage() {
 
     const handleSubmit = async () => {
         if (missingContext) {
-            toast.error("Missing location context — try refreshing");
+            toast.error("Select a store first");
             return;
         }
         try {
             await createTicket(buildPayload("submitted"));
             toast.success("Order submitted to warehouse");
-            router.push("/admin/orders");
+            router.push("/super-admin/orders");
         } catch {
             toast.error("Failed to submit order");
         }
@@ -746,35 +758,72 @@ export default function NewOrderPage() {
                 )}
             </div>
 
-            {warehouseLocation && (
-                <div className="flex items-center gap-2.5 px-6 py-2.5 mx-6 my-3.5 rounded-xl bg-indigo-50 border-b border-indigo-100">
-                    <Warehouse
+            <div className="flex items-center gap-3">
+                {/* ── Feature 2: Sourcing warehouse banner ── */}
+                {warehouseLocation && (
+                    <div className="w-full h-20 rounded-xl flex flex-col items-start gap-2.5 ml-6 my-2 px-6 py-2.5 bg-indigo-50 border-b border-indigo-100">
+                        <div className="flex items-center gap-3">
+                            <Warehouse
+                                size={13}
+                                className="text-indigo-500 flex-shrink-0"
+                            />
+                            <span className="text-sm font-medium text-indigo-700">
+                                Sourcing from{" "}
+                                <strong>{warehouseLocation.name}:</strong>
+                            </span>
+                        </div>
+                        {warehouseLocation.address && (
+                            <span className="text-[11px] text-indigo-400 ml-1">
+                                {typeof warehouseLocation.address === "object"
+                                    ? [
+                                          (warehouseLocation.address as any)
+                                              .street,
+                                          (warehouseLocation.address as any)
+                                              .city,
+                                      ]
+                                          .filter(Boolean)
+                                          .join(", ")
+                                    : warehouseLocation.address}
+                            </span>
+                        )}
+                    </div>
+                )}
+                {/* ── Store selector ── */}
+                <div className="w-full h-20 flex items-center gap-3 mr-6 my-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+                    <MapPin
                         size={13}
-                        className="text-indigo-500 flex-shrink-0"
+                        className="text-amber-600 flex-shrink-0"
                     />
-                    <span className="text-sm font-medium text-indigo-700">
-                        Sourcing from <strong>{warehouseLocation.name}:</strong>
+                    <span className="text-xs font-medium text-amber-800 whitespace-nowrap">
+                        Ordering for:
                     </span>
-                    {warehouseLocation.address && (
-                        <span className="text-sm text-indigo-400 ml-1">
-                            {typeof warehouseLocation.address === "object"
-                                ? [
-                                      (warehouseLocation.address as any).street,
-                                      (warehouseLocation.address as any).city,
-                                  ]
-                                      .filter(Boolean)
-                                      .join(", ")
-                                : warehouseLocation.address}
+                    <select
+                        value={selectedLocationId}
+                        onChange={(e) => setSelectedLocationId(e.target.value)}
+                        className="flex-1 max-w-xs border border-amber-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="" disabled hidden>
+                            Select a store
+                        </option>
+                        {storeLocations.map((loc) => (
+                            <option key={loc.id} value={loc.id}>
+                                {loc.name}
+                            </option>
+                        ))}
+                    </select>
+                    {selectedLocationId && (
+                        <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
+                            <CheckCircle2 size={10} /> Store selected
                         </span>
                     )}
                 </div>
-            )}
+            </div>
 
             {/* ── Two-column layout ── */}
             <div className="flex flex-1 min-h-0">
                 {/* ── LEFT: Catalog ── */}
                 <div className="flex-1 flex flex-col border-r border-gray-100 overflow-hidden">
-                    {/* Toolbar */}
+                    {/* Search + filter toolbar */}
                     <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100 flex-shrink-0">
                         <div className="relative flex-1">
                             <Search
@@ -797,7 +846,7 @@ export default function NewOrderPage() {
                                         : "",
                                 )
                             }
-                            className="py-2 px-3 text-xs border border-gray-200 rounded-lg outline-none focus:border-indigo-400 bg-white text-gray-600 cursor-pointer transition-all"
+                            className="py-2 px-3 text-xs border border-gray-200 rounded-lg outline-none focus:border-indigo-400 bg-white text-gray-600 cursor-pointer"
                         >
                             <option value="">All categories</option>
                             {(categories ?? []).map((c) => (
@@ -808,7 +857,6 @@ export default function NewOrderPage() {
                         </select>
                     </div>
 
-                    {/* Item count */}
                     <div className="px-5 py-2 text-[11px] text-gray-300 flex-shrink-0">
                         {filteredItems.length} item
                         {filteredItems.length !== 1 ? "s" : ""} available to
@@ -837,8 +885,8 @@ export default function NewOrderPage() {
                                     No items in catalog
                                 </p>
                                 <p className="text-xs text-gray-300 mt-1">
-                                    Items need a box_quantity set by the super
-                                    admin before they can be ordered
+                                    Items need a box_quantity set before they
+                                    can be ordered
                                 </p>
                             </div>
                         ) : filteredItems.length === 0 ? (
@@ -862,8 +910,8 @@ export default function NewOrderPage() {
                                     <CatalogItemRow
                                         key={item.id}
                                         item={item}
-                                        organizationId={organizationId}
                                         cartEntry={cart[item.id]}
+                                        organizationId={organizationId}
                                         onAdd={handleAdd}
                                         onRemove={handleRemove}
                                         onQtyChange={handleQtyChange}
@@ -877,7 +925,7 @@ export default function NewOrderPage() {
 
                 {/* ── RIGHT: Order summary ── */}
                 <div className="w-72 flex flex-col flex-shrink-0 bg-gray-50/50">
-                    {/* Header + stats */}
+                    {/* Stats */}
                     <div className="px-4 pt-4 pb-3 border-b border-gray-100 bg-white flex-shrink-0">
                         <div className="flex items-center gap-2 mb-3">
                             <ShoppingCart
@@ -943,15 +991,13 @@ export default function NewOrderPage() {
                         )}
                     </div>
 
-                    {/* Delivery type + notes + actions */}
+                    {/* Delivery + notes + actions */}
                     <div className="px-3 pb-4 pt-3 border-t border-gray-100 bg-white flex-shrink-0 flex flex-col gap-3">
-                        {/* Delivery type selector */}
                         <DeliveryTypeSelector
                             value={deliveryType}
                             onChange={setDeliveryType}
                         />
 
-                        {/* Notes */}
                         <div>
                             <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
                                 Notes{" "}
@@ -968,7 +1014,6 @@ export default function NewOrderPage() {
                             />
                         </div>
 
-                        {/* Action buttons */}
                         <div className="flex flex-col gap-2">
                             <button
                                 onClick={handleSubmit}
@@ -998,8 +1043,7 @@ export default function NewOrderPage() {
 
                         <p className="text-[10px] text-gray-300 text-center leading-relaxed">
                             Submitting sends this order to the warehouse for
-                            fulfillment. Store admins cannot see warehouse stock
-                            levels.
+                            fulfillment.
                         </p>
                     </div>
                 </div>

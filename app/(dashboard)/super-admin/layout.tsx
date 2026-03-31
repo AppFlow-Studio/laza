@@ -42,6 +42,7 @@ import {
     SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 // ---------------------------------------------------------------------------
 // Navigation config
@@ -196,9 +197,7 @@ export default function SuperAdminLayout({
                     <Sidebar variant="floating" collapsible="icon">
                         <SidebarHeader>
                             <div className="flex items-center gap-2 px-2 py-2">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-indigo-600 text-white text-sm font-semibold">
-                                    L
-                                </div>
+                                <Image alt="logo" width={100} height={100} src={"/lazabluelogo.png"} className="flex h-8 w-8 items-center justify-center rounded-full border bg-indigo-600 text-white text-sm font-semibold"/>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-semibold">
                                         Laza Dessert Cafe
