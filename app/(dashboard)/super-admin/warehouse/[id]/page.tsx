@@ -6,6 +6,7 @@ import { useWarehouseById } from "@/lib/hooks/queries/useWarehouse";
 import { useLocationWithDetails } from "@/lib/hooks/queries/useLocations";
 import { usePurchaseOrders } from "@/lib/hooks/queries/usePurchaseOrders";
 import { usePallets, usePalletStats, usePurchaseOrdersForFilter } from "@/lib/hooks/queries/usePallets";
+import { useWarehouseInventory } from "@/lib/hooks/queries/useWarehouse";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import {
     Package, Thermometer, Snowflake, Wind,
@@ -20,7 +21,7 @@ import { useState, use, useCallback } from "react";
 import type { StorageSpace } from "@/lib/supabase/types";
 import type { PalletFilters, PalletWithDetails } from "@/lib/supabase/queries/pallets";
 
-type TabId = "storage" | "shipments" | "pallets";
+type TabId = "storage" | "inventory" | "shipments" | "pallets";
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
@@ -123,44 +124,6 @@ function StorageSpaceRow({ space, warehouseId }: { space: StorageSpace; warehous
     );
 }
 
-// ─── Shipment components ──────────────────────────────────────────────────────
-
-function ShipmentCard({ po, warehouseId }: { po: any; warehouseId: string }) {
-    const itemCount  = po.purchase_order_items?.length ?? 0;
-    const grandTotal = (po.subtotal_before ?? 0) + (po.office_fee ?? 0) + (po.shipping_fee ?? 0);
-    return (
-        <Link
-            href={`/super-admin/warehouse/${warehouseId}/purchase-orders/${po.id}`}
-            className="bg-white rounded-xl shadow-sm border border-zinc-200 p-5 hover:shadow-md hover:border-zinc-300 transition-all group block"
-        >
-            <div className="flex items-start justify-between mb-3">
-                <div>
-                    <p className="font-semibold text-zinc-900 group-hover:text-indigo-600 transition-colors">{po.po_number}</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">{po.supplier_name ?? "—"}</p>
-                </div>
-                <PoStatusBadge status={po.status} />
-            </div>
-            <div className="grid grid-cols-3 gap-3 pt-3 border-t border-zinc-100">
-                <div>
-                    <p className="text-xs text-zinc-400">Ordered</p>
-                    <p className="text-sm font-medium text-zinc-900 mt-0.5">
-                        {po.order_date ? new Date(po.order_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}
-                    </p>
-                </div>
-                <div>
-                    <p className="text-xs text-zinc-400">Items</p>
-                    <p className="text-sm font-medium text-zinc-900 mt-0.5">{itemCount}</p>
-                </div>
-                <div>
-                    <p className="text-xs text-zinc-400">Total</p>
-                    <p className="text-sm font-medium text-zinc-900 mt-0.5">
-                        {grandTotal > 0 ? `$${grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
-                    </p>
-                </div>
-            </div>
-        </Link>
-    );
-}
 
 function ShipmentRow({ po, warehouseId }: { po: any; warehouseId: string }) {
     const itemCount  = po.purchase_order_items?.length ?? 0;
@@ -644,13 +607,151 @@ function PalletsTab({
     );
 }
 
+function InventoryTab({ warehouseId }: { warehouseId: string }) {
+    const [search, setSearch] = useState("");
+    const { data: inventory, isLoading } = useWarehouseInventory(warehouseId);
+
+    const filtered = (inventory ?? []).filter((row: any) =>
+        !search ||
+        row.items?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        row.items?.sku?.toLowerCase().includes(search.toLowerCase())
+    );
+
+    if (isLoading) {
+        return (
+            <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                    <LoadingSkeleton key={i} className="h-14 w-full rounded-xl" />
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {/* Search */}
+            <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                <input
+                    type="text"
+                    placeholder="Search by item name or SKU…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-9 pr-9 py-2 text-sm border border-zinc-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                {search && (
+                    <button
+                        onClick={() => setSearch("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                    >
+                        <X className="w-3.5 h-3.5" />
+                    </button>
+                )}
+            </div>
+
+            {/* Table */}
+            {filtered.length === 0 ? (
+                <div className="bg-white rounded-xl shadow-sm border border-zinc-200 py-16 text-center">
+                    <Package className="w-12 h-12 text-zinc-300 mx-auto mb-3" />
+                    <p className="text-zinc-500 font-medium">
+                        {search ? "No items match your search" : "No inventory in this warehouse"}
+                    </p>
+                </div>
+            ) : (
+                <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-zinc-100 bg-zinc-50">
+                        <p className="text-xs text-zinc-500 font-medium">
+                            {filtered.length} item{filtered.length !== 1 ? "s" : ""}
+                        </p>
+                    </div>
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-zinc-100 bg-zinc-50/50 text-left">
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">Item</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">SKU</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">Storage Space</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Quantity</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Min Qty</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100">
+                            {filtered.map((row: any) => {
+                                const qty    = row.current_quantity ?? 0;
+                                const minQty = row.min_quantity_override ?? row.items?.min_quantity ?? 0;
+                                const isLow  = minQty > 0 && qty <= minQty;
+                                const isOut  = qty === 0;
+
+                                return (
+                                    <tr key={row.id} className="hover:bg-zinc-50 transition-colors">
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0">
+                                                    <Package className="w-4 h-4 text-zinc-400" />
+                                                </div>
+                                                <span className="font-medium text-zinc-900">
+                                                    {row.items?.name ?? "Unknown"}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className="font-mono text-xs text-zinc-500">
+                                                {row.items?.sku ?? "—"}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-zinc-600">
+                                            {row.storage_spaces?.name ?? "—"}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <span className={`text-sm font-semibold ${
+                                                isOut  ? "text-red-600"    :
+                                                isLow  ? "text-amber-600"  :
+                                                "text-zinc-900"
+                                            }`}>
+                                                {qty}
+                                            </span>
+                                            <span className="text-xs text-zinc-400 ml-1">
+                                                {row.items?.unit_of_measure ?? ""}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-sm text-zinc-500">
+                                            {minQty > 0 ? minQty : "—"}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {isOut ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                                                    Out of stock
+                                                </span>
+                                            ) : isLow ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                                    Low stock
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                                    In stock
+                                                </span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function WarehouseDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const rawTab       = searchParams.get("tab");
-    const activeTab: TabId = (rawTab === "shipments" || rawTab === "pallets") ? rawTab : "storage";
+    const activeTab: TabId = (["storage", "inventory", "shipments", "pallets"] as TabId[]).includes(rawTab as TabId)
+    ? (rawTab as TabId)
+    : "storage";
 
     const setActiveTab = (tab: TabId) => {
         const next = new URLSearchParams(searchParams.toString());
@@ -697,6 +798,7 @@ export default function WarehouseDetailPage({ params }: { params: Promise<{ id: 
 
     const tabs: { id: TabId; label: string; icon: React.ElementType; count?: number }[] = [
         { id: "storage", label: "Storage Spaces", icon: Package, count: storageSpaces.length },
+        { id: "inventory", label: "Inventory", icon: LayoutGrid },
         { id: "shipments", label: "Shipments", icon: Ship},
         { id: "pallets", label: "Pallets", icon: Layers, count: palletStats?.total },
     ];
@@ -773,6 +875,7 @@ export default function WarehouseDetailPage({ params }: { params: Promise<{ id: 
 
             {/* Tab content */}
             {activeTab === "storage" && <StorageSpacesTab storageSpaces={storageSpaces} warehouseId={id} />}
+            {activeTab === "inventory" && <InventoryTab warehouseId={id} />}
             {activeTab === "shipments" && warehouse?.organization_id && (
                 <ShipmentsTab organizationId={warehouse.organization_id} warehouseId={id} />
             )}

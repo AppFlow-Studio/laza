@@ -59,7 +59,7 @@ const navigation = [
     },
     { name: "Orders", href: "/super-admin/orders", icon: StretchHorizontal },
     { name: "Analytics", href: "/super-admin/analytics", icon: ChartColumn },
-    { name: "Locations", href: "/super-admin/locations", icon: MapPin },
+    // { name: "Locations", href: "/super-admin/locations", icon: MapPin },
     { name: "Users", href: "/super-admin/users", icon: Users },
     { name: "Items", href: "/super-admin/items", icon: Package },
     { name: "Categories", href: "/super-admin/categories", icon: Tags },
