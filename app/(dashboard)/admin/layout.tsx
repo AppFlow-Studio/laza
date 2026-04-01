@@ -14,6 +14,7 @@ import {
     Tags,
     Settings,
     StretchHorizontal,
+    Warehouse,
 } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
@@ -32,18 +33,49 @@ import {
     SidebarMenuItem,
     SidebarProvider,
     SidebarTrigger,
+    useSidebar,
 } from "@/components/ui/sidebar";
+import Image from "next/image";
+import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
+import { useLocation } from "@/lib/hooks/queries/useLocations";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const navigation = [
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { name: "Orders", href: "/admin/orders", icon: StretchHorizontal },
-    { name: "Locations", href: "/admin/locations", icon: MapPin },
+    // { name: "Locations", href: "/admin/locations", icon: MapPin },
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Items", href: "/admin/items", icon: Package },
     { name: "Categories", href: "/admin/categories", icon: Tags },
     { name: "Inventory", href: "/admin/inventory", icon: BarChart3 },
     { name: "Settings", href: "/admin/settings/notifications", icon: Settings },
 ];
+
+// Add this inner component above AdminLayout:
+function SidebarLocationBlock() {
+    const { state } = useSidebar();
+    const isCollapsed = state === "collapsed";
+
+    const { data: userInfo } = useUserInfo();
+    const { data: location } = useLocation(
+        userInfo?.assigned_location_id ?? "",
+    );
+
+    if (isCollapsed) return null;
+
+    return (
+        <div className="w-full rounded-xl px-6 py-2.5 bg-indigo-50 border-b border-indigo-100">
+            {location ? (
+                <div className="flex items-center gap-3 text-indigo-700 text-sm font-medium">
+                    <Warehouse size={14} />
+                    {location.name}
+                </div>
+            ) : (
+                <Skeleton className="w-full h-8" />
+            )}
+        </div>
+    );
+}
 
 export default function AdminLayout({
     children,
@@ -52,6 +84,11 @@ export default function AdminLayout({
 }) {
     const pathname = usePathname();
     const { user } = useUser();
+
+    const { data: userInfo } = useUserInfo();
+    const { data: location } = useLocation(
+        userInfo?.assigned_location_id ?? "",
+    );
 
     return (
         <ErrorBoundary>
@@ -63,9 +100,13 @@ export default function AdminLayout({
                     <Sidebar variant="floating" collapsible="icon" className="">
                         <SidebarHeader>
                             <div className="flex items-center gap-2 px-2 py-2">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-indigo-600 text-white text-sm font-semibold truncate">
-                                    L
-                                </div>
+                                <Image
+                                    alt="logo"
+                                    width={100}
+                                    height={100}
+                                    src={"/lazabluelogo.png"}
+                                    className="flex h-8 w-8 items-center justify-center rounded-full border bg-indigo-600 text-white text-sm font-semibold"
+                                />
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-semibold">
                                         Laza Dessert Cafe
@@ -75,6 +116,7 @@ export default function AdminLayout({
                                     </span>
                                 </div>
                             </div>
+                            <SidebarLocationBlock />
                         </SidebarHeader>
 
                         <SidebarContent>

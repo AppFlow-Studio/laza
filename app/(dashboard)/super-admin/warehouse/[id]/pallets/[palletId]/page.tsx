@@ -1,25 +1,21 @@
+//super-admin/warehouse/[palletId]
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, MoveRight, Pencil } from "lucide-react";
+import { ArrowLeft, MoveRight } from "lucide-react";
 import { usePallet, usePalletOperationsLog } from "@/lib/hooks/queries/usePallets";
 import { PalletStatusBadge } from "@/components/pallets/PalletStatusBadge";
-import { TemperatureBadge } from "@/components/pallets/TemperatureBadge";
 import { FillLevelBar } from "@/components/pallets/FillLevelBar";
 import { PalletContentsTable } from "@/components/pallets/PalletContentsTable";
 import { PalletActivityLog } from "@/components/pallets/PalletActivityLog";
-import { EditStorageSpaceModal } from "@/components/pallets/EditStorageSpaceModal";
 import { format } from "date-fns";
-import { useState } from "react";
 
 export default function PalletDetailPage() {
 	const { palletId } = useParams<{ palletId: string }>();
 	const router = useRouter();
-	const [editModalOpen, setEditModalOpen] = useState(false);
 
 	const { data: pallet, isLoading } = usePallet(palletId);
-	const { data: activityLog, isLoading: logLoading } =
-		usePalletOperationsLog(palletId);
+	const { data: activityLog, isLoading: logLoading } = usePalletOperationsLog(palletId);
 
 	if (isLoading) {
 		return <PalletDetailSkeleton />;
@@ -34,7 +30,7 @@ export default function PalletDetailPage() {
 	}
 
 	const totalCapacity = (pallet.pallet_inventory ?? []).reduce(
-		(s: number, r: { initial_box_count: number; }) => s + (r.initial_box_count ?? 0),
+		(s: number, r: { initial_box_count: number }) => s + (r.initial_box_count ?? 0),
 		0
 	);
 
@@ -59,50 +55,25 @@ export default function PalletDetailPage() {
 					</h1>
 					<PalletStatusBadge status={pallet.status as "active" | "empty" | "retired"} />
 				</div>
-				<div className="flex gap-2">
-					<button
-						onClick={() =>
-							router.push(`/super-admin/warehouse/pallets/reorganize?${params.toString()}`)
-						}
-						className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-					>
-						<MoveRight className="h-4 w-4" />
-						Move Items
-					</button>
-					<button
-						onClick={() => setEditModalOpen(true)}
-						className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-					>
-						<Pencil className="h-4 w-4" />
-						Edit
-					</button>
-				</div>
+				<button
+					onClick={() =>
+						router.push(`/super-admin/warehouse/pallets/reorganize?${params.toString()}`)
+					}
+					className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+				>
+					<MoveRight className="h-4 w-4" />
+					Move Items
+				</button>
 			</div>
 
 			{/* ── Info Cards ── */}
-			<div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-				{/* Location */}
-				<InfoCard label="Location">
-					{pallet.storage_spaces ? (
-						<div className="flex flex-col gap-1">
-							<TemperatureBadge type={pallet.storage_spaces.temperature_type} />
-							<span className="text-sm font-medium text-gray-900">
-                {pallet.storage_spaces.name}
-              </span>
-						</div>
-					) : (
-						<span className="text-sm text-gray-400">Unassigned</span>
-					)}
-				</InfoCard>
-
+			<div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
 				{/* Source PO */}
 				<InfoCard label="Source Shipment">
 					{pallet.purchase_orders ? (
 						<button
 							onClick={() =>
-								router.push(
-									`/super-admin/purchase-orders/${pallet.purchase_order_id}`
-								)
+								router.push(`/super-admin/purchase-orders/${pallet.purchase_order_id}`)
 							}
 							className="text-left"
 						>
@@ -110,9 +81,7 @@ export default function PalletDetailPage() {
 								{pallet.purchase_orders.po_number}
 							</p>
 							{pallet.purchase_orders.supplier_name && (
-								<p className="text-xs text-gray-500">
-									{pallet.purchase_orders.supplier_name}
-								</p>
+								<p className="text-xs text-gray-500">{pallet.purchase_orders.supplier_name}</p>
 							)}
 							{pallet.received_at && (
 								<p className="text-xs text-gray-400">
@@ -128,12 +97,12 @@ export default function PalletDetailPage() {
 				{/* Capacity */}
 				<InfoCard label="Capacity">
 					<div className="flex flex-col gap-2">
-            <span className="text-xl font-semibold text-gray-900">
-              {pallet.total_boxes}
-				<span className="text-sm font-normal text-gray-400">
-                /{totalCapacity} boxes
-              </span>
-            </span>
+						<span className="text-xl font-semibold text-gray-900">
+							{pallet.total_boxes}
+							<span className="text-sm font-normal text-gray-400">
+								/{totalCapacity} boxes
+							</span>
+						</span>
 						<FillLevelBar
 							current={pallet.total_boxes}
 							capacity={totalCapacity}
@@ -147,11 +116,11 @@ export default function PalletDetailPage() {
 					<div className="flex flex-col gap-1">
 						<PalletStatusBadge status={pallet.status as "active" | "empty" | "retired"} />
 						<span className="text-xs text-gray-400">
-              Updated{" "}
+							Updated{" "}
 							{pallet.updated_at
 								? format(new Date(pallet.updated_at), "MMM d, yyyy")
 								: "—"}
-            </span>
+						</span>
 					</div>
 				</InfoCard>
 			</div>
@@ -165,25 +134,11 @@ export default function PalletDetailPage() {
 					<PalletActivityLog log={activityLog ?? []} isLoading={logLoading} />
 				</div>
 			</div>
-
-			{/* Edit Modal */}
-			{editModalOpen && (
-				<EditStorageSpaceModal
-					pallet={pallet}
-					onClose={() => setEditModalOpen(false)}
-				/>
-			)}
 		</div>
 	);
 }
 
-function InfoCard({
-					  label,
-					  children,
-				  }: {
-	label: string;
-	children: React.ReactNode;
-}) {
+function InfoCard({ label, children }: { label: string; children: React.ReactNode }) {
 	return (
 		<div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
 			<p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
@@ -201,8 +156,8 @@ function PalletDetailSkeleton() {
 				<div className="h-9 w-9 animate-pulse rounded-lg bg-gray-100" />
 				<div className="h-7 w-48 animate-pulse rounded-lg bg-gray-100" />
 			</div>
-			<div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-				{Array.from({ length: 4 }).map((_, i) => (
+			<div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+				{Array.from({ length: 3 }).map((_, i) => (
 					<div key={i} className="h-24 animate-pulse rounded-xl bg-gray-100" />
 				))}
 			</div>

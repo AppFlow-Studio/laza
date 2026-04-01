@@ -5,7 +5,7 @@ import type { Database } from '@/lib/supabase/types';
 
 export type PalletAssignment = {
     pallet_label: string;
-    // No storage_space_id — warehouse items are tracked by pallet, not storage space
+    // Items are assigned directly to pallets — no storage space involved
     items: {
         item_id:                number;
         purchase_order_item_id: string;
@@ -19,6 +19,7 @@ export type PalletAssignment = {
 // ─── Reads ────────────────────────────────────────────────────────────────────
 
 export async function getPOForReceivingAction(purchaseOrderId: string) {
+
     const supabase = createServiceRoleClient();
     const { data, error } = await supabase
         .from('purchase_orders')
@@ -34,29 +35,16 @@ export async function getPOForReceivingAction(purchaseOrderId: string) {
         .eq('id', purchaseOrderId)
         .single();
 
-    console.log("log", data, error)
     if (error) throw new Error(error.message);
     return data;
 }
 
-export async function getWarehouseStorageSpacesAction(warehouseLocationId: string) {
-    const supabase = createServiceRoleClient();
-    const { data, error } = await supabase
-        .from('storage_spaces')
-        .select('id, name, temperature_type')
-        .eq('location_id', warehouseLocationId)
-        .order('name');
-    if (error) throw new Error(error.message);
-    return data ?? [];
-}
-
-// ─── Core pallet query — used by both actions below ───────────────────────────
+// ─── Core pallet query ────────────────────────────────────────────────────────
 
 async function queryPallets(
-    warehouseLocationId: string | null, // null = all warehouses
+    warehouseLocationId: string | null,
     filters?: {
         status?: string;
-        storageSpaceId?: string;
         purchaseOrderId?: string;
         search?: string;
     }
@@ -67,7 +55,6 @@ async function queryPallets(
         !v || v === '$undefined' ? undefined : v;
 
     const status          = clean(filters?.status);
-    const storageSpaceId  = clean(filters?.storageSpaceId);
     const purchaseOrderId = clean(filters?.purchaseOrderId);
     const search          = clean(filters?.search);
 
@@ -75,7 +62,6 @@ async function queryPallets(
         .from('warehouse_pallets')
         .select(`
             *,
-            storage_spaces ( name, temperature_type ),
             purchase_orders ( po_number, supplier_name ),
             warehouse:locations(name),
             pallet_inventory (
@@ -85,7 +71,6 @@ async function queryPallets(
             )
         `);
 
-    // Only filter by warehouse when a real ID is provided
     if (warehouseLocationId) {
         query = query.eq('warehouse_location_id', warehouseLocationId);
     }
@@ -95,7 +80,7 @@ async function queryPallets(
     } else if (!status) {
         query = query.neq('status', 'retired');
     }
-    if (storageSpaceId)  query = query.eq('storage_space_id', storageSpaceId);
+
     if (purchaseOrderId) query = query.eq('purchase_order_id', purchaseOrderId);
 
     const { data, error } = await query.order('received_at', { ascending: false });
@@ -124,38 +109,25 @@ async function queryPallets(
     return pallets;
 }
 
-// Scoped to one warehouse (warehouse detail page tab)
 export async function getPalletsAction(
     warehouseLocationId: string,
-    filters?: {
-        status?: string;
-        storageSpaceId?: string;
-        purchaseOrderId?: string;
-        search?: string;
-    }
+    filters?: { status?: string; purchaseOrderId?: string; search?: string }
 ) {
     return queryPallets(warehouseLocationId, filters);
 }
 
-// All pallets across the org (standalone pallets page)
 export async function getAllPalletsAction(
-    filters?: {
-        status?: string;
-        storageSpaceId?: string;
-        purchaseOrderId?: string;
-        search?: string;
-    }
+    filters?: { status?: string; purchaseOrderId?: string; search?: string }
 ) {
     return queryPallets(null, filters);
 }
 
-// ─── Stats — same split ───────────────────────────────────────────────────────
+// ─── Stats ────────────────────────────────────────────────────────────────────
 
 async function queryPalletStats(warehouseLocationId: string | null) {
     const supabase = createServiceRoleClient();
 
     let query = supabase.from('warehouse_pallets').select('status');
-
     if (warehouseLocationId) {
         query = query.eq('warehouse_location_id', warehouseLocationId);
     }
@@ -172,12 +144,10 @@ async function queryPalletStats(warehouseLocationId: string | null) {
     };
 }
 
-// Scoped to one warehouse
 export async function getPalletStatsAction(warehouseLocationId: string) {
     return queryPalletStats(warehouseLocationId);
 }
 
-// All pallets across org
 export async function getAllPalletStatsAction() {
     return queryPalletStats(null);
 }
@@ -188,7 +158,6 @@ export async function getPalletByIdAction(palletId: string) {
         .from('warehouse_pallets')
         .select(`
             *,
-            storage_spaces ( name, temperature_type ),
             purchase_orders ( po_number, supplier_name ),
             warehouse:locations(name),
             pallet_inventory (
@@ -235,8 +204,6 @@ export async function getPurchaseOrdersForPalletFilterAction(organizationId: str
     if (error) throw new Error(error.message);
     return data ?? [];
 }
-
-
 
 // ─── Phase A: Confirm PO Receipt ──────────────────────────────────────────────
 

@@ -1,9 +1,8 @@
+//super-admin/warehouse/
 "use client";
 
 import { useState, useCallback } from "react";
-import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
 import { usePallets, usePalletStats, usePurchaseOrdersForFilter } from "@/lib/hooks/queries/usePallets";
-import { useLocationWithDetails } from "@/lib/hooks/queries/useLocations";
 import { PalletFilters } from "@/lib/supabase/queries/pallets";
 import { PalletStatsRow } from "@/components/pallets/PalletStatsRow";
 import { PalletFiltersBar } from "@/components/pallets/PalletFiltersBar";
@@ -11,23 +10,16 @@ import { PalletTable } from "@/components/pallets/PalletTable";
 import { PalletTableSkeleton } from "@/components/pallets/PalletTableSkeleton";
 
 export default function PalletsPage() {
-	// useWarehouseLocation takes NO args — gets org via useUserInfo() internally
-	const { data: warehouseLocation, isLoading: locationLoading } = useWarehouseLocation();
-
 	const [filters, setFilters] = useState<PalletFilters>({ status: undefined });
 
-	const { data: pallets,      isLoading: palletsLoading } = usePallets(undefined, filters);
-	const { data: stats,        isLoading: statsLoading } = usePalletStats(undefined);
-	const { data: storageSpaces } = useLocationWithDetails(warehouseLocation?.id);
-	const { data: purchaseOrders } = usePurchaseOrdersForFilter(null);
-
+	const { data: pallets,  isLoading: palletsLoading } = usePallets(undefined, filters);
+	const { data: stats,    isLoading: statsLoading }   = usePalletStats(undefined);
+	const { data: purchaseOrders }                       = usePurchaseOrdersForFilter(null);
 
 	const handleFilterChange = useCallback(
 		(partial: Partial<PalletFilters>) => setFilters((prev) => ({ ...prev, ...partial })),
 		[]
 	);
-
-	const isLoading = locationLoading || palletsLoading;
 
 	return (
 		<div className="flex flex-col gap-6 p-6">
@@ -50,11 +42,10 @@ export default function PalletsPage() {
 			<PalletFiltersBar
 				filters={filters}
 				onFilterChange={handleFilterChange}
-				storageSpaces={storageSpaces?.storage_spaces ?? []}
 				purchaseOrders={purchaseOrders ?? []}
 			/>
 
-			{isLoading ? (
+			{palletsLoading ? (
 				<PalletTableSkeleton />
 			) : (
 				<PalletTable pallets={pallets ?? []} isLoading={palletsLoading} />

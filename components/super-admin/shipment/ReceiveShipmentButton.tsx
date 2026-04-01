@@ -14,10 +14,10 @@ interface ReceiveShipmentButtonProps {
 const RECEIVABLE_STATUSES = ["in_transit", "arrived"];
 
 export function ReceiveShipmentButton({
-    poId,
-    poStatus,
-    warehouseId,
-}: ReceiveShipmentButtonProps) {
+                                          poId,
+                                          poStatus,
+                                          warehouseId,
+                                      }: ReceiveShipmentButtonProps) {
     const router = useRouter();
 
     if (!RECEIVABLE_STATUSES.includes(poStatus)) return null;
