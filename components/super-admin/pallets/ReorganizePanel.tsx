@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMoveBoxesBetweenPallets } from "@/lib/hooks/queries/useReorganize";
-import { useWarehouseStorageSpaces } from "@/lib/hooks/queries/useReceiving";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 
@@ -30,35 +29,28 @@ type Pallet = {
     id: string;
     pallet_label: string;
     status: string;
-    storage_space_id: string | null;
     total_boxes: number;
-    storage_spaces: { id: string; name: string; temperature_type: string } | null;
     pallet_inventory: PalletInventoryRow[];
 };
 
-// Move qty keyed by pallet_inventory id
 type MoveMap = Record<string, number>;
 
 interface ReorganizePanelProps {
-    pallets:               Pallet[];
-    preselectedSourceId:   string | null;
-    warehouseLocationId:   string;
-    onComplete:            () => void;
+    pallets:             Pallet[];
+    preselectedSourceId: string | null;
+    warehouseLocationId: string;
+    onComplete:          () => void;
 }
-
-const TEMP_ICONS: Record<string, string> = {
-    frozen: "🧊", refrigerated: "❄️", dry: "📦",
-};
 
 // ─── Pallet selector dropdown ─────────────────────────────────────────────────
 
 function PalletSelector({
-    pallets,
-    selectedId,
-    excludeId,
-    placeholder,
-    onSelect,
-}: {
+                            pallets,
+                            selectedId,
+                            excludeId,
+                            placeholder,
+                            onSelect,
+                        }: {
     pallets:     Pallet[];
     selectedId:  string | null;
     excludeId?:  string | null;
@@ -71,16 +63,11 @@ function PalletSelector({
 
     const filtered = pallets.filter((p) => {
         if (p.id === excludeId) return false;
-        const term = query.toLowerCase();
-        return (
-            p.pallet_label.toLowerCase().includes(term) ||
-            p.storage_spaces?.name.toLowerCase().includes(term)
-        );
+        return p.pallet_label.toLowerCase().includes(query.toLowerCase());
     });
 
     const selected = pallets.find((p) => p.id === selectedId);
 
-    // Close on outside click
     useState(() => {
         function handle(e: MouseEvent) {
             if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -101,17 +88,9 @@ function PalletSelector({
             >
                 <div className="min-w-0">
                     {selected ? (
-                        <div>
-                            <span className="font-mono font-semibold text-zinc-900">
-                                {selected.pallet_label}
-                            </span>
-                            {selected.storage_spaces && (
-                                <span className="ml-2 text-xs text-zinc-400">
-                                    {TEMP_ICONS[selected.storage_spaces.temperature_type]}{" "}
-                                    {selected.storage_spaces.name}
-                                </span>
-                            )}
-                        </div>
+                        <span className="font-mono font-semibold text-zinc-900">
+                            {selected.pallet_label}
+                        </span>
                     ) : (
                         placeholder
                     )}
@@ -146,23 +125,13 @@ function PalletSelector({
                                             : "hover:bg-zinc-50 text-zinc-800"
                                     )}
                                 >
-                                    <div>
-                                        <span className="font-mono font-semibold">{p.pallet_label}</span>
-                                        {p.storage_spaces && (
-                                            <span className="ml-2 text-xs text-zinc-400">
-                                                {TEMP_ICONS[p.storage_spaces.temperature_type]}{" "}
-                                                {p.storage_spaces.name}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                        <span className={cn(
-                                            "text-xs px-2 py-0.5 rounded-full font-medium",
-                                            p.status === "active" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
-                                        )}>
-                                            {p.total_boxes} boxes
-                                        </span>
-                                    </div>
+                                    <span className="font-mono font-semibold">{p.pallet_label}</span>
+                                    <span className={cn(
+                                        "text-xs px-2 py-0.5 rounded-full font-medium",
+                                        p.status === "active" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                                    )}>
+                                        {p.total_boxes} boxes
+                                    </span>
                                 </button>
                             </li>
                         ))}
@@ -176,18 +145,16 @@ function PalletSelector({
 // ─── Move summary bar ─────────────────────────────────────────────────────────
 
 function MoveSummary({
-    source,
-    moveMap,
-    destLabel,
-    destSpace,
-}: {
+                         source,
+                         moveMap,
+                         destLabel,
+                     }: {
     source:    Pallet | null;
     moveMap:   MoveMap;
     destLabel: string;
-    destSpace: string;
 }) {
-    const totalBoxes  = Object.values(moveMap).reduce((s, v) => s + v, 0);
-    const itemCount   = Object.values(moveMap).filter((v) => v > 0).length;
+    const totalBoxes = Object.values(moveMap).reduce((s, v) => s + v, 0);
+    const itemCount  = Object.values(moveMap).filter((v) => v > 0).length;
 
     if (!source || totalBoxes === 0) return null;
 
@@ -198,16 +165,9 @@ function MoveSummary({
             className="rounded-xl border border-indigo-200 bg-indigo-50 px-5 py-4"
         >
             <div className="flex items-center gap-3 text-sm">
-                <div className="font-mono font-semibold text-indigo-700">
-                    {source.pallet_label}
-                </div>
+                <div className="font-mono font-semibold text-indigo-700">{source.pallet_label}</div>
                 <ArrowRight className="h-4 w-4 text-indigo-400 flex-shrink-0" />
-                <div className="font-mono font-semibold text-indigo-700">
-                    {destLabel || "New Pallet"}
-                </div>
-                {destSpace && (
-                    <span className="text-xs text-indigo-500">({destSpace})</span>
-                )}
+                <div className="font-mono font-semibold text-indigo-700">{destLabel || "New Pallet"}</div>
                 <div className="ml-auto text-xs text-indigo-600 font-medium">
                     {itemCount} item type{itemCount !== 1 ? "s" : ""} · {totalBoxes} box{totalBoxes !== 1 ? "es" : ""}
                 </div>
@@ -219,42 +179,33 @@ function MoveSummary({
 // ─── Main Panel ───────────────────────────────────────────────────────────────
 
 export function ReorganizePanel({
-    pallets,
-    preselectedSourceId,
-    warehouseLocationId,
-    onComplete,
-}: ReorganizePanelProps) {
+                                    pallets,
+                                    preselectedSourceId,
+                                    onComplete,
+                                }: ReorganizePanelProps) {
     const router = useRouter();
 
-    // ── State ──────────────────────────────────────────────────────────────
     const [sourcePallet, setSourcePallet] = useState<Pallet | null>(
         preselectedSourceId ? (pallets.find((p) => p.id === preselectedSourceId) ?? null) : null
     );
-    const [destMode, setDestMode]         = useState<"existing" | "new">("existing");
-    const [destPallet, setDestPallet]     = useState<Pallet | null>(null);
-    const [destSpaceId, setDestSpaceId]   = useState<string>("");
+    const [destMode, setDestMode]             = useState<"existing" | "new">("existing");
+    const [destPallet, setDestPallet]         = useState<Pallet | null>(null);
     const [newPalletLabel, setNewPalletLabel] = useState<string>("");
-    const [moveMap, setMoveMap]           = useState<MoveMap>({}); // inv_id → boxes to move
+    const [moveMap, setMoveMap]               = useState<MoveMap>({});
 
-    const { data: storageSpaces = [] } = useWarehouseStorageSpaces(warehouseLocationId);
     const { mutateAsync: moveBoxes, isPending } = useMoveBoxesBetweenPallets();
 
-    // ── Derived ────────────────────────────────────────────────────────────
-    const inventory = sourcePallet?.pallet_inventory ?? [];
-
+    const inventory   = sourcePallet?.pallet_inventory ?? [];
     const totalMoving = Object.values(moveMap).reduce((s, v) => s + (v || 0), 0);
 
-    // Validation
     const errors = useMemo(() => {
         const out: string[] = [];
         if (!sourcePallet) return out;
         if (totalMoving === 0) out.push("Select at least one box to move.");
         if (destMode === "existing" && !destPallet) out.push("Select a destination pallet.");
         if (destMode === "new" && !newPalletLabel.trim()) out.push("Enter a label for the new pallet.");
-        if (!destSpaceId) out.push("Select a storage space for the destination.");
         if (destMode === "existing" && destPallet?.id === sourcePallet?.id) out.push("Source and destination cannot be the same pallet.");
 
-        // Check overflows
         inventory.forEach((row) => {
             const moving = moveMap[row.id] ?? 0;
             if (moving > row.box_count) {
@@ -263,15 +214,8 @@ export function ReorganizePanel({
         });
 
         return out;
-    }, [sourcePallet, destPallet, destMode, destSpaceId, newPalletLabel, moveMap, totalMoving, inventory]);
+    }, [sourcePallet, destPallet, destMode, newPalletLabel, moveMap, totalMoving, inventory]);
 
-    // Temp mismatch warning
-    const destSpaceObj = storageSpaces.find((s: any) => s.id === destSpaceId);
-    const sourceSpaceObj = sourcePallet?.storage_spaces;
-    const tempMismatch = destSpaceObj && sourceSpaceObj &&
-        destSpaceObj.temperature_type !== sourceSpaceObj.temperature_type;
-
-    // Select all toggle
     const allSelected = inventory.length > 0 &&
         inventory.every((row) => (moveMap[row.id] ?? 0) === row.box_count);
 
@@ -285,34 +229,14 @@ export function ReorganizePanel({
         }
     }
 
-    // Handle source change — reset move map
     function handleSourceSelect(p: Pallet | null) {
         setSourcePallet(p);
         setMoveMap({});
     }
 
-    // Handle dest pallet change — sync storage space
-    function handleDestSelect(p: Pallet | null) {
-        setDestPallet(p);
-        if (p?.storage_space_id) setDestSpaceId(p.storage_space_id);
-    }
-
-    // ── Submit ─────────────────────────────────────────────────────────────
     async function handleMove() {
-        if (errors.length > 0) return;
-        if (!sourcePallet) return;
+        if (errors.length > 0 || !sourcePallet) return;
 
-        // Temp mismatch — confirm
-        if (tempMismatch) {
-            const ok = confirm(
-                `Destination storage is ${destSpaceObj?.temperature_type}. ` +
-                `Source is ${sourceSpaceObj?.temperature_type}. ` +
-                `Proceed anyway?`
-            );
-            if (!ok) return;
-        }
-
-        // Source will be empty after move — confirm
         const willEmpty = inventory.every((r) => (moveMap[r.id] ?? 0) >= r.box_count);
         if (willEmpty) {
             const ok = confirm(
@@ -331,28 +255,21 @@ export function ReorganizePanel({
             }));
 
         try {
-            const result = await moveBoxes({
-                sourcePalletId:       sourcePallet.id,
-                targetPalletId:       destMode === "existing" ? destPallet?.id ?? null : null,
-                targetStorageSpaceId: destSpaceId,
+            await moveBoxes({
+                sourcePalletId: sourcePallet.id,
+                targetPalletId: destMode === "existing" ? destPallet?.id ?? null : null,
                 itemsToMove,
-                newPalletLabel:       destMode === "new" ? newPalletLabel.trim() : undefined,
+                newPalletLabel: destMode === "new" ? newPalletLabel.trim() : undefined,
             });
 
-            const destLabel = destMode === "new"
-                ? newPalletLabel
-                : destPallet?.pallet_label ?? "pallet";
-
-            toast.success(
-                `${totalMoving} box${totalMoving !== 1 ? "es" : ""} moved from ${sourcePallet.pallet_label} to ${destLabel}.`
-            );
+            const destLabel = destMode === "new" ? newPalletLabel : destPallet?.pallet_label ?? "pallet";
+            toast.success(`${totalMoving} box${totalMoving !== 1 ? "es" : ""} moved from ${sourcePallet.pallet_label} to ${destLabel}.`);
             onComplete();
         } catch (err: any) {
             toast.error(err.message ?? "Move failed. Please try again.");
         }
     }
 
-    // ── Drag and drop (desktop enhancement) ───────────────────────────────
     function handleDragStart(e: React.DragEvent, invId: string, maxBoxes: number) {
         e.dataTransfer.setData("inv_id", invId);
         e.dataTransfer.setData("max_boxes", String(maxBoxes));
@@ -364,17 +281,15 @@ export function ReorganizePanel({
     function handleDrop(e: React.DragEvent) {
         e.preventDefault();
         setIsDragOver(false);
-        const invId   = e.dataTransfer.getData("inv_id");
+        const invId    = e.dataTransfer.getData("inv_id");
         const maxBoxes = parseInt(e.dataTransfer.getData("max_boxes"));
         if (invId && maxBoxes > 0) {
             setMoveMap((prev) => ({ ...prev, [invId]: maxBoxes }));
         }
     }
 
-    // ── Render ─────────────────────────────────────────────────────────────
     return (
         <div className="flex flex-col gap-5">
-            {/* ── Source selector ── */}
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
 
                 {/* LEFT: Source */}
@@ -394,7 +309,6 @@ export function ReorganizePanel({
                         onSelect={handleSourceSelect}
                     />
 
-                    {/* Source contents */}
                     <AnimatePresence mode="wait">
                         {sourcePallet && (
                             <motion.div
@@ -404,7 +318,6 @@ export function ReorganizePanel({
                                 exit={{ opacity: 0 }}
                                 className="flex flex-col gap-3"
                             >
-                                {/* Select all */}
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs text-zinc-500">
                                         {inventory.length} item type{inventory.length !== 1 ? "s" : ""}
@@ -419,11 +332,10 @@ export function ReorganizePanel({
                                     </button>
                                 </div>
 
-                                {/* Item rows */}
                                 <div className="divide-y divide-zinc-50 rounded-xl border border-zinc-100 overflow-hidden">
                                     {inventory.map((row) => {
-                                        const moving  = moveMap[row.id] ?? 0;
-                                        const isOver  = moving > row.box_count;
+                                        const moving   = moveMap[row.id] ?? 0;
+                                        const isOver   = moving > row.box_count;
                                         const itemName = row.items?.short_label ?? row.items?.name ?? "—";
 
                                         return (
@@ -439,22 +351,14 @@ export function ReorganizePanel({
                                             >
                                                 <Package className="h-3.5 w-3.5 flex-shrink-0 text-zinc-300" />
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium text-zinc-900 truncate">
-                                                        {itemName}
-                                                    </p>
-                                                    <p className="text-xs text-zinc-400">
-                                                        {row.box_count} box{row.box_count !== 1 ? "es" : ""} available
-                                                    </p>
+                                                    <p className="text-sm font-medium text-zinc-900 truncate">{itemName}</p>
+                                                    <p className="text-xs text-zinc-400">{row.box_count} box{row.box_count !== 1 ? "es" : ""} available</p>
                                                 </div>
 
-                                                {/* Box count input */}
                                                 <div className="flex items-center gap-1.5 flex-shrink-0">
                                                     <button
                                                         type="button"
-                                                        onClick={() => setMoveMap((p) => ({
-                                                            ...p,
-                                                            [row.id]: Math.max(0, (p[row.id] ?? 0) - 1),
-                                                        }))}
+                                                        onClick={() => setMoveMap((p) => ({ ...p, [row.id]: Math.max(0, (p[row.id] ?? 0) - 1) }))}
                                                         className="w-6 h-6 rounded-md border border-zinc-200 text-zinc-500 hover:bg-zinc-100 text-sm font-medium flex items-center justify-center"
                                                     >
                                                         −
@@ -464,25 +368,19 @@ export function ReorganizePanel({
                                                         min={0}
                                                         max={row.box_count}
                                                         value={moving}
-                                                        onChange={(e) => setMoveMap((p) => ({
-                                                            ...p,
-                                                            [row.id]: Math.max(0, parseInt(e.target.value) || 0),
-                                                        }))}
+                                                        onChange={(e) => setMoveMap((p) => ({ ...p, [row.id]: Math.max(0, parseInt(e.target.value) || 0) }))}
                                                         className={cn(
                                                             "w-14 rounded-lg border text-center text-sm tabular-nums py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500",
                                                             isOver
                                                                 ? "border-red-400 bg-red-50 text-red-700"
                                                                 : moving > 0
-                                                                ? "border-indigo-300 bg-white"
-                                                                : "border-zinc-200 bg-white text-zinc-700"
+                                                                    ? "border-indigo-300 bg-white"
+                                                                    : "border-zinc-200 bg-white text-zinc-700"
                                                         )}
                                                     />
                                                     <button
                                                         type="button"
-                                                        onClick={() => setMoveMap((p) => ({
-                                                            ...p,
-                                                            [row.id]: Math.min(row.box_count, (p[row.id] ?? 0) + 1),
-                                                        }))}
+                                                        onClick={() => setMoveMap((p) => ({ ...p, [row.id]: Math.min(row.box_count, (p[row.id] ?? 0) + 1) }))}
                                                         className="w-6 h-6 rounded-md border border-zinc-200 text-zinc-500 hover:bg-zinc-100 text-sm font-medium flex items-center justify-center"
                                                     >
                                                         +
@@ -517,11 +415,8 @@ export function ReorganizePanel({
                     <div>
                         <h2 className="text-sm font-semibold text-zinc-900">Move To</h2>
                         <p className="mt-0.5 text-xs text-zinc-400">
-                            Choose an existing pallet or create a new one.
-                            {" "}
-                            <span className="text-indigo-400">
-                                Drag items here on desktop.
-                            </span>
+                            Choose an existing pallet or create a new one.{" "}
+                            <span className="text-indigo-400">Drag items here on desktop.</span>
                         </p>
                     </div>
 
@@ -534,7 +429,6 @@ export function ReorganizePanel({
                                 onClick={() => {
                                     setDestMode(mode);
                                     setDestPallet(null);
-                                    setDestSpaceId("");
                                     setNewPalletLabel("");
                                 }}
                                 className={cn(
@@ -563,32 +457,9 @@ export function ReorganizePanel({
                                     selectedId={destPallet?.id ?? null}
                                     excludeId={sourcePallet?.id}
                                     placeholder="Select destination pallet…"
-                                    onSelect={handleDestSelect}
+                                    onSelect={setDestPallet}
                                 />
 
-                                {/* Storage space (editable even for existing — allows reassignment) */}
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-medium text-zinc-600">
-                                        Storage Space <span className="text-red-400">*</span>
-                                    </label>
-                                    <select
-                                        value={destSpaceId}
-                                        onChange={(e) => setDestSpaceId(e.target.value)}
-                                        className={cn(
-                                            "w-full rounded-lg border px-3 py-2 text-sm text-zinc-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500",
-                                            !destSpaceId ? "border-zinc-200 text-zinc-400" : "border-zinc-200"
-                                        )}
-                                    >
-                                        <option value="">Select storage space…</option>
-                                        {storageSpaces.map((ss: any) => (
-                                            <option key={ss.id} value={ss.id}>
-                                                {TEMP_ICONS[ss.temperature_type] ?? "📦"} {ss.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Dest pallet current contents (read only) */}
                                 {destPallet && destPallet.pallet_inventory.length > 0 && (
                                     <div className="rounded-xl border border-zinc-100 bg-zinc-50 overflow-hidden">
                                         <p className="px-4 py-2 text-xs font-medium text-zinc-400 border-b border-zinc-100">
@@ -609,7 +480,6 @@ export function ReorganizePanel({
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="flex flex-col gap-3"
                             >
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-medium text-zinc-600">
@@ -623,38 +493,9 @@ export function ReorganizePanel({
                                         className="w-full rounded-lg border border-zinc-200 px-3 py-2 font-mono text-sm text-zinc-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                     />
                                 </div>
-
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-medium text-zinc-600">
-                                        Storage Space <span className="text-red-400">*</span>
-                                    </label>
-                                    <select
-                                        value={destSpaceId}
-                                        onChange={(e) => setDestSpaceId(e.target.value)}
-                                        className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                    >
-                                        <option value="">Select storage space…</option>
-                                        {storageSpaces.map((ss: any) => (
-                                            <option key={ss.id} value={ss.id}>
-                                                {TEMP_ICONS[ss.temperature_type] ?? "📦"} {ss.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
-
-                    {/* Temperature mismatch warning */}
-                    {tempMismatch && (
-                        <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-                            <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                            <p className="text-xs text-amber-700">
-                                Destination is <strong>{destSpaceObj?.temperature_type}</strong> but source is{" "}
-                                <strong>{sourceSpaceObj?.temperature_type}</strong>. You can still proceed.
-                            </p>
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -665,7 +506,6 @@ export function ReorganizePanel({
                         source={sourcePallet}
                         moveMap={moveMap}
                         destLabel={destMode === "existing" ? (destPallet?.pallet_label ?? "") : newPalletLabel}
-                        destSpace={destSpaceObj?.name ?? ""}
                     />
                 )}
             </AnimatePresence>
@@ -684,15 +524,9 @@ export function ReorganizePanel({
 
             {/* ── Action footer ── */}
             <div className="flex items-center justify-between border-t border-zinc-100 pt-4">
-                <Button
-                    variant="outline"
-                    onClick={() => router.back()}
-                    disabled={isPending}
-                    size="sm"
-                >
+                <Button variant="outline" onClick={() => router.back()} disabled={isPending} size="sm">
                     Cancel
                 </Button>
-
                 <Button
                     onClick={handleMove}
                     disabled={isPending || errors.length > 0 || totalMoving === 0}

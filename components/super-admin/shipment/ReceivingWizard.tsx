@@ -15,6 +15,7 @@ type POForReceiving = {
     supplier_name: string | null;
     organization_id: string;
     expected_arrival: string | null;
+    actual_arrival: string | null;
     purchase_order_items: {
         id: string;
         item_id: number;
@@ -38,6 +39,12 @@ interface ReceivingWizardProps {
     po: POForReceiving;
     warehouseLocationId: string;
     organizationId: string;
+    /**
+     * Start at step 2 (pallet assignment) when the PO was already received
+     * but pallets were never created. Wizard auto-reconstructs PhaseA data
+     * from the PO's stored quantity_received values.
+     */
+    initialStep?: 1 | 2;
     onComplete: () => void;
     onCancel: () => void;
 }
@@ -47,17 +54,37 @@ const STEPS = [
     { num: 2, label: "Assign to Pallets" },
 ];
 
+/** Rebuild PhaseA data from an already-received PO so Phase B can run standalone. */
+function reconstructPhaseAData(po: POForReceiving): PhaseAData {
+    const { format } = require("date-fns");
+    return {
+        actualArrivalDate: po.actual_arrival ?? format(new Date(), "yyyy-MM-dd"),
+        notes: "",
+        lineItems: po.purchase_order_items.map((item) => ({
+            item_id:           item.item_id,
+            po_item_id:        item.id,
+            quantity_ordered:  item.quantity_ordered,
+            pieces_per_box:    item.pieces_per_box,
+            quantity_received: item.quantity_received ?? item.quantity_ordered,
+        })),
+    };
+}
+
 export function ReceivingWizard({
                                     po,
                                     warehouseLocationId,
                                     organizationId,
+                                    initialStep = 1,
                                     onComplete,
                                     onCancel,
                                 }: ReceivingWizardProps) {
-    const [currentStep, setCurrentStep]           = useState(1);
+    const [currentStep, setCurrentStep]           = useState(initialStep);
     const [direction, setDirection]               = useState(1);
-    const [phaseAData, setPhaseAData]             = useState<PhaseAData | null>(null);
-    const [phaseADone, setPhaseADone]             = useState(false);
+    const [phaseAData, setPhaseAData]             = useState<PhaseAData | null>(
+        // If starting at step 2, pre-populate from the PO's received quantities
+        initialStep === 2 ? reconstructPhaseAData(po) : null
+    );
+    const [phaseADone, setPhaseADone]             = useState(initialStep === 2);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
 
     const confirmReceipt  = useConfirmPOReceipt();
@@ -98,8 +125,6 @@ export function ReceivingWizard({
                 purchaseOrderId:    po.id,
                 organizationId,
                 warehouseLocationId,
-                // Pass box_configs array per item — D4 RPC format.
-                // No storage_space_id — warehouse pallets are not tied to storage spaces.
                 palletAssignments: data.pallets.map((p) => ({
                     pallet_label: p.pallet_label,
                     items: p.items
@@ -127,14 +152,6 @@ export function ReceivingWizard({
         }
     };
 
-    // ── Phase B skipped ────────────────────────────────────────────────────
-    const handlePhaseBSkip = () => {
-        toast.success(
-            "Shipment received. You can assign pallets later from the Pallets page."
-        );
-        onComplete();
-    };
-
     // ── Cancel guard ──────────────────────────────────────────────────────
     const handleCancelClick = () => {
         if (phaseADone) {
@@ -153,12 +170,12 @@ export function ReceivingWizard({
             <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4 flex-shrink-0">
                 <div>
                     <h1 className="text-lg font-semibold text-zinc-900">
-                        Receiving Shipment
+                        {initialStep === 2 ? "Assign to Pallets" : "Receiving Shipment"}
                     </h1>
                     <p className="mt-0.5 text-sm text-zinc-500">
                         {po.po_number}
                         {po.supplier_name ? ` · ${po.supplier_name}` : ""}
-                        {" · "}Step {currentStep} of {STEPS.length}
+                        {initialStep === 1 && ` · Step ${currentStep} of ${STEPS.length}`}
                     </p>
                 </div>
                 <button
@@ -170,36 +187,36 @@ export function ReceivingWizard({
                 </button>
             </div>
 
-            {/* ── Progress bar ── */}
-            <div className="px-6 pt-4 flex-shrink-0">
-                <div className="flex gap-1.5">
-                    {STEPS.map((s) => (
-                        <div key={s.num} className="flex-1">
-                            <div
-                                className={`h-1.5 rounded-full transition-all duration-500 ${
-                                    currentStep >= s.num
-                                        ? "bg-indigo-600"
-                                        : "bg-zinc-100"
-                                }`}
-                            />
-                            <p
-                                className={`mt-1.5 text-xs font-medium ${
-                                    currentStep === s.num
-                                        ? "text-indigo-600"
-                                        : currentStep > s.num
-                                            ? "text-zinc-400"
-                                            : "text-zinc-300"
-                                }`}
-                            >
-                                Step {s.num}: {s.label}
-                                {s.num === 1 && phaseADone && (
-                                    <span className="ml-1 text-green-500">✓</span>
-                                )}
-                            </p>
-                        </div>
-                    ))}
+            {/* ── Progress bar (only shown for full flow) ── */}
+            {initialStep === 1 && (
+                <div className="px-6 pt-4 flex-shrink-0">
+                    <div className="flex gap-1.5">
+                        {STEPS.map((s) => (
+                            <div key={s.num} className="flex-1">
+                                <div
+                                    className={`h-1.5 rounded-full transition-all duration-500 ${
+                                        currentStep >= s.num ? "bg-indigo-600" : "bg-zinc-100"
+                                    }`}
+                                />
+                                <p
+                                    className={`mt-1.5 text-xs font-medium ${
+                                        currentStep === s.num
+                                            ? "text-indigo-600"
+                                            : currentStep > s.num
+                                                ? "text-zinc-400"
+                                                : "text-zinc-300"
+                                    }`}
+                                >
+                                    Step {s.num}: {s.label}
+                                    {s.num === 1 && phaseADone && (
+                                        <span className="ml-1 text-green-500">✓</span>
+                                    )}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* ── Step Content ── */}
             <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -225,7 +242,7 @@ export function ReceivingWizard({
                                 warehouseLocationId={warehouseLocationId}
                                 organizationId={organizationId}
                                 onSubmit={handlePhaseBSubmit}
-                                onSkip={handlePhaseBSkip}
+                                onSkip={() => {}} // unused — skip is removed
                                 isLoading={isPhaseBLoading}
                             />
                         )}
@@ -238,7 +255,7 @@ export function ReceivingWizard({
                 <Button
                     variant="outline"
                     onClick={() =>
-                        currentStep > 1
+                        currentStep > 1 && initialStep === 1
                             ? goTo(currentStep - 1)
                             : handleCancelClick()
                     }
@@ -259,10 +276,7 @@ export function ReceivingWizard({
                             document
                                 .getElementById("phase-a-form")
                                 ?.dispatchEvent(
-                                    new Event("submit", {
-                                        cancelable: true,
-                                        bubbles: true,
-                                    })
+                                    new Event("submit", { cancelable: true, bubbles: true })
                                 )
                         }
                         disabled={isPhaseALoading}
@@ -283,47 +297,26 @@ export function ReceivingWizard({
                 )}
 
                 {currentStep === 2 && (
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                if (
-                                    confirm(
-                                        "Skip pallet assignment? You can assign pallets later from the Pallets page. Warehouse stock has already been updated."
-                                    )
-                                ) {
-                                    handlePhaseBSkip();
-                                }
-                            }}
-                            disabled={isPhaseBLoading}
-                            size="sm"
-                        >
-                            Skip for now
-                        </Button>
-                        <Button
-                            onClick={() =>
-                                document
-                                    .getElementById("phase-b-form")
-                                    ?.dispatchEvent(
-                                        new Event("submit", {
-                                            cancelable: true,
-                                            bubbles: true,
-                                        })
-                                    )
-                            }
-                            disabled={isPhaseBLoading}
-                            size="sm"
-                        >
-                            {isPhaseBLoading ? (
-                                <>
-                                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                                    Creating pallets…
-                                </>
-                            ) : (
-                                "Complete Receiving"
-                            )}
-                        </Button>
-                    </div>
+                    <Button
+                        onClick={() =>
+                            document
+                                .getElementById("phase-b-form")
+                                ?.dispatchEvent(
+                                    new Event("submit", { cancelable: true, bubbles: true })
+                                )
+                        }
+                        disabled={isPhaseBLoading}
+                        size="sm"
+                    >
+                        {isPhaseBLoading ? (
+                            <>
+                                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                Creating pallets…
+                            </>
+                        ) : (
+                            "Complete Receiving"
+                        )}
+                    </Button>
                 )}
             </div>
 
@@ -336,14 +329,13 @@ export function ReceivingWizard({
                                 <AlertTriangle className="h-5 w-5 text-amber-600" />
                             </div>
                             <h2 className="text-base font-semibold text-zinc-900">
-                                Warehouse stock already updated
+                                Pallets not yet assigned
                             </h2>
                         </div>
                         <p className="text-sm text-zinc-600">
-                            Phase A (receipt confirmation) has already been committed —
-                            warehouse quantities have been updated. Leaving now will skip
-                            pallet assignment. You can assign pallets later from the Pallets
-                            page.
+                            Warehouse stock has already been updated. If you leave now, this
+                            shipment will have no pallets. You can return to this page at any
+                            time to complete pallet assignment.
                         </p>
                         <div className="mt-5 flex gap-2">
                             <Button
@@ -351,9 +343,10 @@ export function ReceivingWizard({
                                 className="flex-1"
                                 onClick={() => setShowCancelDialog(false)}
                             >
-                                Stay
+                                Stay &amp; assign pallets
                             </Button>
                             <Button
+                                variant="destructive"
                                 className="flex-1"
                                 onClick={() => {
                                     setShowCancelDialog(false);

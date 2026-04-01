@@ -1,3 +1,5 @@
+//super-admin/warehouse/reorganize
+
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
@@ -7,9 +9,9 @@ import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import { MoveRight } from "lucide-react";
 
 export default function PalletReorganizePage() {
-    const router        = useRouter();
-    const searchParams  = useSearchParams();
-    const sourceParam   = searchParams.get("source");
+    const router         = useRouter();
+    const searchParams   = useSearchParams();
+    const sourceParam    = searchParams.get("source");
     const warehouseParam = searchParams.get("warehouse") ?? "";
 
     const {
@@ -41,7 +43,7 @@ export default function PalletReorganizePage() {
                         Reorganize Pallets
                     </h1>
                     <p className="text-sm text-zinc-400">
-                        Move boxes between pallets or reassign storage spaces
+                        Move boxes between pallets
                     </p>
                 </div>
             </div>
