@@ -320,7 +320,7 @@ export function PhaseAStep({ po, onSubmit, isLoading }: PhaseAStepProps) {
                             <div key={i} className="flex items-center justify-between text-xs text-amber-800">
                                 <span className="font-medium">{d.name}</span>
                                 <span>
-                                    ordered {d.ordered.toLocaleString()}, received {d.received.toLocaleString()}
+                                    ordered {d.ordered.toLocaleString()}
                                     <span className={cn("ml-1.5 font-semibold", d.delta < 0 ? "text-red-600" : "text-amber-600")}>
                                         ({d.delta > 0 ? "+" : ""}{d.delta})
                                     </span>
