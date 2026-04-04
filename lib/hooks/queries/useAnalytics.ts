@@ -10,12 +10,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
-	getBurnRatesAction,
-	getReorderAlertsAction,
-	getStoreOrderHistoryAction,
-	getStoreComparisonAction,
-	getMostOrderedItemsAction,
-	getWarehouseDepletionTrendAction,
+	getBurnRates,
+	getReorderAlerts,
+	getStoreOrderHistory,
+	getStoreComparison,
+	getMostOrderedItems,
+	getWarehouseDepletionTrend,
 } from "@/lib/supabase/actions/analyticsActions";
 import type { DateRange } from "@/lib/supabase/queries/analytics";
 
@@ -45,7 +45,7 @@ export function useBurnRates(
 ) {
 	return useQuery({
 		queryKey:  analyticsKeys.burnRates(orgId ?? "", daysLookback),
-		queryFn:   () => getBurnRatesAction(orgId!, daysLookback),
+		queryFn:   () => getBurnRates(orgId!, daysLookback),
 		enabled:   !!orgId,
 		staleTime: 5 * 60_000,
 	});
@@ -60,7 +60,7 @@ export function useReorderAlerts(
 ) {
 	return useQuery({
 		queryKey:  analyticsKeys.reorderAlerts(orgId ?? "", leadTimeDays, bufferDays),
-		queryFn:   () => getReorderAlertsAction(orgId!, leadTimeDays, bufferDays),
+		queryFn:   () => getReorderAlerts(orgId!, leadTimeDays, bufferDays),
 		enabled:   !!orgId,
 		staleTime: 5 * 60_000,
 	});
@@ -74,7 +74,7 @@ export function useStoreOrderHistory(
 ) {
 	return useQuery({
 		queryKey:  analyticsKeys.storeHistory(locationId ?? "", dateRange),
-		queryFn:   () => getStoreOrderHistoryAction(locationId!, dateRange),
+		queryFn:   () => getStoreOrderHistory(locationId!, dateRange),
 		enabled:   !!locationId,
 		staleTime: 5 * 60_000,
 	});
@@ -88,7 +88,7 @@ export function useStoreComparison(
 ) {
 	return useQuery({
 		queryKey:  analyticsKeys.storeComparison(orgId ?? "", dateRange),
-		queryFn:   () => getStoreComparisonAction(orgId!, dateRange),
+		queryFn:   () => getStoreComparison(orgId!, dateRange),
 		enabled:   !!orgId,
 		staleTime: 5 * 60_000,
 	});
@@ -102,7 +102,7 @@ export function useMostOrderedItems(
 ) {
 	return useQuery({
 		queryKey:  analyticsKeys.mostOrdered(orgId ?? "", dateRange),
-		queryFn:   () => getMostOrderedItemsAction(orgId!, dateRange),
+		queryFn:   () => getMostOrderedItems(orgId!, dateRange),
 		enabled:   !!orgId,
 		staleTime: 5 * 60_000,
 	});
@@ -116,7 +116,7 @@ export function useWarehouseDepletion(
 ) {
 	return useQuery({
 		queryKey:  analyticsKeys.warehouseDepletion(orgId ?? "", dateRange),
-		queryFn:   () => getWarehouseDepletionTrendAction(orgId!, dateRange),
+		queryFn:   () => getWarehouseDepletionTrend(orgId!, dateRange),
 		enabled:   !!orgId,
 		staleTime: 5 * 60_000,
 	});
