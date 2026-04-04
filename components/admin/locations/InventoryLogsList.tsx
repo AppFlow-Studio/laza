@@ -203,7 +203,7 @@ export default function InventoryLogsList({ logs, isLoading, onRefresh }: Invent
     return (
         <div className="h-full flex flex-col">
             {/* Sticky Header with Search and Filters */}
-            <div className="sticky top-0 z-20 bg-white pb-4 border-b border-zinc-200 -mx-4 px-4 pt-0 shadow-sm">
+            <div className="sticky top-0 z-20 bg-white pb-4 -mx-4 px-4 pt-0 ">
                 <div className="flex flex-col gap-4 py-4">
                     <div className="flex flex-col sm:flex-row gap-4 items-center">
                         <div className="flex-1 w-full">

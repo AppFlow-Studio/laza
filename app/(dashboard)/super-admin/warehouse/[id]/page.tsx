@@ -1,5 +1,4 @@
-//super-admin/warehouse/[palletId]/
-
+//super-admin/warehouse/purchase-orders
 "use client";
 
 import { useWarehouseById } from "@/lib/hooks/queries/useWarehouse";
@@ -81,10 +80,14 @@ function PalletStatusBadge({ status }: { status: string }) {
 // ─── Shipments tab ────────────────────────────────────────────────────────────
 
 function ShipmentRow({ po, warehouseId }: { po: any; warehouseId: string }) {
+    const router = useRouter();
     const itemCount  = po.purchase_order_items?.length ?? 0;
     const grandTotal = (po.subtotal_before ?? 0) + (po.office_fee ?? 0) + (po.shipping_fee ?? 0);
     return (
-        <tr className="hover:bg-zinc-50 transition-colors group">
+        <tr
+            onClick={() => router.push(`/super-admin/warehouse/${warehouseId}/purchase-orders/${po.id}`)}
+            className="hover:bg-zinc-50 transition-colors group cursor-pointer"
+        >
             <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0 group-hover:bg-violet-50 transition-colors">
@@ -365,7 +368,7 @@ function PalletsTab({ warehouseId }: { warehouseId: string }) {
                         { label: "Total Active", value: stats.total,   color: "text-zinc-900" },
                         { label: "Active",        value: stats.active,  color: "text-green-600" },
                         { label: "Empty",         value: stats.empty,   color: "text-zinc-500" },
-                        { label: "Retired",       value: stats.retired, color: "text-red-500" },
+                        { label: "Archive",       value: stats.retired, color: "text-red-500" },
                     ].map(({ label, value, color }) => (
                         <div key={label} className="bg-white rounded-xl border border-zinc-200 shadow-sm p-4">
                             <p className={`text-2xl font-semibold ${color}`}>{value}</p>
@@ -606,8 +609,8 @@ export default function WarehouseDetailPage({ params }: { params: Promise<{ id: 
     const searchParams = useSearchParams();
     const rawTab       = searchParams.get("tab");
     const activeTab: TabId = (["inventory", "shipments", "pallets"] as TabId[]).includes(rawTab as TabId)
-    ? (rawTab as TabId)
-    : "inventory";
+        ? (rawTab as TabId)
+        : "inventory";
 
     const setActiveTab = (tab: TabId) => {
         const next = new URLSearchParams(searchParams.toString());
