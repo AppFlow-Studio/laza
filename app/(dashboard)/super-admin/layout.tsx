@@ -25,6 +25,7 @@ import {
     ArrowsUpFromLine,
     BarChart2,
     LineChart,
+    CircleDollarSign,
 } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
@@ -104,6 +105,11 @@ const analyticsChildren = [
         name: "Distribution",
         href: "/super-admin/analytics/distribution",
         icon: BarChart2,
+    },
+    {
+        name: "Costs",
+        href: "/super-admin/analytics/costs",
+        icon: CircleDollarSign,
     },
 ];
 

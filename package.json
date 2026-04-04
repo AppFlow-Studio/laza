@@ -53,6 +53,9 @@
   "devDependencies": {
     "@supabase/supabase-js": "^2.100.0",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
@@ -62,6 +65,7 @@
     "eslint": "9.33.0",
     "eslint-config-next": "15.4.6",
     "jest": "^30.3.0",
+    "jest-environment-jsdom": "^30.3.0",
     "react-email": "4.2.7",
     "supabase": "^2.76.16",
     "tailwindcss": "^4",
