@@ -21,7 +21,10 @@ import {
     ChevronDown,
     Building2,
     Thermometer,
-    Receipt, ArrowsUpFromLine,
+    Receipt,
+    ArrowsUpFromLine,
+    BarChart2,
+    LineChart,
 } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
@@ -95,8 +98,17 @@ const warehouseChildren = [
     },
 ];
 
+const analyticsChildren = [
+    { name: "Analytics", href: "/super-admin/analytics", icon: ChartColumn },
+    {
+        name: "Distribution",
+        href: "/super-admin/analytics/distribution",
+        icon: BarChart2,
+    },
+];
+
 // ---------------------------------------------------------------------------
-// Collapsible warehouse group
+// Collapsible groups
 // ---------------------------------------------------------------------------
 
 function WarehouseGroup({ pathname }: { pathname: string }) {
@@ -165,6 +177,70 @@ function WarehouseGroup({ pathname }: { pathname: string }) {
     );
 }
 
+function AnalyticsGroup({ pathname }: { pathname: string }) {
+    const isOnWarehouse = pathname?.startsWith("/super-admin/analytics");
+    const [open, setOpen] = useState(isOnWarehouse);
+
+    // Auto-expand when navigating to a analytics sub-route
+    useEffect(() => {
+        if (isOnWarehouse) setOpen(true);
+    }, [isOnWarehouse]);
+
+    return (
+        <SidebarMenuItem>
+            {/* Parent row — clicking toggles sub-menu */}
+            <SidebarMenuButton
+                onClick={() => setOpen((o) => !o)}
+                isActive={isOnWarehouse}
+                tooltip="Analytics"
+                className="cursor-pointer"
+            >
+                <LineChart className="h-4 w-4" />
+                <span className="flex-1">Analytics</span>
+                <ChevronDown
+                    className={cn(
+                        "h-3.5 w-3.5 text-zinc-400 transition-transform duration-200",
+                        open && "rotate-180",
+                    )}
+                />
+            </SidebarMenuButton>
+
+            {/* Sub-items */}
+            {open && (
+                <div className="ml-4 mt-0.5 flex flex-col">
+                    {/* Vertical connector line */}
+                    <div className="relative pl-3 border-l border-zinc-200">
+                        {analyticsChildren.map((child) => {
+                            const isActive =
+                                pathname === child.href ||
+                                (child.href === "/super-admin/analytics"
+                                    ? pathname === "/super-admin/analytics"
+                                    : pathname?.startsWith(child.href + "/") ||
+                                      pathname === child.href);
+
+                            return (
+                                <Link
+                                    key={child.href}
+                                    href={child.href}
+                                    className={cn(
+                                        "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors mb-0.5",
+                                        isActive
+                                            ? "bg-indigo-50 text-indigo-600 font-medium"
+                                            : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
+                                    )}
+                                >
+                                    <child.icon className="h-3.5 w-3.5 flex-shrink-0" />
+                                    <span>{child.name}</span>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </SidebarMenuItem>
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Layout
 // ---------------------------------------------------------------------------
@@ -197,7 +273,13 @@ export default function SuperAdminLayout({
                     <Sidebar variant="floating" collapsible="icon">
                         <SidebarHeader>
                             <div className="flex items-center gap-2 px-2 py-2">
-                                <Image alt="logo" width={100} height={100} src={"/lazabluelogo.png"} className="flex h-8 w-8 items-center justify-center rounded-full border bg-indigo-600 text-white text-sm font-semibold"/>
+                                <Image
+                                    alt="logo"
+                                    width={100}
+                                    height={100}
+                                    src={"/lazabluelogo.png"}
+                                    className="flex h-8 w-8 items-center justify-center rounded-full border bg-indigo-600 text-white text-sm font-semibold"
+                                />
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-semibold">
                                         Laza Dessert Cafe
@@ -231,6 +313,7 @@ export default function SuperAdminLayout({
 
                                         {/* Warehouse — collapsible group */}
                                         <WarehouseGroup pathname={pathname} />
+                                        <AnalyticsGroup pathname={pathname} />
 
                                         {/* Rest of nav */}
                                         {navigation
