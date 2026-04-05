@@ -24,7 +24,7 @@ const locations = [
 
 const socialLinks = [
     { href: "https://www.tiktok.com/@lazacafe", icon: "/tiktok.png", label: "TikTok" },
-    { href: "https://www.instagram.com/laza.cafe", icon: "/insta.png", label: "Instagram" },
+    { href: "https://www.instagram.com/lazacafe/", icon: "/insta.png", label: "Instagram" },
 ];
 
 export default function Footer() {
@@ -84,7 +84,7 @@ export default function Footer() {
                         </a>
                     ))}
                 </div>
-                <span className="text-[#2C4B7E]">© 2025 Laza Cafe inc.</span>
+                <span className="text-[#2C4B7E]">© 2026 Laza Cafe inc.</span>
                 <div className="flex gap-12">
                     <Link href="/privacy-policy" className="hover:underline">Privacy Policy</Link>
                     <Link href="/terms-conditions" className="hover:underline">Terms & Conditions</Link>
