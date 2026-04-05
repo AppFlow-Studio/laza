@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
     Ship, Clock, CheckCircle2, XCircle,
@@ -31,12 +32,16 @@ function PoStatusBadge({ status }: { status: string }) {
 }
 
 function ShipmentRow({ po }: { po: any }) {
+    const router = useRouter();
     const itemCount  = po.purchase_order_items?.length ?? 0;
     const grandTotal = (po.subtotal_before ?? 0) + (po.office_fee ?? 0) + (po.shipping_fee ?? 0);
     const warehouseName = po.warehouse?.name ?? null;
 
     return (
-        <tr className="hover:bg-zinc-50 transition-colors group">
+        <tr
+            onClick={() => router.push(`/super-admin/purchase-orders/${po.id}`)}
+            className="hover:bg-zinc-50 transition-colors group cursor-pointer"
+        >
             <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0 group-hover:bg-violet-50 transition-colors">
