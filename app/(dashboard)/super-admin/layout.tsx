@@ -77,11 +77,11 @@ const navigation = [
 
 const warehouseChildren = [
     { name: "Inventory", href: "/super-admin/warehouse", icon: Building2 },
-    {
-        name: "Employees",
-        href: "/super-admin/warehouse/employees",
-        icon: Users,
-    },
+    // {
+    //     name: "Employees",
+    //     href: "/super-admin/warehouse/employees",
+    //     icon: Users,
+    // },
     {
         name: "Thresholds",
         href: "/super-admin/warehouse/thresholds",
