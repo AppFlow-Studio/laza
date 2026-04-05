@@ -3,16 +3,6 @@
 /**
  * TASK 3.5 — Super Admin: Orders Queue Page
  * File: app/(dashboard)/super-admin/orders/page.tsx
- *
- * The super admin's primary "inbox" — all tickets from all stores.
- * Default filter is "submitted" (needs action). Every other status
- * is reachable via filter chips.
- *
- * Sidebar badge:
- *   In your super-admin layout sidebar, add:
- *   import { usePendingTicketCount } from "@/lib/hooks/queries/useOrderTickets";
- *   const { data: pendingCount } = usePendingTicketCount();
- *   // Render pendingCount as a badge next to the "Orders" nav item.
  */
 
 import { useState, useMemo } from "react";
@@ -29,12 +19,9 @@ import {
     AlertCircle,
     Search,
     FileEdit,
-    LayoutGrid,
-    List,
     Plus,
 } from "lucide-react";
 import { useAllTickets } from "@/lib/hooks/queries/useOrderTickets";
-import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { useOrganization } from "@clerk/nextjs";
 import Link from "next/link";
 
@@ -50,7 +37,6 @@ type TicketStatus =
     | "rejected"
     | "cancelled";
 
-// Shape returned by getAllTickets() with the joins we need for this list view
 type QueueTicket = {
     id: string;
     organization_id: string;
@@ -60,12 +46,12 @@ type QueueTicket = {
     submitted_at: string | null;
     created_at: string;
     is_auto_approved: boolean;
+    title: string | null;
     notes: string | null;
     requesting_location: {
         id: string;
         name: string;
     } | null;
-    // We compute item_count + total_boxes from these
     order_ticket_items: {
         id: string;
         quantity_boxes: number;
@@ -103,15 +89,14 @@ function getTotalBoxes(ticket: QueueTicket) {
     );
 }
 
+// ─── Grid layout — single source of truth ────────────────────────────────────
+// Ticket ID | Title | Store | Submitted by | Date | Contents | Status | Arrow
+const GRID_COLS = "110px 160px 1fr 120px 80px 160px 140px 20px";
+
 // ─── Status config ────────────────────────────────────────────────────────────
 const STATUS_META: Record<
     TicketStatus,
-    {
-        label: string;
-        badge: string;
-        dot: string;
-        icon: React.ReactNode;
-    }
+    { label: string; badge: string; dot: string; icon: React.ReactNode }
 > = {
     draft: {
         label: "Draft",
@@ -169,7 +154,6 @@ const STATUS_META: Record<
     },
 };
 
-// Filter chip definitions — "submitted" maps to "needs action" label for clarity
 const FILTER_CHIPS: { key: TicketStatus | "all"; label: string }[] = [
     { key: "all", label: "All" },
     { key: "submitted", label: "Needs action" },
@@ -215,9 +199,7 @@ function FilterChip({
             {label}
             <span
                 className={`text-[10px] px-1 py-0.5 rounded ${
-                    active
-                        ? "bg-white/20 text-white/80"
-                        : "bg-gray-100 text-gray-400"
+                    active ? "bg-white/20 text-white/80" : "bg-gray-100 text-gray-400"
                 }`}
             >
                 {count}
@@ -227,8 +209,7 @@ function FilterChip({
 }
 
 function StoreBadge({ name }: { name: string }) {
-    // Deterministic pastel from store name first char
-    const palettes: string[] = [
+    const palettes = [
         "bg-violet-100 text-violet-700",
         "bg-blue-100 text-blue-700",
         "bg-emerald-100 text-emerald-700",
@@ -246,7 +227,7 @@ function StoreBadge({ name }: { name: string }) {
     );
 }
 
-// ─── Ticket row (list view) ───────────────────────────────────────────────────
+// ─── Ticket row ───────────────────────────────────────────────────────────────
 function TicketRow({ ticket }: { ticket: QueueTicket }) {
     const router = useRouter();
     const dateIso = ticket.submitted_at ?? ticket.created_at;
@@ -260,87 +241,75 @@ function TicketRow({ ticket }: { ticket: QueueTicket }) {
         >
             <div
                 className={`grid gap-3 items-center px-5 py-3.5 border-b border-gray-50 hover:bg-gray-50/70 transition-colors ${
-                    ticket.status === "submitted"
-                        ? "border-l-2 border-l-blue-400"
-                        : ""
+                    ticket.status === "submitted" ? "border-l-2 border-l-blue-400" : ""
                 }`}
-                style={{
-                    gridTemplateColumns: "116px 1fr 130px 90px 1fr 148px 20px",
-                }}
+                style={{ gridTemplateColumns: GRID_COLS }}
             >
-                {/* Ticket ID */}
+                {/* 1 — Ticket ID */}
                 <span
-                    style={{
-                        fontFamily:
-                            "var(--font-mono, 'JetBrains Mono', monospace)",
-                    }}
+                    style={{ fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)" }}
                     className="text-xs font-medium text-gray-500"
                     title={ticket.id}
                 >
                     {shortId(ticket.id)}
                 </span>
 
-                {/* Store */}
+                {/* 2 — Title */}
+                <span className="text-xs font-medium text-gray-800 truncate" title={ticket.title ?? ""}>
+                    {ticket.title ? (
+                        ticket.title
+                    ) : (
+                        <span className="text-gray-300 italic">No title</span>
+                    )}
+                </span>
+
+                {/* 3 — Store */}
                 <div className="flex items-center gap-2 min-w-0">
-                    <StoreBadge
-                        name={ticket.requesting_location?.name ?? "?"}
-                    />
+                    <StoreBadge name={ticket.requesting_location?.name ?? "?"} />
                     <span className="text-sm font-semibold text-gray-900 truncate">
                         {ticket.requesting_location?.name ?? "—"}
                     </span>
                 </div>
 
-                {/* Submitted by — just the user ID for now; swap with user name lookup if available */}
+                {/* 4 — Submitted by */}
                 <div className="flex items-center gap-1.5 min-w-0">
                     <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-indigo-700">
                         {(ticket.requested_by ?? "?").slice(0, 2).toUpperCase()}
                     </div>
-                    <span
-                        className="text-xs text-gray-500 truncate"
-                        title={ticket.requested_by}
-                    >
+                    <span className="text-xs text-gray-500 truncate" title={ticket.requested_by}>
                         Admin
                     </span>
                 </div>
 
-                {/* Date */}
-                <span className="text-xs text-gray-400">
-                    {relativeDate(dateIso)}
-                </span>
+                {/* 5 — Date */}
+                <span className="text-xs text-gray-400">{relativeDate(dateIso)}</span>
 
-                {/* Contents */}
+                {/* 6 — Contents */}
                 <div className="flex items-center gap-3 min-w-0">
                     <span className="text-xs text-gray-500">
-                        <span className="font-semibold text-gray-800">
-                            {itemCount}
-                        </span>{" "}
-                        items
+                        <span className="font-semibold text-gray-800">{itemCount}</span> items
                     </span>
                     <span className="text-xs text-gray-500">
-                        <span className="font-semibold text-gray-800">
-                            {totalBoxes}
-                        </span>{" "}
-                        boxes
+                        <span className="font-semibold text-gray-800">{totalBoxes}</span> boxes
                     </span>
                     {ticket.notes && (
-                        <span className="hidden xl:block text-[11px] text-gray-300 italic truncate max-w-[120px]">
+                        <span className="hidden xl:block text-[11px] text-gray-300 italic truncate max-w-[80px]">
                             {ticket.notes}
                         </span>
                     )}
                 </div>
 
-                {/* Status + auto-approved */}
+                {/* 7 — Status */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                     <StatusBadge status={ticket.status} />
                     {ticket.is_auto_approved && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full">
-                            <CheckCircle2 size={8} />
-                            Auto
+                            <CheckCircle2 size={8} /> Auto
                         </span>
                     )}
                 </div>
 
-                {/* Arrow */}
+                {/* 8 — Arrow */}
                 <ChevronRight
                     size={14}
                     className="text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all"
@@ -367,19 +336,13 @@ function StatCard({
     return (
         <div
             className={`bg-white border rounded-xl p-4 ${
-                highlight
-                    ? "border-blue-200 ring-2 ring-blue-50"
-                    : "border-gray-200"
+                highlight ? "border-blue-200 ring-2 ring-blue-50" : "border-gray-200"
             }`}
         >
-            <div
-                className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${iconBg}`}
-            >
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${iconBg}`}>
                 {icon}
             </div>
-            <p className="text-2xl font-bold text-gray-900 tracking-tight">
-                {value}
-            </p>
+            <p className="text-2xl font-bold text-gray-900 tracking-tight">{value}</p>
             <p className="text-xs text-gray-400 mt-0.5">{label}</p>
         </div>
     );
@@ -390,25 +353,14 @@ export default function SuperAdminOrdersPage() {
     const { organization } = useOrganization();
     const organizationId = organization?.id ?? "";
 
-    // Fetch all tickets across all stores
-    // useAllTickets is from lib/hooks/queries/useOrderTickets.ts
     const { data: rawTickets, isLoading } = useAllTickets(organizationId);
     const tickets = (rawTickets ?? []) as QueueTicket[];
 
-    console.log(rawTickets);
-
-    // ── Local UI state ──
-    // Default to "submitted" — the super admin's action queue
-    const [activeFilter, setActiveFilter] = useState<TicketStatus | "all">(
-        "submitted",
-    );
+    const [activeFilter, setActiveFilter] = useState<TicketStatus | "all">("submitted");
     const [search, setSearch] = useState("");
     const [storeFilter, setStoreFilter] = useState("");
-    const [dateFilter, setDateFilter] = useState<
-        "today" | "week" | "month" | ""
-    >("");
+    const [dateFilter, setDateFilter] = useState<"today" | "week" | "month" | "">("");
 
-    // ── Unique store list for dropdown ──
     const stores = useMemo(() => {
         const names = new Set(
             tickets.map((t) => t.requesting_location?.name).filter(Boolean),
@@ -416,18 +368,14 @@ export default function SuperAdminOrdersPage() {
         return Array.from(names) as string[];
     }, [tickets]);
 
-    // ── Count per status for chips + stat cards ──
     const counts = useMemo(() => {
         const map: Record<string, number> = { all: tickets.length };
         FILTER_CHIPS.forEach(({ key }) => {
-            if (key !== "all") {
-                map[key] = tickets.filter((t) => t.status === key).length;
-            }
+            if (key !== "all") map[key] = tickets.filter((t) => t.status === key).length;
         });
         return map;
     }, [tickets]);
 
-    // ── Date boundary helper ──
     function isInDateRange(iso: string): boolean {
         if (!dateFilter) return true;
         const diff = Date.now() - new Date(iso).getTime();
@@ -437,25 +385,22 @@ export default function SuperAdminOrdersPage() {
         return true;
     }
 
-    // ── Filtered + searched list ──
     const filtered = useMemo(() => {
         const q = search.toLowerCase();
         return tickets.filter((t) => {
-            const matchStatus =
-                activeFilter === "all" || t.status === activeFilter;
-            const matchStore =
-                !storeFilter || t.requesting_location?.name === storeFilter;
+            const matchStatus = activeFilter === "all" || t.status === activeFilter;
+            const matchStore = !storeFilter || t.requesting_location?.name === storeFilter;
             const matchDate = isInDateRange(t.submitted_at ?? t.created_at);
             const matchSearch =
                 !q ||
                 t.id.toLowerCase().includes(q) ||
                 shortId(t.id).toLowerCase().includes(q) ||
-                (t.requesting_location?.name ?? "").toLowerCase().includes(q);
+                (t.requesting_location?.name ?? "").toLowerCase().includes(q) ||
+                (t.title ?? "").toLowerCase().includes(q);
             return matchStatus && matchStore && matchDate && matchSearch;
         });
     }, [tickets, activeFilter, storeFilter, dateFilter, search]);
 
-    // ── Derived stats ──
     const submittedCount = counts["submitted"] ?? 0;
     const processingCount = counts["processing"] ?? 0;
     const fulfilledCount = counts["fulfilled"] ?? 0;
@@ -467,14 +412,11 @@ export default function SuperAdminOrdersPage() {
             <div className="px-6 pt-6 pb-5 border-b border-gray-100">
                 <div className="flex items-start justify-between gap-4 mb-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-                            Orders
-                        </h1>
+                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Orders</h1>
                         <p className="text-xs text-gray-400 mt-1">
                             All store orders across every location
                         </p>
                     </div>
-
                     <Link
                         href="/super-admin/orders/new"
                         className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(99,102,241,.3)]"
@@ -483,7 +425,6 @@ export default function SuperAdminOrdersPage() {
                     </Link>
                 </div>
 
-                {/* Stat cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <StatCard
                         label="Awaiting review"
@@ -514,21 +455,17 @@ export default function SuperAdminOrdersPage() {
             </div>
 
             {/* ── Toolbar ── */}
-            {/* Urgent attention banner */}
             <div className="w-full flex justify-end pt-3.5 px-6">
                 {submittedCount > 0 && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800 font-medium flex-shrink-0">
-                        <AlertCircle
-                            size={13}
-                            className="text-yellow-600 flex-shrink-0"
-                        />
-                        {submittedCount} ticket{submittedCount !== 1 ? "s" : ""}{" "}
-                        need{submittedCount === 1 ? "s" : ""} your attention
+                        <AlertCircle size={13} className="text-yellow-600 flex-shrink-0" />
+                        {submittedCount} ticket{submittedCount !== 1 ? "s" : ""} need
+                        {submittedCount === 1 ? "s" : ""} your attention
                     </div>
                 )}
             </div>
+
             <div className="flex items-center gap-2 px-6 py-3.5 border-b border-gray-100 flex-wrap">
-                {/* Search */}
                 <div className="relative">
                     <Search
                         size={13}
@@ -537,12 +474,11 @@ export default function SuperAdminOrdersPage() {
                     <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search by ID or store…"
+                        placeholder="Search by ID, title or store…"
                         className="w-fit border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                     />
                 </div>
 
-                {/* Store filter */}
                 <select
                     value={storeFilter}
                     onChange={(e) => setStoreFilter(e.target.value)}
@@ -550,18 +486,13 @@ export default function SuperAdminOrdersPage() {
                 >
                     <option value="">All stores</option>
                     {stores.map((s) => (
-                        <option key={s} value={s}>
-                            {s}
-                        </option>
+                        <option key={s} value={s}>{s}</option>
                     ))}
                 </select>
 
-                {/* Date filter */}
                 <select
                     value={dateFilter}
-                    onChange={(e) =>
-                        setDateFilter(e.target.value as typeof dateFilter)
-                    }
+                    onChange={(e) => setDateFilter(e.target.value as typeof dateFilter)}
                     className="py-2 px-3 text-xs border border-gray-200 rounded-lg outline-none focus:border-indigo-400 bg-white text-gray-600 cursor-pointer"
                 >
                     <option value="">All time</option>
@@ -570,18 +501,13 @@ export default function SuperAdminOrdersPage() {
                     <option value="month">This month</option>
                 </select>
 
-                {/* Status filter chips */}
                 <div className="flex items-center gap-1.5 flex-wrap ml-1">
                     {FILTER_CHIPS.map(({ key, label }) => (
                         <FilterChip
                             key={key}
                             label={label}
                             active={activeFilter === key}
-                            count={
-                                key === "all"
-                                    ? tickets.length
-                                    : (counts[key] ?? 0)
-                            }
+                            count={key === "all" ? tickets.length : (counts[key] ?? 0)}
                             onClick={() => setActiveFilter(key)}
                         />
                     ))}
@@ -599,9 +525,7 @@ export default function SuperAdminOrdersPage() {
                     <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-3">
                         <Package size={20} className="text-gray-300" />
                     </div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">
-                        No orders found
-                    </p>
+                    <p className="text-sm font-medium text-gray-500 mb-1">No orders found</p>
                     <p className="text-xs text-gray-300">
                         {activeFilter === "submitted"
                             ? "No tickets are waiting for your review right now."
@@ -610,40 +534,29 @@ export default function SuperAdminOrdersPage() {
                 </div>
             ) : (
                 <>
-                    {/* Column headers */}
+                    {/* Column headers — same GRID_COLS as rows */}
                     <div
                         className="hidden sm:grid gap-3 px-5 py-2 bg-gray-50 border-b border-gray-100"
-                        style={{
-                            gridTemplateColumns:
-                                "116px 1fr 130px 90px 1fr 148px 20px",
-                        }}
+                        style={{ gridTemplateColumns: GRID_COLS }}
                     >
-                        {[
-                            "Ticket ID",
-                            "Store",
-                            "Submitted by",
-                            "Date",
-                            "Contents",
-                            "Status",
-                            "",
-                        ].map((h) => (
-                            <span
-                                key={h}
-                                className="text-[10px] font-bold uppercase tracking-widest text-gray-400"
-                            >
-                                {h}
-                            </span>
-                        ))}
+                        {["Ticket ID", "Title", "Store", "Submitted by", "Date", "Contents", "Status", ""].map(
+                            (h) => (
+                                <span
+                                    key={h}
+                                    className="text-[10px] font-bold uppercase tracking-widest text-gray-400"
+                                >
+                                    {h}
+                                </span>
+                            ),
+                        )}
                     </div>
 
-                    {/* Rows */}
                     <div className="divide-y-0">
                         {filtered.map((ticket) => (
                             <TicketRow key={ticket.id} ticket={ticket} />
                         ))}
                     </div>
 
-                    {/* Footer count */}
                     <p className="text-center text-[11px] text-gray-300 py-4">
                         Showing {filtered.length} of {tickets.length} orders
                     </p>

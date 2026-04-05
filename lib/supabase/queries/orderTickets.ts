@@ -29,6 +29,7 @@ export interface CreateTicketInput {
     requestingLocationId: string;
     warehouseLocationId: string;
     requestedBy: string;
+    title?: string
     notes?: string;
     initialStatus: "draft" | "submitted";
     items: Array<{

@@ -21,11 +21,9 @@ import {
     Store,
     Warehouse,
     ChevronDown,
-    History,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
-// ─── Real hooks ───────────────────────────────────────────────────────────────
 import {
     useWarehouseCatalog,
     useWarehouseLocation,
@@ -43,13 +41,8 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-// delivery_type lives on order_tickets (added Task 1.43, Schema v2 Section 5.7)
-// "company" → warehouse delivers, $65/pallet, payment hold placed at fulfillment
-// "self"    → store self-pickup, $0 cost, skips in_transit status entirely
-//             fulfilled → delivered → confirmed  (no in_transit step)
 type DeliveryType = "company" | "self";
 
-// Cart entry — only items WITH box_quantity can be added
 type CartEntry = {
     item: WarehouseCatalogItem & { box_quantity: number };
     boxes: number;
@@ -79,44 +72,43 @@ function effectivePiecesPerBox(
     return config?.piecesPerBox ?? item.box_quantity;
 }
 
+// ─── useItemShipmentConfigs ───────────────────────────────────────────────────
 function useItemShipmentConfigs(
     itemId: number | null,
     organizationId: string,
 ): { configs: ShipmentBoxConfig[]; loading: boolean } {
     const [configs, setConfigs] = useState<ShipmentBoxConfig[]>([]);
     const [loading, setLoading] = useState(false);
-    console.log(itemId, organizationId);
-    
+
     useEffect(() => {
         if (!itemId || !organizationId) return;
         setLoading(true);
         getItemShipmentHistory(itemId, organizationId)
-            .then((result) => {
-                console.log("shipment configs for item", itemId, result); // ← add this
-                setConfigs(result);
-            })
+            .then((result) => setConfigs(result))
             .finally(() => setLoading(false));
     }, [itemId, organizationId]);
 
     return { configs, loading };
 }
 
+// ─── ShipmentConfigPicker ─────────────────────────────────────────────────────
 function ShipmentConfigPicker({
     item,
     organizationId,
     selectedConfig,
+    hasError,
     onSelect,
 }: {
     item: WarehouseCatalogItem & { box_quantity: number };
     organizationId: string;
     selectedConfig: ShipmentBoxConfig | null;
+    hasError?: boolean;
     onSelect: (config: ShipmentBoxConfig | null) => void;
 }) {
     const { configs, loading } = useItemShipmentConfigs(
         item.id,
         organizationId,
     );
-    
 
     if (loading) {
         return (
@@ -136,24 +128,21 @@ function ShipmentConfigPicker({
         );
     }
 
-    const tabs = [
-        {
-            key: "default",
-            label: "Default",
-            sub: `${item.box_quantity} ${item.unit_of_measure}/box`,
-            config: null as ShipmentBoxConfig | null,
-        },
-        ...configs.map((cfg) => ({
-            key: cfg.id,
-            label: cfg.poNumber ?? "Shipment",
-            sub: `${cfg.piecesPerBox} ${item.unit_of_measure}/box`,
-            config: cfg,
-        })),
-    ];
+    const tabs = configs.map((cfg) => ({
+        key: cfg.id,
+        label:
+            cfg.poNumber ??
+            (cfg.poDate
+                ? new Date(cfg.poDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      year: "numeric",
+                  })
+                : `${cfg.piecesPerBox}/box`),
+        sub: `${cfg.piecesPerBox} ${item.unit_of_measure}/box`,
+        config: cfg,
+    }));
 
-    console.log({ configs });
-
-    const activeKey = selectedConfig === null ? "default" : selectedConfig.id;
+    const activeKey = selectedConfig?.id ?? null;
 
     return (
         <div className="mt-2">
@@ -171,7 +160,9 @@ function ShipmentConfigPicker({
                             className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all ${
                                 isActive
                                     ? "border-indigo-400 bg-indigo-50 text-indigo-700"
-                                    : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                                    : hasError
+                                      ? "border-red-300 bg-red-50 hover:border-red-400"
+                                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
                             }`}
                         >
                             <span
@@ -191,6 +182,13 @@ function ShipmentConfigPicker({
                     );
                 })}
             </div>
+
+            {hasError && (
+                <p className="mt-1.5 text-[11px] text-red-500 font-medium flex items-center gap-1">
+                    <AlertCircle size={10} /> Choose a box config to proceed
+                </p>
+            )}
+
             {selectedConfig &&
                 (selectedConfig.supplierName || selectedConfig.poDate) && (
                     <p className="text-[10px] text-gray-400 mt-1.5">
@@ -284,7 +282,6 @@ function DeliveryTypeSelector({
                                     </div>
                                 )}
                             </div>
-                            {/* Selected indicator dot */}
                             <div
                                 className={`ml-auto mt-0.5 w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 transition-all ${
                                     active
@@ -322,15 +319,21 @@ function CatalogItemRow({
     onQtyChange: (itemId: number, boxes: number) => void;
     onConfigChange: (itemId: number, config: ShipmentBoxConfig | null) => void;
 }) {
+    const [configError, setConfigError] = useState(false);
     const [inputVal, setInputVal] = useState(String(cartEntry?.boxes ?? 1));
     const [error, setError] = useState<string | null>(null);
     const [localConfig, setLocalConfig] = useState<ShipmentBoxConfig | null>(
         cartEntry?.selectedConfig ?? null,
     );
-
     const [showConfigPicker, setShowConfigPicker] = useState(false);
-    const ppb = effectivePiecesPerBox(item, localConfig);
 
+    const { configs: availableConfigs } = useItemShipmentConfigs(
+        item.id,
+        organizationId,
+    );
+    const requiresConfigSelection = availableConfigs.length > 0;
+
+    const ppb = effectivePiecesPerBox(item, localConfig);
     const inCart = !!cartEntry;
     const displayBoxes = parseInt(inputVal) || 1;
 
@@ -359,7 +362,13 @@ function CatalogItemRow({
             setError(v.error ?? null);
             return;
         }
+        if (requiresConfigSelection && !localConfig) {
+            setConfigError(true);
+            setShowConfigPicker(true);
+            return;
+        }
         setError(null);
+        setConfigError(false);
         onAdd(item, v.value!, localConfig);
     };
 
@@ -371,7 +380,6 @@ function CatalogItemRow({
                     : "border-gray-200 bg-white hover:border-violet-200 hover:shadow-[0_1px_6px_rgba(99,102,241,0.07)]"
             }`}
         >
-            {/* Item info */}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-gray-900">
@@ -395,9 +403,14 @@ function CatalogItemRow({
                         </span>
                     </div>
                 )}
+
                 <button
                     onClick={() => setShowConfigPicker((p) => !p)}
-                    className="flex items-center gap-1 mt-1.5 text-[11px] text-gray-500 hover:text-indigo-600 transition-colors group"
+                    className={`flex items-center gap-1 mt-1.5 text-[11px] transition-colors group ${
+                        configError
+                            ? "text-red-500 hover:text-red-600"
+                            : "text-gray-500 hover:text-indigo-600"
+                    }`}
                 >
                     <Boxes
                         size={10}
@@ -422,8 +435,10 @@ function CatalogItemRow({
                         item={item}
                         organizationId={organizationId}
                         selectedConfig={localConfig}
+                        hasError={configError}
                         onSelect={(cfg) => {
                             setLocalConfig(cfg);
+                            setConfigError(false);
                             onConfigChange(item.id, cfg);
                             setShowConfigPicker(false);
                         }}
@@ -431,7 +446,6 @@ function CatalogItemRow({
                 )}
             </div>
 
-            {/* Qty controls */}
             <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                 <div className="flex items-center">
                     <button
@@ -544,46 +558,28 @@ function CartRow({
 export default function NewOrderPage() {
     const router = useRouter();
 
-    // ── Auth / org context ──────────────────────────────────────────────────────
     const { data: userInfo } = useUserInfo();
-    const requestingLocationId = userInfo?.assigned_location_id ?? ""; // exact column name
+    const requestingLocationId = userInfo?.assigned_location_id ?? "";
     const requestedBy = userInfo?.id ?? "";
 
     const { organization } = useOrganization();
     const organizationId = organization?.id ?? "";
 
-    // ── Warehouse location ──────────────────────────────────────────────────────
-    // getWarehouseLocation() filters location_type = 'warehouse'
     const { data: warehouseLocation } = useWarehouseLocation();
     const warehouseLocationId = warehouseLocation?.id ?? "";
 
-    // ── Catalog — NO quantities by design ──────────────────────────────────────
-    // getWarehouseCatalog() selects item details only (no item_locations join).
-    // RLS also blocks store admins from reading warehouse current_quantity.
     const { data: rawCatalogItems, isLoading: catalogLoading } =
         useWarehouseCatalog();
-
-    // console.log(rawCatalogItems); // NO BOX_QUANTITY THERE COMING !!!!!!!!!!
-
-    // ── Categories ──────────────────────────────────────────────────────────────
     const { data: categories } = useCategories();
-
-    // ── Create ticket mutation ──────────────────────────────────────────────────
-    // createTicket() → INSERT order_tickets + order_ticket_items + order_ticket_logs
     const { mutate: createTicket, isPending: isSubmitting } = useCreateTicket();
 
-    // ── Local state ─────────────────────────────────────────────────────────────
+    const [title, setTitle] = useState("");
     const [search, setSearch] = useState("");
     const [categoryFilter, setCategoryFilter] = useState<number | "">("");
     const [cart, setCart] = useState<Record<number, CartEntry>>({});
     const [notes, setNotes] = useState("");
-
-    // delivery_type on order_tickets (Task 1.43, Schema v2 §5.7)
-    // "company" → warehouse delivers, cost est. at fulfillment ($65/pallet)
-    // "self"    → store picks up, $0 cost, skips in_transit in the status flow
     const [deliveryType, setDeliveryType] = useState<DeliveryType>("company");
 
-    // ── Filter: only items with box_quantity set are orderable ──────────────────
     const orderableItems = useMemo(
         () =>
             (rawCatalogItems ?? []).filter(
@@ -595,7 +591,6 @@ export default function NewOrderPage() {
         [rawCatalogItems],
     );
 
-    // ── Catalog filtering ────────────────────────────────────────────────────────
     const filteredItems = useMemo(() => {
         const q = search.toLowerCase();
         return orderableItems.filter((item) => {
@@ -603,7 +598,6 @@ export default function NewOrderPage() {
                 !q ||
                 item.name.toLowerCase().includes(q) ||
                 (item.sku ?? "").toLowerCase().includes(q);
-            // category_id is a direct BIGINT on the item row
             const matchCat =
                 !categoryFilter ||
                 item.category?.forEach(
@@ -613,7 +607,6 @@ export default function NewOrderPage() {
         });
     }, [orderableItems, search, categoryFilter]);
 
-    // ── Cart stats ───────────────────────────────────────────────────────────────
     const cartEntries = Object.values(cart);
     const totalItems = cartEntries.length;
     const totalBoxes = cartEntries.reduce((s, e) => s + e.boxes, 0);
@@ -633,12 +626,11 @@ export default function NewOrderPage() {
         [],
     );
 
-    // ── Cart handlers ────────────────────────────────────────────────────────────
     const handleAdd = useCallback(
         (
             item: WarehouseCatalogItem & { box_quantity: number },
             boxes: number,
-            config: ShipmentBoxConfig | null, // ← add
+            config: ShipmentBoxConfig | null,
         ) => {
             setCart((prev) => ({
                 ...prev,
@@ -664,7 +656,6 @@ export default function NewOrderPage() {
         );
     }, []);
 
-    // ── Build payload ────────────────────────────────────────────────────────────
     const buildPayload = (
         status: "draft" | "submitted",
     ): CreateTicketInput => ({
@@ -673,25 +664,20 @@ export default function NewOrderPage() {
         warehouseLocationId,
         requestedBy,
         initialStatus: status,
-        // delivery_type stored on order_tickets row (Task 1.43)
-        // Tells the fulfillment RPC and status flow which path to take:
-        //   "company" → fulfilled → in_transit → delivered → confirmed
-        //   "self"    → fulfilled → delivered → confirmed  (no in_transit)
         deliveryType,
+        title: title.trim() || undefined,
         notes: notes.trim() || undefined,
         items: cartEntries.map((e) => ({
             itemId: e.item.id,
             quantityBoxes: e.boxes,
             quantityUnits:
-                e.boxes * effectivePiecesPerBox(e.item, e.selectedConfig), // ← was e.item.box_quantity
+                e.boxes * effectivePiecesPerBox(e.item, e.selectedConfig),
         })),
     });
 
-    // ── Guards ────────────────────────────────────────────────────────────────────
     const missingContext =
         !organizationId || !requestingLocationId || !warehouseLocationId;
 
-    // ── Actions ──────────────────────────────────────────────────────────────────
     const handleDraft = async () => {
         if (missingContext) {
             toast.error("Missing location context — try refreshing");
@@ -720,7 +706,6 @@ export default function NewOrderPage() {
         }
     };
 
-    // ─── Render ────────────────────────────────────────────────────────────────
     return (
         <div className="flex flex-col h-screen bg-white">
             {/* ── Top bar ── */}
@@ -774,7 +759,6 @@ export default function NewOrderPage() {
             <div className="flex flex-1 min-h-0">
                 {/* ── LEFT: Catalog ── */}
                 <div className="flex-1 flex flex-col border-r border-gray-100 overflow-hidden">
-                    {/* Toolbar */}
                     <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100 flex-shrink-0">
                         <div className="relative flex-1">
                             <Search
@@ -808,14 +792,12 @@ export default function NewOrderPage() {
                         </select>
                     </div>
 
-                    {/* Item count */}
                     <div className="px-5 py-2 text-[11px] text-gray-300 flex-shrink-0">
                         {filteredItems.length} item
                         {filteredItems.length !== 1 ? "s" : ""} available to
                         order
                     </div>
 
-                    {/* Items list */}
                     <div className="flex-1 overflow-y-auto px-5 pb-5">
                         {catalogLoading ? (
                             <div className="flex items-center justify-center py-16 gap-2 text-gray-400">
@@ -877,7 +859,7 @@ export default function NewOrderPage() {
 
                 {/* ── RIGHT: Order summary ── */}
                 <div className="w-72 flex flex-col flex-shrink-0 bg-gray-50/50">
-                    {/* Header + stats */}
+                    {/* Stats */}
                     <div className="px-4 pt-4 pb-3 border-b border-gray-100 bg-white flex-shrink-0">
                         <div className="flex items-center gap-2 mb-3">
                             <ShoppingCart
@@ -943,13 +925,29 @@ export default function NewOrderPage() {
                         )}
                     </div>
 
-                    {/* Delivery type + notes + actions */}
+                    {/* Delivery + title + notes + actions */}
                     <div className="px-3 pb-4 pt-3 border-t border-gray-100 bg-white flex-shrink-0 flex flex-col gap-3">
-                        {/* Delivery type selector */}
                         <DeliveryTypeSelector
                             value={deliveryType}
                             onChange={setDeliveryType}
                         />
+
+                        {/* Order Title */}
+                        <div>
+                            <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                Order Title{" "}
+                                <span className="font-normal text-gray-300">
+                                    (optional)
+                                </span>
+                            </label>
+                            <input
+                                type="text"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder="e.g. Nutella for Bay Ridge…"
+                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                            />
+                        </div>
 
                         {/* Notes */}
                         <div>
@@ -968,7 +966,6 @@ export default function NewOrderPage() {
                             />
                         </div>
 
-                        {/* Action buttons */}
                         <div className="flex flex-col gap-2">
                             <button
                                 onClick={handleSubmit}
