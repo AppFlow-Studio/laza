@@ -56,6 +56,13 @@ export type Database = {
             foreignKeyName: "alerts_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "alerts_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
           },
@@ -331,6 +338,13 @@ export type Database = {
             foreignKeyName: "inventory_logs_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "inventory_logs_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
           },
@@ -400,6 +414,13 @@ export type Database = {
             foreignKeyName: "item_cost_history_item_fk"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "item_cost_history_item_fk"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
           },
@@ -409,6 +430,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_cost_history_po_fk"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "item_shipment_breakdown"
+            referencedColumns: ["po_id"]
           },
           {
             foreignKeyName: "item_cost_history_po_fk"
@@ -454,6 +482,13 @@ export type Database = {
           storage_space_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "item_locations_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
           {
             foreignKeyName: "item_locations_item_id_fkey"
             columns: ["item_id"]
@@ -582,6 +617,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_catalog_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
           },
           {
             foreignKeyName: "location_catalog_item_id_fkey"
@@ -756,6 +798,13 @@ export type Database = {
             foreignKeyName: "low_stock_notification_queue_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "low_stock_notification_queue_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
           },
@@ -820,6 +869,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "low_stock_thresholds_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
           {
             foreignKeyName: "low_stock_thresholds_item_id_fkey"
             columns: ["item_id"]
@@ -1061,6 +1117,13 @@ export type Database = {
             foreignKeyName: "order_ticket_items_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "order_ticket_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
           },
@@ -1125,6 +1188,7 @@ export type Database = {
           created_at: string
           delivery_type: string | null
           fulfilled_at: string | null
+          has_discrepancy: boolean
           id: string
           is_auto_approved: boolean
           notes: string | null
@@ -1145,6 +1209,7 @@ export type Database = {
           created_at?: string
           delivery_type?: string | null
           fulfilled_at?: string | null
+          has_discrepancy?: boolean
           id?: string
           is_auto_approved?: boolean
           notes?: string | null
@@ -1165,6 +1230,7 @@ export type Database = {
           created_at?: string
           delivery_type?: string | null
           fulfilled_at?: string | null
+          has_discrepancy?: boolean
           id?: string
           is_auto_approved?: boolean
           notes?: string | null
@@ -1358,6 +1424,13 @@ export type Database = {
             foreignKeyName: "pallet_inventory_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "pallet_inventory_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
           },
@@ -1418,6 +1491,13 @@ export type Database = {
           related_ticket_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pallet_operations_log_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
           {
             foreignKeyName: "pallet_operations_log_item_id_fkey"
             columns: ["item_id"]
@@ -1612,6 +1692,44 @@ export type Database = {
           },
         ]
       }
+      po_item_box_configs: {
+        Row: {
+          box_count: number
+          created_at: string
+          id: string
+          notes: string | null
+          pieces_per_box: number
+          purchase_order_item_id: string
+          total_pieces: number | null
+        }
+        Insert: {
+          box_count: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          pieces_per_box: number
+          purchase_order_item_id: string
+          total_pieces?: number | null
+        }
+        Update: {
+          box_count?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          pieces_per_box?: number
+          purchase_order_item_id?: string
+          total_pieces?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_item_box_configs_purchase_order_item_id_fkey"
+            columns: ["purchase_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_order_items: {
         Row: {
           allocated_office_fee: number
@@ -1619,6 +1737,7 @@ export type Database = {
           cartons: number | null
           cbm: number | null
           cbm_share: number | null
+          has_mixed_configs: boolean
           id: string
           item_id: number
           pieces_per_box: number | null
@@ -1637,6 +1756,7 @@ export type Database = {
           cartons?: number | null
           cbm?: number | null
           cbm_share?: number | null
+          has_mixed_configs?: boolean
           id?: string
           item_id: number
           pieces_per_box?: number | null
@@ -1655,6 +1775,7 @@ export type Database = {
           cartons?: number | null
           cbm?: number | null
           cbm_share?: number | null
+          has_mixed_configs?: boolean
           id?: string
           item_id?: number
           pieces_per_box?: number | null
@@ -1672,8 +1793,22 @@ export type Database = {
             foreignKeyName: "purchase_order_items_item_fk"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_item_fk"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_po_fk"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "item_shipment_breakdown"
+            referencedColumns: ["po_id"]
           },
           {
             foreignKeyName: "purchase_order_items_po_fk"
@@ -1703,6 +1838,7 @@ export type Database = {
           total_cbm: number | null
           total_pallets: number | null
           updated_at: string
+          warehouse_location_id: string | null
         }
         Insert: {
           actual_arrival?: string | null
@@ -1722,6 +1858,7 @@ export type Database = {
           total_cbm?: number | null
           total_pallets?: number | null
           updated_at?: string
+          warehouse_location_id?: string | null
         }
         Update: {
           actual_arrival?: string | null
@@ -1741,6 +1878,7 @@ export type Database = {
           total_cbm?: number | null
           total_pallets?: number | null
           updated_at?: string
+          warehouse_location_id?: string | null
         }
         Relationships: [
           {
@@ -1755,6 +1893,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_warehouse_location_id_fkey"
+            columns: ["warehouse_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
         ]
@@ -1971,6 +2116,13 @@ export type Database = {
             foreignKeyName: "update_override_logs_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "update_override_logs_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
           },
@@ -2130,6 +2282,7 @@ export type Database = {
           period_start: string | null
           purchase_order_id: string | null
           rate_per_pallet: number | null
+          title: string | null
           updated_at: string
           warehouse_location_id: string
         }
@@ -2148,6 +2301,7 @@ export type Database = {
           period_start?: string | null
           purchase_order_id?: string | null
           rate_per_pallet?: number | null
+          title?: string | null
           updated_at?: string
           warehouse_location_id: string
         }
@@ -2166,6 +2320,7 @@ export type Database = {
           period_start?: string | null
           purchase_order_id?: string | null
           rate_per_pallet?: number | null
+          title?: string | null
           updated_at?: string
           warehouse_location_id?: string
         }
@@ -2190,6 +2345,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_expenses_po_fk"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "item_shipment_breakdown"
+            referencedColumns: ["po_id"]
           },
           {
             foreignKeyName: "warehouse_expenses_po_fk"
@@ -2247,6 +2409,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_pallets_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "item_shipment_breakdown"
+            referencedColumns: ["po_id"]
           },
           {
             foreignKeyName: "warehouse_pallets_purchase_order_id_fkey"
@@ -2314,38 +2483,157 @@ export type Database = {
       }
     }
     Views: {
+      delivery_estimation_accuracy: {
+        Row: {
+          actual_boxes_per_pallet: number | null
+          actual_cost: number | null
+          actual_pallet_count: number | null
+          cost_delta: number | null
+          delivered_at: string | null
+          delivery_id: string | null
+          estimated_cost: number | null
+          estimated_pallet_count: number | null
+          organization_id: string | null
+          pallet_delta: number | null
+          requesting_location_id: string | null
+          ticket_id: string | null
+          total_boxes_delivered: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_tickets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_tickets_requesting_location_id_fkey"
+            columns: ["requesting_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_deliveries_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "order_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      item_box_totals: {
+        Row: {
+          current_default_per_box: number | null
+          current_warehouse_boxes: number | null
+          item_id: number | null
+          item_name: string | null
+          organization_id: string | null
+          shipment_count: number | null
+          sku: string | null
+          total_boxes_received: number | null
+          total_pieces_received: number | null
+          weighted_avg_per_box: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      item_shipment_breakdown: {
+        Row: {
+          actual_arrival: string | null
+          config_box_count: number | null
+          config_created_at: string | null
+          config_id: string | null
+          config_notes: string | null
+          config_pieces_per_box: number | null
+          config_total_pieces: number | null
+          has_mixed_configs: boolean | null
+          item_id: number | null
+          item_name: string | null
+          organization_id: string | null
+          po_date: string | null
+          po_id: string | null
+          po_line_total_boxes: number | null
+          po_line_total_pieces: number | null
+          po_number: string | null
+          purchase_order_item_id: string | null
+          sku: string | null
+          supplier_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_item_box_configs_purchase_order_item_id_fkey"
+            columns: ["purchase_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_item_fk"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_item_fk"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_org_fk"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warehouse_inventory_overview: {
         Row: {
           box_count: number | null
-          category_id: number | null
-          display_label: string | null
-          effective_pieces_per_box: number | null
+          config_source: string | null
+          effective_ppb: number | null
+          has_mixed_configs: boolean | null
           initial_box_count: number | null
           inventory_created_at: string | null
           inventory_updated_at: string | null
+          item_default_ppb: number | null
+          item_display_label: string | null
           item_id: number | null
           item_name: string | null
+          organization_id: string | null
           pallet_id: string | null
           pallet_inventory_id: string | null
           pallet_label: string | null
-          pallet_received_at: string | null
           pallet_status: string | null
           pieces_per_box_override: number | null
+          po_pieces_per_box: number | null
           purchase_order_id: string | null
           purchase_order_item_id: string | null
+          received_at: string | null
           sku: string | null
           storage_space_id: string | null
           total_pieces: number | null
-          unit_of_measure: string | null
           warehouse_location_id: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "items_category_id_fkey"
-            columns: ["category_id"]
+            foreignKeyName: "pallet_inventory_item_id_fkey"
+            columns: ["item_id"]
             isOneToOne: false
-            referencedRelation: "category"
-            referencedColumns: ["id"]
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
           },
           {
             foreignKeyName: "pallet_inventory_item_id_fkey"
@@ -2367,6 +2655,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "purchase_order_items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_pallets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_pallets_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "item_shipment_breakdown"
+            referencedColumns: ["po_id"]
           },
           {
             foreignKeyName: "warehouse_pallets_purchase_order_id_fkey"
@@ -2409,6 +2711,59 @@ export type Database = {
           triggered: boolean
         }[]
       }
+      confirm_delivery: {
+        Args: {
+          p_actual_pallets: number
+          p_admin_user_id: string
+          p_notes?: string
+          p_ticket_id: string
+        }
+        Returns: Json
+      }
+      confirm_order_receipt: {
+        Args: { p_received_items: Json; p_ticket_id: string; p_user_id: string }
+        Returns: Json
+      }
+      confirm_self_pickup: {
+        Args: { p_admin_user_id: string; p_notes?: string; p_ticket_id: string }
+        Returns: Json
+      }
+      dispatch_order_ticket: {
+        Args: {
+          p_admin_user_id: string
+          p_estimated_pallets?: number
+          p_notes?: string
+          p_ticket_id: string
+        }
+        Returns: Json
+      }
+      fulfill_order_ticket:
+        | {
+            Args: {
+              p_admin_user_id: string
+              p_allow_partial: boolean
+              p_delivery_type: string
+              p_ticket_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_admin_user_id: string
+              p_delivery_type?: string
+              p_ticket_id: string
+            }
+            Returns: Json
+          }
+      fulfill_order_ticket_manual: {
+        Args: {
+          p_admin_user_id: string
+          p_delivery_type?: string
+          p_pallet_selection: Json
+          p_ticket_id: string
+        }
+        Returns: Json
+      }
       get_daily_summary_data: {
         Args: {
           p_date?: string
@@ -2416,6 +2771,15 @@ export type Database = {
           p_organization_id: string
         }
         Returns: Json
+      }
+      get_delivery_pallet_estimate: {
+        Args: { p_organization_id: string; p_total_boxes: number }
+        Returns: {
+          avg_boxes_per_pallet: number
+          confidence: string
+          delivery_count: number
+          estimated_pallets: number
+        }[]
       }
       get_effective_notification_preferences: {
         Args: { p_location_id: string; p_organization_id: string }
@@ -2434,6 +2798,10 @@ export type Database = {
       get_effective_pieces_per_box: {
         Args: { p_pallet_inventory_id: string }
         Returns: number
+      }
+      get_item_shipment_history: {
+        Args: { p_item_id: number; p_organization_id: string }
+        Returns: Json
       }
       get_jwt_debug: { Args: never; Returns: Json }
       get_my_claim: { Args: { claim: string }; Returns: string }
@@ -2462,6 +2830,22 @@ export type Database = {
           urgency_level: string
         }[]
       }
+      get_reorder_alerts: {
+        Args: {
+          p_buffer_days?: number
+          p_lead_time_days?: number
+          p_organization_id: string
+        }
+        Returns: {
+          avg_weekly_units: number
+          current_warehouse_stock: number
+          item_id: number
+          item_name: string
+          item_sku: string
+          urgency: string
+          weeks_remaining: number
+        }[]
+      }
       get_time_window_bounds: {
         Args: {
           p_reference_time?: string
@@ -2485,6 +2869,17 @@ export type Database = {
         Returns: number
       }
       get_user_role: { Args: { user_id: string }; Returns: string }
+      get_warehouse_burn_rates: {
+        Args: { p_days_lookback?: number; p_organization_id: string }
+        Returns: {
+          avg_weekly_units: number
+          current_warehouse_stock: number
+          item_id: number
+          item_name: string
+          item_sku: string
+          weeks_remaining: number
+        }[]
+      }
       is_admin_or_above: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       is_within_time_window: {
@@ -2567,6 +2962,10 @@ export type Database = {
           organization_id: string
           triggered: boolean
         }[]
+      }
+      validate_pallet_selection: {
+        Args: { p_pallet_selection: Json; p_ticket_id: string }
+        Returns: Json
       }
     }
     Enums: {

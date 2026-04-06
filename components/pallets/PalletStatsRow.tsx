@@ -35,7 +35,7 @@ const STAT_CARDS = [
   },
   {
     key: "retired" as keyof PalletStats,
-    label: "Retired",
+    label: "Archive",
     icon: Archive,
     color: "text-gray-500",
     bg: "bg-gray-50",

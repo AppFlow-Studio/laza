@@ -55,7 +55,6 @@ export default function LocationsPage() {
         }
     };
 
-    console.log({ editingLocation });
 
     return (
         <div className="space-y-6">

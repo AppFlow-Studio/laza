@@ -5,7 +5,6 @@ import { useUser } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 import {
     LayoutDashboard,
-    MapPin,
     Users,
     Package,
     BarChart3,
@@ -15,13 +14,17 @@ import {
     Settings,
     Warehouse,
     Store,
-    ChartColumn,
     StretchHorizontal,
     ShoppingCart,
     ChevronDown,
     Building2,
     Thermometer,
-    Receipt, ArrowsUpFromLine,
+    Receipt,
+    ArrowsUpFromLine,
+    BarChart2,
+    LineChart,
+    CircleDollarSign,
+    ChartColumn,
 } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
@@ -38,8 +41,12 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    SidebarMenuSub,
+    SidebarMenuSubButton,
+    SidebarMenuSubItem,
     SidebarProvider,
     SidebarTrigger,
+    useSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -50,7 +57,6 @@ import Image from "next/image";
 
 const navigation = [
     { name: "Dashboard", href: "/super-admin", icon: LayoutDashboard },
-    // Warehouse is handled separately below (collapsible group)
     { name: "All Stores", href: "/super-admin/stores", icon: Store },
     {
         name: "Purchase Orders",
@@ -58,12 +64,10 @@ const navigation = [
         icon: ShoppingCart,
     },
     { name: "Orders", href: "/super-admin/orders", icon: StretchHorizontal },
-    { name: "Analytics", href: "/super-admin/analytics", icon: ChartColumn },
-    // { name: "Locations", href: "/super-admin/locations", icon: MapPin },
     { name: "Users", href: "/super-admin/users", icon: Users },
     { name: "Items", href: "/super-admin/items", icon: Package },
     { name: "Categories", href: "/super-admin/categories", icon: Tags },
-    { name: "Inventory", href: "/super-admin/inventory", icon: BarChart3 },
+    // { name: "Inventory", href: "/super-admin/inventory", icon: BarChart3 },
     {
         name: "Settings",
         href: "/super-admin/settings/notifications",
@@ -73,11 +77,6 @@ const navigation = [
 
 const warehouseChildren = [
     { name: "Inventory", href: "/super-admin/warehouse", icon: Building2 },
-    {
-        name: "Employees",
-        href: "/super-admin/warehouse/employees",
-        icon: Users,
-    },
     {
         name: "Thresholds",
         href: "/super-admin/warehouse/thresholds",
@@ -95,30 +94,74 @@ const warehouseChildren = [
     },
 ];
 
+const analyticsChildren = [
+    { name: "Analytics", href: "/super-admin/analytics", icon: ChartColumn },
+    {
+        name: "Distribution",
+        href: "/super-admin/analytics/distribution",
+        icon: BarChart2,
+    },
+    {
+        name: "Costs",
+        href: "/super-admin/analytics/costs",
+        icon: CircleDollarSign,
+    },
+];
+
 // ---------------------------------------------------------------------------
-// Collapsible warehouse group
+// Collapsible groups — sidebar-aware
 // ---------------------------------------------------------------------------
 
-function WarehouseGroup({ pathname }: { pathname: string }) {
-    const isOnWarehouse = pathname?.startsWith("/super-admin/warehouse");
-    const [open, setOpen] = useState(isOnWarehouse);
+function CollapsibleNavGroup({
+    label,
+    icon: Icon,
+    basePath,
+    children,
+    pathname,
+}: {
+    label: string;
+    icon: React.ElementType;
+    basePath: string;
+    children: { name: string; href: string; icon: React.ElementType }[];
+    pathname: string;
+}) {
+    const { state } = useSidebar();
+    const isCollapsed = state === "collapsed";
+    const isOnSection = pathname?.startsWith(basePath);
+    const [open, setOpen] = useState(isOnSection);
 
-    // Auto-expand when navigating to a warehouse sub-route
     useEffect(() => {
-        if (isOnWarehouse) setOpen(true);
-    }, [isOnWarehouse]);
+        if (isOnSection) setOpen(true);
+    }, [isOnSection]);
+
+    // In collapsed mode: just show the parent icon with tooltip linking to base path
+    if (isCollapsed) {
+        return (
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={isOnSection}
+                    tooltip={label}
+                >
+                    <Link href={children[0].href}>
+                        <Icon className="h-4 w-4" />
+                        <span>{label}</span>
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+        );
+    }
 
     return (
         <SidebarMenuItem>
-            {/* Parent row — clicking toggles sub-menu */}
             <SidebarMenuButton
                 onClick={() => setOpen((o) => !o)}
-                isActive={isOnWarehouse}
-                tooltip="Warehouse"
+                isActive={isOnSection}
+                tooltip={label}
                 className="cursor-pointer"
             >
-                <Warehouse className="h-4 w-4" />
-                <span className="flex-1">Warehouse</span>
+                <Icon className="h-4 w-4" />
+                <span className="flex-1">{label}</span>
                 <ChevronDown
                     className={cn(
                         "h-3.5 w-3.5 text-zinc-400 transition-transform duration-200",
@@ -127,39 +170,29 @@ function WarehouseGroup({ pathname }: { pathname: string }) {
                 />
             </SidebarMenuButton>
 
-            {/* Sub-items */}
             {open && (
-                <div className="ml-4 mt-0.5 flex flex-col">
-                    {/* Vertical connector line */}
-                    <div className="relative pl-3 border-l border-zinc-200">
-                        {warehouseChildren.map((child) => {
-                            const isActive =
-                                pathname === child.href ||
-                                // Warehouse inventory: exact match only to avoid
-                                // matching all /warehouse/* when on /warehouse
-                                (child.href === "/super-admin/warehouse"
-                                    ? pathname === "/super-admin/warehouse"
-                                    : pathname?.startsWith(child.href + "/") ||
-                                      pathname === child.href);
-
-                            return (
-                                <Link
-                                    key={child.href}
-                                    href={child.href}
-                                    className={cn(
-                                        "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors mb-0.5",
-                                        isActive
-                                            ? "bg-indigo-50 text-indigo-600 font-medium"
-                                            : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
-                                    )}
+                <SidebarMenuSub>
+                    {children.map((child) => {
+                        const isActive =
+                            child.href === basePath
+                                ? pathname === child.href
+                                : pathname === child.href ||
+                                  pathname?.startsWith(child.href + "/");
+                        return (
+                            <SidebarMenuSubItem key={child.href}>
+                                <SidebarMenuSubButton
+                                    asChild
+                                    isActive={isActive}
                                 >
-                                    <child.icon className="h-3.5 w-3.5 flex-shrink-0" />
-                                    <span>{child.name}</span>
-                                </Link>
-                            );
-                        })}
-                    </div>
-                </div>
+                                    <Link href={child.href}>
+                                        <child.icon className="h-3.5 w-3.5" />
+                                        <span>{child.name}</span>
+                                    </Link>
+                                </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                        );
+                    })}
+                </SidebarMenuSub>
             )}
         </SidebarMenuItem>
     );
@@ -178,8 +211,10 @@ export default function SuperAdminLayout({
     const { user } = useUser();
 
     const currentNav =
-        // Check warehouse children first for accurate header title
         warehouseChildren.find(
+            (c) => pathname === c.href || pathname?.startsWith(c.href + "/"),
+        ) ??
+        analyticsChildren.find(
             (c) => pathname === c.href || pathname?.startsWith(c.href + "/"),
         ) ??
         navigation.find(
@@ -193,12 +228,21 @@ export default function SuperAdminLayout({
                 <div className="min-h-screen bg-zinc-50 flex w-full">
                     <ToastProvider />
 
-                    {/* Sidebar */}
-                    <Sidebar variant="floating" collapsible="icon">
-                        <SidebarHeader>
-                            <div className="flex items-center gap-2 px-2 py-2">
-                                <Image alt="logo" width={100} height={100} src={"/lazabluelogo.png"} className="flex h-8 w-8 items-center justify-center rounded-full border bg-indigo-600 text-white text-sm font-semibold"/>
-                                <div className="grid flex-1 text-left text-sm leading-tight">
+                    <Sidebar
+                        variant="floating"
+                        collapsible="icon"
+                        className="[&[data-collapsible=icon]]:w-12"
+                    >
+                        <SidebarHeader className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+                            <div className="flex items-center gap-2 px-2 py-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center">
+                                <Image
+                                    alt="logo"
+                                    width={32}
+                                    height={32}
+                                    src={"/lazabluelogo.png"}
+                                    className="h-8 w-8 shrink-0 rounded-full border bg-indigo-600"
+                                />
+                                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                                     <span className="truncate font-semibold">
                                         Laza Dessert Cafe
                                     </span>
@@ -210,7 +254,7 @@ export default function SuperAdminLayout({
                         </SidebarHeader>
 
                         <SidebarContent>
-                            <SidebarGroup>
+                            <SidebarGroup className="group-data-[collapsible=icon]:px-2">
                                 <SidebarGroupContent>
                                     <SidebarMenu>
                                         {/* Dashboard */}
@@ -229,8 +273,23 @@ export default function SuperAdminLayout({
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
 
-                                        {/* Warehouse — collapsible group */}
-                                        <WarehouseGroup pathname={pathname} />
+                                        {/* Warehouse */}
+                                        <CollapsibleNavGroup
+                                            label="Warehouse"
+                                            icon={Warehouse}
+                                            basePath="/super-admin/warehouse"
+                                            children={warehouseChildren}
+                                            pathname={pathname}
+                                        />
+
+                                        {/* Analytics */}
+                                        <CollapsibleNavGroup
+                                            label="Analytics"
+                                            icon={LineChart}
+                                            basePath="/super-admin/analytics"
+                                            children={analyticsChildren}
+                                            pathname={pathname}
+                                        />
 
                                         {/* Rest of nav */}
                                         {navigation
@@ -270,7 +329,7 @@ export default function SuperAdminLayout({
                             </SidebarGroup>
                         </SidebarContent>
 
-                        <SidebarFooter>
+                        <SidebarFooter className="group-data-[collapsible=icon]:px-2">
                             <SidebarMenu>
                                 <SidebarMenuItem>
                                     <SidebarMenuButton
@@ -283,16 +342,18 @@ export default function SuperAdminLayout({
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
+
+                                {/* User info — hidden when collapsed */}
                                 <SidebarMenuItem>
-                                    <div className="flex items-center gap-2 px-2 py-2 mb-2">
-                                        <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-semibold">
+                                    <div className="flex items-center gap-2 px-2 py-1 group-data-[collapsible=icon]:hidden">
+                                        <div className="w-7 h-7 shrink-0 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-semibold">
                                             {user?.firstName?.[0] ||
                                                 user?.emailAddresses[0]
                                                     ?.emailAddress[0] ||
                                                 "U"}
                                         </div>
                                         <div className="grid flex-1 text-left text-sm leading-tight min-w-0">
-                                            <span className="truncate font-semibold">
+                                            <span className="truncate font-semibold text-xs">
                                                 {user?.firstName ||
                                                     user?.emailAddresses[0]
                                                         ?.emailAddress ||
@@ -307,19 +368,12 @@ export default function SuperAdminLayout({
                                         </div>
                                     </div>
                                 </SidebarMenuItem>
+
                                 <SidebarMenuItem>
                                     <SignOutButton>
-                                        <SidebarMenuButton
-                                            asChild
-                                            tooltip="Sign Out"
-                                        >
-                                            <button
-                                                type="button"
-                                                className="flex items-center gap-2 w-full"
-                                            >
-                                                <LogOut className="h-4 w-4" />
-                                                <span>Sign Out</span>
-                                            </button>
+                                        <SidebarMenuButton tooltip="Sign Out">
+                                            <LogOut className="h-4 w-4" />
+                                            <span>Sign Out</span>
                                         </SidebarMenuButton>
                                     </SignOutButton>
                                 </SidebarMenuItem>

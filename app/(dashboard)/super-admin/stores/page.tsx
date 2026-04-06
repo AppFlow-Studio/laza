@@ -234,6 +234,7 @@ function StoresMap({
 	return (
 		<div className="rounded-xl overflow-hidden border border-zinc-200 shadow-sm">
 			<GoogleMap
+
 				mapContainerStyle={MAP_CONTAINER_STYLE}
 				center={DEFAULT_CENTER}
 				zoom={DEFAULT_ZOOM}
@@ -338,6 +339,8 @@ export default function AllStoresPage() {
 	const { data: employees } = useOrganizationUsers(orgId);
 	const { data: alerts } = useAlerts({ resolved: false });
 	// const { data: pendingCount } = usePendingTicketCount(orgId);
+	console.log( locations );
+
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [viewMode, setViewMode] = useState<ViewMode>("grid");

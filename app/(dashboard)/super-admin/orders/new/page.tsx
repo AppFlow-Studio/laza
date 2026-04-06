@@ -125,11 +125,13 @@ function ShipmentConfigPicker({
     item,
     organizationId,
     selectedConfig,
+    hasError,
     onSelect,
 }: {
     item: WarehouseCatalogItem & { box_quantity: number };
     organizationId: string;
     selectedConfig: ShipmentBoxConfig | null;
+    hasError?: boolean;
     onSelect: (config: ShipmentBoxConfig | null) => void;
 }) {
     const { configs, loading } = useItemShipmentConfigs(
@@ -156,43 +158,41 @@ function ShipmentConfigPicker({
         );
     }
 
-    // Build tab options: Default + one per shipment config
-    const tabs = [
-        {
-            key: "default",
-            label: "Default",
-            sub: `${item.box_quantity} ${item.unit_of_measure}/box`,
-            config: null as ShipmentBoxConfig | null,
-        },
-        ...configs.map((cfg) => ({
-            key: cfg.id,
-            label: cfg.poNumber ?? "Shipment",
-            sub: `${cfg.piecesPerBox} ${item.unit_of_measure}/box`,
-            config: cfg,
-        })),
-    ];
+    const tabs = configs.map((cfg) => ({
+        key: cfg.id,
+        label:
+            cfg.poNumber ??
+            (cfg.poDate
+                ? new Date(cfg.poDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      year: "numeric",
+                  })
+                : `${cfg.piecesPerBox}/box`),
+        sub: `${cfg.piecesPerBox} ${item.unit_of_measure}/box`,
+        config: cfg,
+    }));
 
-    const activeKey = selectedConfig === null ? "default" : selectedConfig.id;
+    const activeKey = selectedConfig?.id ?? null;
 
     return (
         <div className="mt-2">
             <p className="text-[10px] font-semibold text-gray-400 tracking-widest mb-1.5">
                 Box config
             </p>
-
-            {/* Tab strip */}
             <div className="flex gap-1 flex-wrap">
-                {tabs.map((tab, idx) => {
+                {tabs.map((tab) => {
                     const isActive = activeKey === tab.key;
                     return (
                         <button
-                            key={idx}
+                            key={tab.key}
                             type="button"
                             onClick={() => onSelect(tab.config)}
                             className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all ${
                                 isActive
                                     ? "border-indigo-400 bg-indigo-50 text-indigo-700"
-                                    : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                                    : hasError
+                                      ? "border-red-300 bg-red-50 hover:border-red-400"
+                                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
                             }`}
                         >
                             <span
@@ -205,7 +205,6 @@ function ShipmentConfigPicker({
                             >
                                 {tab.sub}
                             </span>
-                            {/* Active indicator dot */}
                             {isActive && (
                                 <div className="w-1 h-1 rounded-full bg-indigo-500 mt-1" />
                             )}
@@ -214,7 +213,14 @@ function ShipmentConfigPicker({
                 })}
             </div>
 
-            {/* Show supplier/date detail for active non-default config */}
+            {/* Red error message */}
+            {hasError && (
+                <p className="mt-1.5 text-[11px] text-red-500 font-medium flex items-center gap-1">
+                    <AlertCircle size={10} /> Choose a box config to proceed
+                </p>
+            )}
+
+            {/* supplier/date detail unchanged */}
             {selectedConfig &&
                 (selectedConfig.supplierName || selectedConfig.poDate) && (
                     <p className="text-[10px] text-gray-400 mt-1.5">
@@ -342,12 +348,18 @@ function CatalogItemRow({
     onQtyChange: (itemId: number, boxes: number) => void;
     onConfigChange: (itemId: number, config: ShipmentBoxConfig | null) => void;
 }) {
+    const [configError, setConfigError] = useState(false);
     const [inputVal, setInputVal] = useState(String(cartEntry?.boxes ?? 1));
     const [error, setError] = useState<string | null>(null);
     const [showConfigPicker, setShowConfigPicker] = useState(false);
     const [localConfig, setLocalConfig] = useState<ShipmentBoxConfig | null>(
         cartEntry?.selectedConfig ?? null,
     );
+    const { configs: availableConfigs } = useItemShipmentConfigs(
+        item.id,
+        organizationId,
+    );
+    const requiresConfigSelection = availableConfigs.length > 0;
 
     const inCart = !!cartEntry;
     const displayBoxes = parseInt(inputVal) || 1;
@@ -378,7 +390,14 @@ function CatalogItemRow({
             setError(v.error ?? null);
             return;
         }
+        // If item has shipment configs, one MUST be selected
+        if (requiresConfigSelection && !localConfig) {
+            setConfigError(true);
+            setShowConfigPicker(true); // auto-open the picker
+            return;
+        }
         setError(null);
+        setConfigError(false);
         onAdd(item, v.value!, localConfig);
     };
 
@@ -417,7 +436,11 @@ function CatalogItemRow({
                     {/* Config pill — shows active config or toggle to show picker */}
                     <button
                         onClick={() => setShowConfigPicker((p) => !p)}
-                        className="flex items-center gap-1 mt-1.5 text-[11px] text-gray-500 hover:text-indigo-600 transition-colors group"
+                        className={`flex items-center gap-1 mt-1.5 text-[11px] transition-colors group ${
+                            configError
+                                ? "text-red-500 hover:text-red-600"
+                                : "text-gray-500 hover:text-indigo-600"
+                        }`}
                     >
                         <Boxes
                             size={10}
@@ -444,8 +467,10 @@ function CatalogItemRow({
                             item={item}
                             organizationId={organizationId}
                             selectedConfig={localConfig}
+                            hasError={configError}
                             onSelect={(cfg) => {
                                 setLocalConfig(cfg);
+                                setConfigError(false);
                                 onConfigChange(item.id, cfg);
                                 setShowConfigPicker(false);
                             }}
@@ -596,6 +621,7 @@ export default function NewOrderPage() {
     const { mutate: createTicket, isPending: isSubmitting } = useCreateTicket();
 
     // ── Local state ────────────────────────────────────────────────────────────
+    const [title, setTitle] = useState("");
     const [search, setSearch] = useState("");
     const [categoryFilter, setCategoryFilter] = useState<number | "">("");
     const [cart, setCart] = useState<Record<number, CartEntry>>({});
@@ -689,6 +715,7 @@ export default function NewOrderPage() {
         requestedBy,
         initialStatus: status,
         deliveryType,
+        title: title.trim() || undefined,
         notes: notes.trim() || undefined,
         items: cartEntries.map((e) => {
             const ppb = effectivePiecesPerBox(e.item, e.selectedConfig);
@@ -997,6 +1024,22 @@ export default function NewOrderPage() {
                             value={deliveryType}
                             onChange={setDeliveryType}
                         />
+
+                        <div>
+                            <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                Order Title
+                                <span className="font-normal text-gray-300 ml-1">
+                                    (optional)
+                                </span>
+                            </label>
+                            <input
+                                type="text"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder="e.g. Nutella for Bay Ridge…"
+                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                            />
+                        </div>
 
                         <div>
                             <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
