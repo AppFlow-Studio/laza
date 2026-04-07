@@ -7,6 +7,10 @@
  * Each item is pre-filled with the expected box count from the warehouse.
  * Employee changes the value if what physically arrived differs.
  *
+ * On mobile, tapping an item's quantity cell opens the NumericKeypad
+ * for large-thumb-friendly entry. On desktop, a standard number input
+ * is shown inline instead.
+ *
  * Discrepant rows are highlighted in amber live as the employee types.
  * On submit, actual quantities go to the store inventory (not expected),
  * and the discrepancy is logged for super admin review.
@@ -43,6 +47,7 @@ import { Badge }  from "@/components/ui/badge";
 import { useConfirmTicket } from "@/lib/hooks/queries/useOrderTickets";
 import type { ReceivedItem } from "@/lib/supabase/queries/orderTickets";
 import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
+import NumericKeypad from "@/components/employee/inventory/NumericKeypad";
 
 interface LineItem {
 	itemId:         number;
@@ -71,6 +76,9 @@ export function ConfirmOrderSheet({
 	const [counts, setCounts] = useState<Record<number, string>>(() =>
 		Object.fromEntries(lineItems.map((li) => [li.itemId, String(li.fulfilledBoxes)])),
 	);
+
+	// Track which item's NumericKeypad is open (mobile)
+	const [keypadItemId, setKeypadItemId] = useState<number | null>(null);
 
 	const { mutate: confirm, isPending } = useConfirmTicket();
 
@@ -160,11 +168,12 @@ export function ConfirmOrderSheet({
 						const actual       = parseInt(counts[li.itemId] ?? "", 10);
 						const isDiscrepant = !isNaN(actual) && actual !== li.fulfilledBoxes;
 						const diff         = isNaN(actual) ? 0 : actual - li.fulfilledBoxes;
+						const isKeypadOpen = keypadItemId === li.itemId;
 
 						return (
 							<div
 								key={li.itemId}
-								className={`rounded-lg border p-3 transition-colors ${
+								className={`rounded-xl border p-3 transition-colors ${
 									isDiscrepant
 										? "border-amber-300 bg-amber-50"
 										: "border-border bg-background"
@@ -192,6 +201,26 @@ export function ConfirmOrderSheet({
 									</div>
 								</div>
 
+								{/* Mobile: tappable cell that opens NumericKeypad */}
+								<button
+									type="button"
+									onClick={() => setKeypadItemId(li.itemId)}
+									className={`sm:hidden w-full h-14 flex items-center justify-center rounded-xl border-2 transition-colors ${
+										isKeypadOpen
+											? "border-indigo-500 bg-indigo-50"
+											: isDiscrepant
+											  ? "border-amber-400 bg-amber-100"
+											  : "border-gray-200 bg-gray-50 active:bg-gray-100"
+									}`}
+								>
+									<span className={`text-2xl font-bold ${
+										isDiscrepant ? "text-amber-700" : "text-gray-900"
+									}`}>
+										{counts[li.itemId] !== "" ? counts[li.itemId] : "—"}
+									</span>
+								</button>
+
+								{/* Desktop: standard number input */}
 								<Input
 									id={`item-${li.itemId}`}
 									type="number"
@@ -199,7 +228,7 @@ export function ConfirmOrderSheet({
 									min={0}
 									value={counts[li.itemId]}
 									onChange={(e) => handleChange(li.itemId, e.target.value)}
-									className={`h-11 text-center text-lg font-semibold ${
+									className={`hidden sm:flex h-11 text-center text-lg font-semibold ${
 										isDiscrepant
 											? "border-amber-400 focus-visible:ring-amber-400"
 											: ""
@@ -210,6 +239,34 @@ export function ConfirmOrderSheet({
 						);
 					})}
 				</div>
+
+				{/* NumericKeypad for mobile quantity entry */}
+				{keypadItemId !== null && (
+					<NumericKeypad
+						isOpen={true}
+						value={counts[keypadItemId] ?? ""}
+						onClose={() => setKeypadItemId(null)}
+						onInput={(char) => {
+							// Box counts are integers only — ignore decimal
+							if (char === ".") return;
+							const current = counts[keypadItemId] ?? "";
+							// Replace leading zero when typing a new digit
+							const newVal = current === "0" ? char : current + char;
+							if (/^\d+$/.test(newVal)) {
+								setCounts((prev) => ({ ...prev, [keypadItemId]: newVal }));
+							}
+						}}
+						onBackspace={() => {
+							const current = counts[keypadItemId] ?? "";
+							const newVal = current.slice(0, -1);
+							setCounts((prev) => ({
+								...prev,
+								[keypadItemId]: newVal,
+							}));
+						}}
+						onEnter={() => setKeypadItemId(null)}
+					/>
+				)}
 
 				<SheetFooter className="gap-2 pt-4">
 					<Button

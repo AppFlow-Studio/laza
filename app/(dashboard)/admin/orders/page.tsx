@@ -25,7 +25,6 @@ import { useAllTickets } from "@/lib/hooks/queries/useOrderTickets";
 import { useOrganization } from "@clerk/nextjs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-// Mirrors the exact shape returned by getAllTickets()
 type TicketStatus =
     | "draft"
     | "submitted"
@@ -37,7 +36,6 @@ type TicketStatus =
 
 type ViewMode = "list" | "grid";
 
-// Derived from getAllTickets() select shape
 type RawTicket = {
     id: string;
     organization_id: string;
@@ -48,6 +46,7 @@ type RawTicket = {
     processed_by: string | null;
     confirmed_by: string | null;
     rejection_reason: string | null;
+    title: string | null;
     notes: string | null;
     submitted_at: string | null;
     fulfilled_at: string | null;
@@ -81,7 +80,7 @@ type RawTicket = {
     }[];
 };
 
-// ─── Derived helpers — compute display values from raw shape ──────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function getItemCount(ticket: RawTicket): number {
     return ticket.order_ticket_items?.length ?? 0;
 }
@@ -95,10 +94,27 @@ function getTotalBoxes(ticket: RawTicket): number {
     );
 }
 
-// Short human-readable ticket ID from UUID (last 8 chars uppercased)
 function shortId(uuid: string): string {
     return uuid.slice(-8).toUpperCase();
 }
+
+function relativeDate(iso: string) {
+    const days = Math.floor(
+        (Date.now() - new Date(iso).getTime()) / 86_400_000,
+    );
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days}d ago`;
+    if (days < 30) return `${Math.floor(days / 7)}w ago`;
+    return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+    }).format(new Date(iso));
+}
+
+// ─── Grid layout — single source of truth ─────────────────────────────────────
+// dot | ID | Title | Date | Location | Contents | Status | Arrow
+const GRID_COLS = "10px 100px 1fr 86px 100px 160px 130px 20px";
 
 // ─── Status config ────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<
@@ -172,21 +188,6 @@ const ALL_STATUSES: TicketStatus[] = [
     "cancelled",
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function relativeDate(iso: string) {
-    const days = Math.floor(
-        (Date.now() - new Date(iso).getTime()) / 86_400_000,
-    );
-    if (days === 0) return "Today";
-    if (days === 1) return "Yesterday";
-    if (days < 7) return `${days}d ago`;
-    if (days < 30) return `${Math.floor(days / 7)}w ago`;
-    return new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-    }).format(new Date(iso));
-}
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: TicketStatus }) {
     const { label, icon, badge } = STATUS_CONFIG[status];
@@ -222,7 +223,11 @@ function FilterChip({
         >
             {label}
             <span
-                className={`text-[10px] px-1 py-0.5 rounded ${active ? "bg-white/20 text-white/80" : "bg-gray-100 text-gray-400"}`}
+                className={`text-[10px] px-1 py-0.5 rounded ${
+                    active
+                        ? "bg-white/20 text-white/80"
+                        : "bg-gray-100 text-gray-400"
+                }`}
             >
                 {count}
             </span>
@@ -230,6 +235,7 @@ function FilterChip({
     );
 }
 
+// ─── List row ─────────────────────────────────────────────────────────────────
 function TicketRow({ ticket }: { ticket: RawTicket }) {
     const router = useRouter();
     const { dot } = STATUS_CONFIG[ticket.status];
@@ -244,14 +250,12 @@ function TicketRow({ ticket }: { ticket: RawTicket }) {
         >
             <div
                 className="grid gap-3 items-center px-4 py-3 bg-white border border-gray-200 rounded-xl hover:border-violet-300 hover:shadow-[0_1px_8px_rgba(99,102,241,0.08)] hover:-translate-y-px transition-all duration-100"
-                style={{
-                    gridTemplateColumns: "10px 110px 96px 96px 1fr 148px 20px",
-                }}
+                style={{ gridTemplateColumns: GRID_COLS }}
             >
-                {/* Status dot */}
+                {/* 1 — Status dot */}
                 <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
 
-                {/* Short ticket ID */}
+                {/* 2 — Ticket ID */}
                 <span
                     style={{
                         fontFamily:
@@ -263,13 +267,25 @@ function TicketRow({ ticket }: { ticket: RawTicket }) {
                     …{shortId(ticket.id)}
                 </span>
 
-                {/* Date */}
+                {/* 3 — Title */}
+                <span
+                    className="text-xs font-medium truncate"
+                    title={ticket.title ?? ""}
+                >
+                    {ticket.title ? (
+                        <span className="text-gray-800">{ticket.title}</span>
+                    ) : (
+                        <span className="text-gray-300 italic">No title</span>
+                    )}
+                </span>
+
+                {/* 4 — Date */}
                 <div className="flex items-center gap-1 text-xs text-gray-400">
                     <CalendarDays size={11} className="flex-shrink-0" />
                     {relativeDate(dateToShow)}
                 </div>
 
-                {/* Location */}
+                {/* 5 — Location */}
                 <div className="flex items-center gap-1 text-xs text-gray-400 truncate">
                     <MapPin size={11} className="flex-shrink-0 text-gray-300" />
                     <span className="truncate">
@@ -277,7 +293,7 @@ function TicketRow({ ticket }: { ticket: RawTicket }) {
                     </span>
                 </div>
 
-                {/* Contents */}
+                {/* 6 — Contents */}
                 <div className="flex items-center gap-3 min-w-0">
                     <span className="text-xs text-gray-500">
                         <span className="font-semibold text-gray-800">
@@ -291,11 +307,6 @@ function TicketRow({ ticket }: { ticket: RawTicket }) {
                         </span>{" "}
                         boxes
                     </span>
-                    {ticket.notes && (
-                        <span className="hidden lg:block text-xs text-gray-300 italic truncate max-w-[140px]">
-                            {ticket.notes}
-                        </span>
-                    )}
                     {ticket.is_auto_approved && (
                         <span className="hidden xl:inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
                             Auto
@@ -303,12 +314,12 @@ function TicketRow({ ticket }: { ticket: RawTicket }) {
                     )}
                 </div>
 
-                {/* Status badge */}
+                {/* 7 — Status badge */}
                 <div className="shrink-0">
                     <StatusBadge status={ticket.status} />
                 </div>
 
-                {/* Arrow */}
+                {/* 8 — Arrow */}
                 <ChevronRight
                     size={14}
                     className="shrink-0 text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all"
@@ -318,6 +329,7 @@ function TicketRow({ ticket }: { ticket: RawTicket }) {
     );
 }
 
+// ─── Grid card ────────────────────────────────────────────────────────────────
 function TicketCard({ ticket }: { ticket: RawTicket }) {
     const router = useRouter();
     const { accent } = STATUS_CONFIG[ticket.status];
@@ -333,10 +345,19 @@ function TicketCard({ ticket }: { ticket: RawTicket }) {
             <div className="relative bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-violet-300 hover:shadow-[0_2px_12px_rgba(99,102,241,0.1)] hover:-translate-y-0.5 transition-all duration-150">
                 <div className={`h-[3px] w-full ${accent}`} />
                 <div className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                        <div>
+                    <div className="flex items-start justify-between mb-2">
+                        <div className="min-w-0 flex-1 mr-2">
+                            {ticket.title ? (
+                                <p className="text-sm font-semibold text-gray-900 truncate">
+                                    {ticket.title}
+                                </p>
+                            ) : (
+                                <p className="text-xs text-gray-300 italic">
+                                    No title
+                                </p>
+                            )}
                             <div
-                                className="text-xs font-medium text-gray-600"
+                                className="text-[10px] text-gray-400 mt-0.5"
                                 style={{
                                     fontFamily: "var(--font-mono, monospace)",
                                 }}
@@ -345,12 +366,13 @@ function TicketCard({ ticket }: { ticket: RawTicket }) {
                                 <span className="text-gray-300">#</span>…
                                 {shortId(ticket.id)}
                             </div>
-                            <div className="flex items-center gap-1 text-[11px] text-gray-300 mt-0.5">
-                                <CalendarDays size={10} />
-                                {relativeDate(dateToShow)}
-                            </div>
                         </div>
                         <StatusBadge status={ticket.status} />
+                    </div>
+
+                    <div className="flex items-center gap-1 text-[11px] text-gray-300 mb-3">
+                        <CalendarDays size={10} />
+                        {relativeDate(dateToShow)}
                     </div>
 
                     <div className="space-y-1.5">
@@ -431,12 +453,7 @@ export default function AdminOrdersPage() {
     const { organization } = useOrganization();
     const organizationId = organization?.id ?? "";
 
-    // useAllTickets fetches all tickets for the org.
-    // For the store-admin view we scope to their location via the filter.
-    const { data: tickets, isLoading } = useAllTickets(organizationId, {
-        // Uncomment to scope to this admin's location:
-        // storeLocationId: userInfo?.assignedLocationId ?? undefined,
-    });
+    const { data: tickets, isLoading } = useAllTickets(organizationId, {});
 
     const [activeFilter, setActiveFilter] = useState<TicketStatus | "all">(
         "all",
@@ -444,7 +461,6 @@ export default function AdminOrdersPage() {
     const [viewMode, setViewMode] = useState<ViewMode>("list");
     const [search, setSearch] = useState("");
 
-    // ── Counts ──
     const counts = useMemo(() => {
         const map: Record<string, number> = { all: tickets?.length ?? 0 };
         ALL_STATUSES.forEach((s) => {
@@ -453,7 +469,6 @@ export default function AdminOrdersPage() {
         return map;
     }, [tickets]);
 
-    // ── Filtered list ──
     const filtered = useMemo(() => {
         if (!tickets) return [];
         return (tickets as RawTicket[]).filter((t) => {
@@ -463,6 +478,7 @@ export default function AdminOrdersPage() {
                 !search ||
                 t.id.toLowerCase().includes(search.toLowerCase()) ||
                 shortId(t.id).toLowerCase().includes(search.toLowerCase()) ||
+                (t.title ?? "").toLowerCase().includes(search.toLowerCase()) ||
                 (t.requesting_location?.name ?? "")
                     .toLowerCase()
                     .includes(search.toLowerCase());
@@ -470,7 +486,6 @@ export default function AdminOrdersPage() {
         });
     }, [tickets, activeFilter, search]);
 
-    // ── Summary stats ──
     const pendingAction = (counts.submitted ?? 0) + (counts.fulfilled ?? 0);
     const boxesConfirmed = useMemo(
         () =>
@@ -494,7 +509,6 @@ export default function AdminOrdersPage() {
                         </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                        {/* View toggle */}
                         <div className="flex border border-gray-200 rounded-lg overflow-hidden">
                             <button
                                 onClick={() => setViewMode("grid")}
@@ -517,7 +531,6 @@ export default function AdminOrdersPage() {
                                 <List size={14} />
                             </button>
                         </div>
-
                         <Link
                             href="/admin/orders/new"
                             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(99,102,241,.3)]"
@@ -527,7 +540,6 @@ export default function AdminOrdersPage() {
                     </div>
                 </div>
 
-                {/* Stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
                     <StatCard
                         label="Total orders"
@@ -565,7 +577,6 @@ export default function AdminOrdersPage() {
 
             {/* ── Body ── */}
             <div className="px-6 py-5">
-                {/* Toolbar */}
                 <div className="flex items-center gap-3 flex-wrap mb-5">
                     <div className="relative">
                         <Search
@@ -575,8 +586,8 @@ export default function AdminOrdersPage() {
                         <input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search by ID or location…"
-                            className="w-60 border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                            placeholder="Search by ID, title or location…"
+                            className="w-64 border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                         />
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -598,7 +609,6 @@ export default function AdminOrdersPage() {
                     </div>
                 </div>
 
-                {/* List / grid / loading / empty */}
                 {isLoading ? (
                     <div className="flex items-center justify-center py-20 gap-2 text-gray-400">
                         <Loader2 size={16} className="animate-spin" />
@@ -618,17 +628,15 @@ export default function AdminOrdersPage() {
                     </div>
                 ) : viewMode === "list" ? (
                     <>
-                        {/* Column headers */}
+                        {/* Column headers — same GRID_COLS as rows */}
                         <div
                             className="hidden sm:grid gap-3 px-4 mb-2"
-                            style={{
-                                gridTemplateColumns:
-                                    "10px 110px 96px 96px 1fr 148px 20px",
-                            }}
+                            style={{ gridTemplateColumns: GRID_COLS }}
                         >
                             {[
                                 "",
                                 "Ticket ID",
+                                "Title",
                                 "Date",
                                 "Location",
                                 "Contents",
