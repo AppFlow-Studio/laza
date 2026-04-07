@@ -447,11 +447,11 @@ export default function SuperAdminTicketDetailPage() {
 
   // ── Fulfill all ───────────────────────────────────────────────────────────
   function handleFulfillAll() {
-    if (!userInfo?.userId) return;
+    if (!userInfo?.id) return;
     fulfillAll(
       {
         ticketId,
-        adminUserId: userInfo.userId,
+        adminUserId: userInfo.id,
         allowPartial: false,
       },
       {

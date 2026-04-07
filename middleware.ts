@@ -57,18 +57,18 @@ export default clerkMiddleware(async (auth, req) => {
 
     // Auto-redirect logged-in users to their dashboard when first entering the website (home page only)
     // Allow them to navigate to other public pages freely
-    // const url = new URL(req.url);
-    // if (userId && url.pathname === '/') {
-    //     if (role === 'super_admin') {
-    //         return NextResponse.redirect(new URL('/super-admin', req.url));
-    //     }
-    //     if (role === 'admin') {
-    //         return NextResponse.redirect(new URL('/admin', req.url));
-    //     }
-    //     if (role === 'member') {
-    //         return NextResponse.redirect(new URL('/employee', req.url));
-    //     }
-    // }
+    const url = new URL(req.url);
+    if (userId && url.pathname === '/') {
+        if (role === 'super_admin') {
+            return NextResponse.redirect(new URL('/super-admin', req.url));
+        }
+        if (role === 'admin') {
+            return NextResponse.redirect(new URL('/admin', req.url));
+        }
+        if (role === 'member') {
+            return NextResponse.redirect(new URL('/employee', req.url));
+        }
+    }
 
     return NextResponse.next();
 });
