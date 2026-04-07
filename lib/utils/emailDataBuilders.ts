@@ -92,6 +92,29 @@ export interface DailySummaryData {
             direction: 'up' | 'down';
         }>;
     };
+    /**
+     * Present only for super admin recipients — summarises warehouse
+     * activity for the day (tickets fulfilled, items dispatched, stock health).
+     */
+    warehouseSummary?: {
+        /** Total order tickets fulfilled today across all stores. */
+        ticketsFulfilledToday: number;
+        /** Per-item dispatch totals sent out to stores today. */
+        itemsDispatchedToday: Array<{
+            itemId: string;
+            itemName: string;
+            totalBoxes: number;
+            totalUnits: number;
+        }>;
+        /** High-level warehouse stock health snapshot. */
+        stockHealth: {
+            totalItems: number;
+            lowStockCount: number;
+            criticalCount: number;
+            /** Percentage of items that are at healthy stock levels (0–100). */
+            healthPercent: number;
+        };
+    };
 }
 
 /**
