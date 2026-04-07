@@ -34,6 +34,7 @@ import {
 import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { RentHistoryTable } from "@/components/super-admin/warehouse/RentHistoryTable";
+import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -159,7 +160,7 @@ function useCreateExpense() {
             });
             toast.success("Expense recorded");
         },
-        onError: (err: Error) => toast.error(err.message),
+        onError: (err: unknown) => toast.error(getFriendlyErrorMessage(err)),
     });
 }
 
@@ -181,7 +182,7 @@ function useUpdateRate() {
             });
             toast.success("Rate updated");
         },
-        onError: (err: Error) => toast.error(err.message),
+        onError: (err: unknown) => toast.error(getFriendlyErrorMessage(err)),
     });
 }
 

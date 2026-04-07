@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useCancelTicket } from "@/lib/hooks/queries/useOrderTickets";
+import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
 
 type TicketStatus =
     | "draft"
@@ -81,7 +82,7 @@ export function CancelOrderDialog({
                     onCancelled?.();
                 },
                 onError: (err: Error) => {
-                    toast.error(err.message ?? "Failed to cancel order.");
+                    toast.error(getFriendlyErrorMessage(err));
                 },
             },
         );

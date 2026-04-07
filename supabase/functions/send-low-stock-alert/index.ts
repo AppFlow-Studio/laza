@@ -56,14 +56,25 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
   // Fetch notification preferences
-  const { data: prefs, error: prefsError } = await supabase
+  // First try location-specific prefs; if none, fall back to org-wide (location_id IS NULL)
+  const { data: locationPrefs } = await supabase
     .from('notification_preferences')
     .select('*')
     .eq('organization_id', organization_id)
-    .single()
+    .eq('location_id', location_id)
+    .maybeSingle()
 
-  if (prefsError || !prefs) {
-    console.error('Notification prefs error', prefsError)
+  const { data: orgPrefs, error: orgPrefsError } = await supabase
+    .from('notification_preferences')
+    .select('*')
+    .eq('organization_id', organization_id)
+    .is('location_id', null)
+    .maybeSingle()
+
+  const prefs = locationPrefs ?? orgPrefs
+
+  if (orgPrefsError || !prefs) {
+    console.error('Notification prefs error', orgPrefsError)
     return new Response('Notification preferences not found', { status: 404 })
   }
 
@@ -72,16 +83,18 @@ Deno.serve(async (req) => {
   }
 
   // Build recipients
+  // For warehouse alerts, always use org-wide prefs (super admin email)
+  const effectivePrefs = isWarehouse ? (orgPrefs ?? prefs) : prefs
   const recipients = [
-    prefs.primary_email,
-    ...(Array.isArray(prefs.secondary_emails) ? prefs.secondary_emails : []),
+    effectivePrefs.primary_email,
+    ...(Array.isArray(effectivePrefs.secondary_emails) ? effectivePrefs.secondary_emails : []),
   ].filter(Boolean) as string[]
 
   if (recipients.length === 0) {
     return new Response('No recipients configured', { status: 200 })
   }
 
-  // Fetch alert context
+  // Fetch alert context (include location_type to detect warehouse)
   const { data: alert, error: alertError } = await supabase
     .from('alerts')
     .select(
@@ -92,7 +105,7 @@ Deno.serve(async (req) => {
         location_id,
         storage_space_id,
         items (name, sku),
-        locations (name),
+        locations (name, location_type),
         storage_spaces (name)
       `
     )
@@ -107,6 +120,7 @@ Deno.serve(async (req) => {
   const itemName = alert.items?.name ?? 'Item'
   const locationName = alert.locations?.name ?? 'Location'
   const storageName = alert.storage_spaces?.name ?? ''
+  const isWarehouse = (alert.locations as any)?.location_type === 'warehouse'
 
   const urgencyLabel =
     urgency_level === 'critical'
@@ -140,7 +154,8 @@ Deno.serve(async (req) => {
   const quantityChange = (previous_quantity ?? current_quantity) - current_quantity
   const changeText = quantityChange > 0 ? `-${quantityChange}` : quantityChange < 0 ? `+${Math.abs(quantityChange)}` : '0'
 
-  const subject = `${urgencyEmoji} ${urgencyLabel}: ${itemName} at ${locationName}`
+  const warehousePrefix = isWarehouse ? '[Warehouse] ' : ''
+  const subject = `${urgencyEmoji} ${warehousePrefix}${urgencyLabel}: ${itemName} at ${locationName}`
 
   const triggeredDate = new Date(alert.triggered_at).toLocaleString('en-US', {
     weekday: 'short',
@@ -153,9 +168,12 @@ Deno.serve(async (req) => {
 
   // Build URLs with item and location context
   const baseUrl = 'https://lazadessert.cafe'
-  const viewItemUrl = `${baseUrl}/admin`
-  // const updateInventoryUrl = `${viewItemUrl}&action=update`
-  const notificationSettingsUrl = `${baseUrl}/admin/settings/notifications`
+  const viewItemUrl = isWarehouse
+    ? `${baseUrl}/super-admin/warehouse/${location_id}`
+    : `${baseUrl}/admin`
+  const notificationSettingsUrl = isWarehouse
+    ? `${baseUrl}/super-admin/settings/notifications`
+    : `${baseUrl}/admin/settings/notifications`
 
   const html = `
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -185,8 +203,9 @@ Deno.serve(async (req) => {
                       <tr>
                         <td>
                           <img alt="Laza Dessert Cafe" height="auto" src="https://lazadessert.cafe/lazabluelogo.png" style="display:block;outline:none;border:none;text-decoration:none;margin:0 auto 20px" width="130"/>
-                          <h1 style="color:#ffffff;font-size:24px;font-weight:bold;margin:0 0 10px;text-align:center">${urgencyEmoji} ${urgencyLabel}</h1>
+                          <h1 style="color:#ffffff;font-size:24px;font-weight:bold;margin:0 0 10px;text-align:center">${urgencyEmoji} ${isWarehouse ? 'Warehouse ' : ''}${urgencyLabel}</h1>
                           <p style="font-size:16px;line-height:24px;color:#e0e7ff;margin:0;text-align:center">Action required for ${itemName}</p>
+                          ${isWarehouse ? '<p style="display:inline-block;background-color:#fbbf24;color:#78350f;font-size:11px;font-weight:bold;letter-spacing:1px;padding:4px 12px;border-radius:4px;margin:10px auto 0;text-align:center">WAREHOUSE ALERT</p>' : ''}
                         </td>
                       </tr>
                     </tbody>
@@ -356,6 +375,7 @@ Deno.serve(async (req) => {
       min_quantity,
       quantity_change: quantityChange,
       recipients,
+      is_warehouse: isWarehouse,
     },
   })
 
