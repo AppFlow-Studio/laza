@@ -281,7 +281,9 @@ function StatusTimeline({ status }: { status: TicketStatus }) {
             <p className="text-[10px] font-bold tracking-widest uppercase text-gray-400 mb-3">
                 Order progress
             </p>
-            <div className="flex items-start">
+
+            {/* ── Horizontal layout — sm and above ── */}
+            <div className="hidden sm:flex items-start">
                 {TIMELINE_STEPS.map((step, i) => {
                     const isDone = !isTerminal && i < currentIdx;
                     const isActive = !isTerminal && i === currentIdx;
@@ -303,7 +305,6 @@ function StatusTimeline({ status }: { status: TicketStatus }) {
                                     }}
                                 />
                             )}
-
                             {/* Dot */}
                             <div
                                 className={`relative z-10 w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-all ${
@@ -328,10 +329,73 @@ function StatusTimeline({ status }: { status: TicketStatus }) {
                                     <div className="w-2 h-2 rounded-full bg-indigo-600" />
                                 ) : null}
                             </div>
-
                             {/* Label */}
                             <span
                                 className={`mt-1.5 text-[10px] text-center leading-tight font-medium ${
+                                    isReject
+                                        ? "text-red-500 font-semibold"
+                                        : isDone || isActive
+                                          ? "text-gray-800 font-semibold"
+                                          : "text-gray-400"
+                                }`}
+                            >
+                                {STATUS_META[step].label}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* ── Vertical layout — mobile only ── */}
+            <div className="flex flex-col sm:hidden">
+                {TIMELINE_STEPS.map((step, i) => {
+                    const isDone = !isTerminal && i < currentIdx;
+                    const isActive = !isTerminal && i === currentIdx;
+                    const isReject = isTerminal && step === "submitted";
+                    const isLast = i === TIMELINE_STEPS.length - 1;
+
+                    return (
+                        <div key={step} className="flex items-start gap-3">
+                            {/* Dot + vertical connector */}
+                            <div className="flex flex-col items-center flex-shrink-0">
+                                <div
+                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                        isReject
+                                            ? "border-red-400 bg-red-400"
+                                            : isDone
+                                              ? "border-indigo-600 bg-indigo-600"
+                                              : isActive
+                                                ? "border-indigo-600 bg-white ring-4 ring-indigo-100"
+                                                : "border-gray-200 bg-white"
+                                    }`}
+                                >
+                                    {isReject ? (
+                                        <X size={9} className="text-white" />
+                                    ) : isDone ? (
+                                        <CheckCircle2
+                                            size={9}
+                                            className="text-white"
+                                            strokeWidth={2.5}
+                                        />
+                                    ) : isActive ? (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                                    ) : null}
+                                </div>
+                                {!isLast && (
+                                    <div
+                                        className="w-px flex-shrink-0 mt-1 mb-1"
+                                        style={{
+                                            height: "20px",
+                                            background: isDone
+                                                ? "#6366f1"
+                                                : "#e5e7eb",
+                                        }}
+                                    />
+                                )}
+                            </div>
+                            {/* Label */}
+                            <span
+                                className={`text-xs leading-tight pt-0.5 font-medium ${
                                     isReject
                                         ? "text-red-500 font-semibold"
                                         : isDone || isActive
@@ -774,41 +838,44 @@ export default function TicketDetailPage() {
     return (
         <div className="min-h-screen bg-white">
             {/* ── Top bar ── */}
-            <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
-                <button
-                    onClick={() => router.push("/admin/orders")}
-                    className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg transition-all"
-                >
-                    <ArrowLeft size={12} /> Orders
-                </button>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
+                {/* Left: back + ID + badges */}
+                <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                        onClick={() => router.push("/admin/orders")}
+                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg transition-all"
+                    >
+                        <ArrowLeft size={12} /> Orders
+                    </button>
 
-                {/* Ticket ID */}
-                <span
-                    style={{ fontFamily: "var(--font-mono, monospace)" }}
-                    className="text-sm font-medium text-gray-600"
-                    title={t.id}
-                >
-                    {shortId(t.id)}
-                </span>
-
-                <StatusBadge status={status} />
-
-                {/* Partial fulfillment badge */}
-                {hasPartialFulfillment && (
-                    <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">
-                        Partial fill
+                    {/* Ticket ID */}
+                    <span
+                        style={{ fontFamily: "var(--font-mono, monospace)" }}
+                        className="text-sm font-medium text-gray-600"
+                        title={t.id}
+                    >
+                        {shortId(t.id)}
                     </span>
-                )}
 
-                {/* Auto-approved badge */}
-                {t.is_auto_approved && (
-                    <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
-                        Auto-approved
-                    </span>
-                )}
+                    <StatusBadge status={status} />
 
-                {/* Action buttons — right side */}
-                <div className="ml-auto flex items-center gap-2">
+                    {/* Partial fulfillment badge */}
+                    {hasPartialFulfillment && (
+                        <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">
+                            Partial fill
+                        </span>
+                    )}
+
+                    {/* Auto-approved badge */}
+                    {t.is_auto_approved && (
+                        <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                            Auto-approved
+                        </span>
+                    )}
+                </div>
+
+                {/* Right: action buttons */}
+                <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
                     {/* Cancel — only when submitted. Component self-hides for other statuses. */}
                     <CancelOrderDialog
                         ticketId={t.id}
@@ -872,7 +939,7 @@ export default function TicketDetailPage() {
             </div>
 
             {/* ── Body ── */}
-            <div className="px-6 py-5 grid grid-cols-[1fr_272px] gap-5 max-w-6xl">
+            <div className="px-4 sm:px-6 py-5 grid grid-cols-1 md:grid-cols-[1fr_272px] gap-5 max-w-6xl">
                 {/* ── LEFT ── */}
                 <div>
                     {/* Timeline */}

@@ -181,6 +181,111 @@ export default function DailyLocationSummary({ summaryData }: DailyLocationSumma
                             </Section>
                         )}
 
+                        {/* ── Warehouse Section (super admin only) ── */}
+                        {summaryData.warehouseSummary && (
+                            <Section style={warehouseSection}>
+                                {/* Section header */}
+                                <Section style={warehouseHeader}>
+                                    <Heading style={warehouseTitle}>
+                                        🏭 Warehouse Summary
+                                    </Heading>
+                                    <Text style={warehouseSubtitle}>
+                                        Central warehouse activity for{' '}
+                                        {new Date(summaryData.date).toLocaleDateString('en-US', {
+                                            weekday: 'long',
+                                            month: 'long',
+                                            day: 'numeric',
+                                        })}
+                                    </Text>
+                                </Section>
+
+                                {/* Key metrics row */}
+                                <Row style={{ marginBottom: '20px' }}>
+                                    <Column style={warehouseMetricColumn}>
+                                        <Text style={warehouseMetricValue}>
+                                            {summaryData.warehouseSummary.ticketsFulfilledToday}
+                                        </Text>
+                                        <Text style={warehouseMetricLabel}>
+                                            Orders Fulfilled
+                                        </Text>
+                                    </Column>
+                                    <Column style={warehouseMetricColumn}>
+                                        <Text style={warehouseMetricValue}>
+                                            {summaryData.warehouseSummary.itemsDispatchedToday.length}
+                                        </Text>
+                                        <Text style={warehouseMetricLabel}>
+                                            Item Types Dispatched
+                                        </Text>
+                                    </Column>
+                                    <Column style={warehouseMetricColumn}>
+                                        <Text style={warehouseMetricValue}>
+                                            {summaryData.warehouseSummary.itemsDispatchedToday.reduce(
+                                                (sum, i) => sum + i.totalBoxes, 0,
+                                            )}
+                                        </Text>
+                                        <Text style={warehouseMetricLabel}>
+                                            Total Boxes Sent
+                                        </Text>
+                                    </Column>
+                                </Row>
+
+                                {/* Stock health bar */}
+                                <Section style={stockHealthBox}>
+                                    <Text style={stockHealthTitle}>📦 Warehouse Stock Health</Text>
+                                    <Row>
+                                        <Column style={{ width: '60%' }}>
+                                            <Text style={stockHealthPercent}>
+                                                {summaryData.warehouseSummary.stockHealth.healthPercent}%
+                                            </Text>
+                                            <Text style={stockHealthLabel}>items at healthy levels</Text>
+                                        </Column>
+                                        <Column style={{ width: '40%', textAlign: 'right' as const }}>
+                                            {summaryData.warehouseSummary.stockHealth.lowStockCount > 0 && (
+                                                <Text style={stockHealthWarning}>
+                                                    ⚠️ {summaryData.warehouseSummary.stockHealth.lowStockCount} low stock
+                                                </Text>
+                                            )}
+                                            {summaryData.warehouseSummary.stockHealth.criticalCount > 0 && (
+                                                <Text style={stockHealthCritical}>
+                                                    🔴 {summaryData.warehouseSummary.stockHealth.criticalCount} critical
+                                                </Text>
+                                            )}
+                                            {summaryData.warehouseSummary.stockHealth.lowStockCount === 0 &&
+                                             summaryData.warehouseSummary.stockHealth.criticalCount === 0 && (
+                                                <Text style={stockHealthGood}>✅ All good</Text>
+                                            )}
+                                        </Column>
+                                    </Row>
+                                </Section>
+
+                                {/* Items dispatched today */}
+                                {summaryData.warehouseSummary.itemsDispatchedToday.length > 0 && (
+                                    <Section style={{ marginTop: '16px' }}>
+                                        <Text style={dispatchedTitle}>📤 Items Dispatched Today</Text>
+                                        {summaryData.warehouseSummary.itemsDispatchedToday.slice(0, 8).map((item, index) => (
+                                            <Section key={index} style={dispatchedRow}>
+                                                <Row>
+                                                    <Column style={{ width: '65%' }}>
+                                                        <Text style={dispatchedItemName}>{item.itemName}</Text>
+                                                    </Column>
+                                                    <Column style={{ width: '35%', textAlign: 'right' as const }}>
+                                                        <Text style={dispatchedItemQty}>
+                                                            {item.totalBoxes} box{item.totalBoxes !== 1 ? 'es' : ''}
+                                                        </Text>
+                                                    </Column>
+                                                </Row>
+                                            </Section>
+                                        ))}
+                                        {summaryData.warehouseSummary.itemsDispatchedToday.length > 8 && (
+                                            <Text style={moreItemsText}>
+                                                ...and {summaryData.warehouseSummary.itemsDispatchedToday.length - 8} more items dispatched
+                                            </Text>
+                                        )}
+                                    </Section>
+                                )}
+                            </Section>
+                        )}
+
                         {/* Action Button */}
                         <Section style={actionSection}>
                             <Button
@@ -417,5 +522,133 @@ const footerSignature = {
     fontSize: '12px',
     color: '#9ca3af',
     margin: '0',
+};
+
+// ── Warehouse section styles ──────────────────────────────────────────────────
+
+const warehouseSection = {
+    marginBottom: '30px',
+    border: '1px solid #d1fae5',
+    borderRadius: '8px',
+    overflow: 'hidden' as const,
+};
+
+const warehouseHeader = {
+    backgroundColor: '#065f46',
+    padding: '18px 20px 14px',
+};
+
+const warehouseTitle = {
+    fontSize: '18px',
+    fontWeight: 'bold' as const,
+    color: '#ffffff',
+    margin: '0 0 6px',
+};
+
+const warehouseSubtitle = {
+    fontSize: '13px',
+    color: '#a7f3d0',
+    margin: '0',
+};
+
+const warehouseMetricColumn = {
+    textAlign: 'center' as const,
+    padding: '14px 8px',
+    backgroundColor: '#ecfdf5',
+};
+
+const warehouseMetricValue = {
+    fontSize: '26px',
+    fontWeight: 'bold' as const,
+    color: '#065f46',
+    margin: '0 0 4px',
+};
+
+const warehouseMetricLabel = {
+    fontSize: '11px',
+    color: '#6b7280',
+    margin: '0',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.4px',
+};
+
+const stockHealthBox = {
+    backgroundColor: '#f9fafb',
+    border: '1px solid #e5e7eb',
+    borderRadius: '6px',
+    padding: '14px 16px',
+    margin: '0 16px 4px',
+};
+
+const stockHealthTitle = {
+    fontSize: '13px',
+    fontWeight: 'bold' as const,
+    color: '#374151',
+    margin: '0 0 8px',
+};
+
+const stockHealthPercent = {
+    fontSize: '28px',
+    fontWeight: 'bold' as const,
+    color: '#059669',
+    margin: '0 0 2px',
+};
+
+const stockHealthLabel = {
+    fontSize: '12px',
+    color: '#6b7280',
+    margin: '0',
+};
+
+const stockHealthWarning = {
+    fontSize: '12px',
+    fontWeight: '600' as const,
+    color: '#d97706',
+    margin: '0 0 4px',
+    textAlign: 'right' as const,
+};
+
+const stockHealthCritical = {
+    fontSize: '12px',
+    fontWeight: '600' as const,
+    color: '#dc2626',
+    margin: '0',
+    textAlign: 'right' as const,
+};
+
+const stockHealthGood = {
+    fontSize: '12px',
+    fontWeight: '600' as const,
+    color: '#059669',
+    margin: '0',
+    textAlign: 'right' as const,
+};
+
+const dispatchedTitle = {
+    fontSize: '13px',
+    fontWeight: 'bold' as const,
+    color: '#374151',
+    margin: '0 0 8px',
+    padding: '0 16px',
+};
+
+const dispatchedRow = {
+    padding: '8px 16px',
+    borderBottom: '1px solid #f3f4f6',
+};
+
+const dispatchedItemName = {
+    fontSize: '13px',
+    fontWeight: '500' as const,
+    color: '#111827',
+    margin: '0',
+};
+
+const dispatchedItemQty = {
+    fontSize: '13px',
+    fontWeight: '600' as const,
+    color: '#065f46',
+    margin: '0',
+    textAlign: 'right' as const,
 };
 
