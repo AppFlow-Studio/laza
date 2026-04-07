@@ -40,6 +40,7 @@ import {
     getItemShipmentHistory,
     type ShipmentBoxConfig,
 } from "@/lib/supabase/queries/itemShipmentHistory";
+import { getFriendlyErrorMessage, isNetworkError } from "@/lib/utils/errorMessages";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -583,6 +584,41 @@ export default function NewOrderPage() {
     // "self"    → store picks up, $0 cost, skips in_transit in the status flow
     const [deliveryType, setDeliveryType] = useState<DeliveryType>("company");
 
+    // ── Restore local draft on mount (network failure recovery) ──────────────
+    // If a previous submit attempt failed due to network issues, the cart was
+    // saved to localStorage. Restore it once the catalog has loaded so we can
+    // re-hydrate items with their full WarehouseCatalogItem data.
+    useEffect(() => {
+        if (!rawCatalogItems || rawCatalogItems.length === 0) return;
+        try {
+            const raw = localStorage.getItem("laza_order_draft");
+            if (!raw) return;
+            const draft = JSON.parse(raw) as {
+                cart: Record<string, { boxes: number; configId: string | null }>;
+                notes: string;
+                deliveryType: DeliveryType;
+            };
+            const restored: Record<number, CartEntry> = {};
+            for (const [id, entry] of Object.entries(draft.cart ?? {})) {
+                const item = rawCatalogItems.find((i) => i.id === Number(id));
+                if (item && item.box_quantity != null && item.box_quantity > 0) {
+                    restored[Number(id)] = {
+                        item: item as WarehouseCatalogItem & { box_quantity: number },
+                        boxes: entry.boxes,
+                        selectedConfig: null,
+                    };
+                }
+            }
+            if (Object.keys(restored).length > 0) {
+                setCart(restored);
+                setNotes(draft.notes ?? "");
+                setDeliveryType(draft.deliveryType ?? "company");
+                toast.success("Restored your previously saved draft.", { duration: 4000 });
+            }
+        } catch { /* ignore corrupt drafts */ }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rawCatalogItems]);
+
     // ── Filter: only items with box_quantity set are orderable ──────────────────
     const orderableItems = useMemo(
         () =>
@@ -691,32 +727,86 @@ export default function NewOrderPage() {
     const missingContext =
         !organizationId || !requestingLocationId || !warehouseLocationId;
 
+    // ── Local draft save/restore for network failure recovery ──────────────────
+    const DRAFT_KEY = "laza_order_draft";
+
+    const saveDraftLocally = () => {
+        try {
+            const draft = {
+                cart: Object.fromEntries(
+                    cartEntries.map((e) => [e.item.id, { boxes: e.boxes, configId: e.selectedConfig?.id ?? null }])
+                ),
+                notes,
+                deliveryType,
+                savedAt: new Date().toISOString(),
+            };
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        } catch { /* localStorage may be unavailable */ }
+    };
+
+    const clearLocalDraft = () => {
+        try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    };
+
+    // ── Validate before submission ───────────────────────────────────────────
+    const validateOrder = (): boolean => {
+        if (!hasItems) {
+            toast.error("Add at least one item to your order.");
+            return false;
+        }
+        // Check for invalid box quantities in cart
+        for (const entry of cartEntries) {
+            const v = validateBoxQty(entry.boxes);
+            if (!v.ok) {
+                toast.error(`${entry.item.name}: ${v.error}`);
+                return false;
+            }
+        }
+        return true;
+    };
+
     // ── Actions ──────────────────────────────────────────────────────────────────
     const handleDraft = async () => {
         if (missingContext) {
-            toast.error("Missing location context — try refreshing");
+            toast.error("Missing location context — try refreshing the page.");
             return;
         }
         try {
             await createTicket(buildPayload("draft"));
+            clearLocalDraft();
             toast.success("Draft saved");
             router.push("/admin/orders");
-        } catch {
-            toast.error("Failed to save draft");
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "";
+            if (isNetworkError(msg)) {
+                saveDraftLocally();
+                toast.error("Connection lost. Your draft has been saved locally — it will be restored when you return.", { duration: 5000 });
+            } else {
+                toast.error(getFriendlyErrorMessage(err));
+            }
         }
     };
 
     const handleSubmit = async () => {
         if (missingContext) {
-            toast.error("Missing location context — try refreshing");
+            toast.error("Missing location context — try refreshing the page.");
             return;
         }
+        if (!validateOrder()) return;
+
         try {
             await createTicket(buildPayload("submitted"));
+            clearLocalDraft();
             toast.success("Order submitted to warehouse");
             router.push("/admin/orders");
-        } catch {
-            toast.error("Failed to submit order");
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "";
+            if (isNetworkError(msg)) {
+                saveDraftLocally();
+                toast.error("Connection lost. Your order has been saved as a local draft. Please try submitting again when your connection is restored.", { duration: 6000 });
+            } else {
+                toast.error(getFriendlyErrorMessage(err));
+            }
         }
     };
 

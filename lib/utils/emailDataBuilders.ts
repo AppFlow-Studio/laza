@@ -27,6 +27,8 @@ export interface LowStockAlertData {
     urgencyLevel: 'low' | 'critical' | 'out_of_stock';
     suggestedReorderQuantity: number;
     triggeredAt: string;
+    /** When true, the alert is for the warehouse location (not a store). */
+    isWarehouse?: boolean;
 }
 
 export interface LowStockDigestData {
@@ -151,6 +153,9 @@ export async function buildLowStockAlertData(alertId: string): Promise<LowStockA
         currentQuantity
     );
 
+    // Detect if this location is a warehouse
+    const isWarehouse = (alert.locations as any).location_type === 'warehouse';
+
     return {
         alertId: alert.id,
         item: {
@@ -177,6 +182,7 @@ export async function buildLowStockAlertData(alertId: string): Promise<LowStockA
         urgencyLevel,
         suggestedReorderQuantity,
         triggeredAt: alert.triggered_at,
+        isWarehouse,
     };
 }
 

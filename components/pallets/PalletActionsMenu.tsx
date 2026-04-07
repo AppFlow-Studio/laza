@@ -6,6 +6,7 @@ import { MoreHorizontal, Eye, MoveRight, Archive } from "lucide-react";
 import { PalletWithDetails } from "@/lib/supabase/queries/pallets";
 import { useRetirePallet } from "@/lib/hooks/queries/usePallets";
 import toast from "react-hot-toast";
+import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
 
 interface PalletActionsMenuProps {
   pallet: PalletWithDetails;
@@ -39,8 +40,8 @@ export function PalletActionsMenu({ pallet }: PalletActionsMenuProps) {
     try {
       await retire(pallet.id);
       toast.success(`Pallet ${pallet.pallet_label} retired.`);
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to retire pallet.");
+    } catch (err: unknown) {
+      toast.error(getFriendlyErrorMessage(err));
     } finally {
       setRetiring(false);
       setOpen(false);

@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label }    from "@/components/ui/label";
 import { toast }    from "react-hot-toast";
 import { useRejectTicket } from "@/lib/hooks/queries/useOrderTickets";
+import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
 
 interface RejectTicketDialogProps {
 	ticketId: string;
@@ -56,7 +57,7 @@ export function RejectTicketDialog({
 					onRejected?.();
 				},
 				onError: (err: Error) => {
-					toast.error(err.message ?? "Failed to reject ticket.");
+					toast.error(getFriendlyErrorMessage(err));
 				},
 			},
 		);

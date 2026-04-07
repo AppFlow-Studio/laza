@@ -31,6 +31,7 @@ import {
 import { useWarehouseInventory, useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
 import { useUserInfo }         from "@/lib/hooks/queries/useUserInfo";
 import { RejectTicketDialog }  from "@/components/orders/RejectTicketDialog";
+import { getFriendlyErrorMessage, isStockConflictError, isConcurrentFulfillmentError } from "@/lib/utils/errorMessages";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TicketStatus =
@@ -430,18 +431,17 @@ export default function SuperAdminTicketDetailPage() {
   // between page load and this click. We detect that and trigger a refresh.
   function handleFulfillError(err: Error) {
     const msg = err.message ?? "";
-    const isStockError =
-      msg.toLowerCase().includes("insufficient") ||
-      msg.toLowerCase().includes("stock") ||
-      msg.toLowerCase().includes("quantity");
 
-    if (isStockError) {
-      // Stale data — refresh and show banner
+    if (isStockConflictError(msg)) {
       setIsStaleData(true);
       handleRefresh();
-      toast.error("Stock changed — data refreshed. Review and try again.");
+      toast.error("Stock levels have changed. Data is being refreshed — please review and try again.");
+    } else if (isConcurrentFulfillmentError(msg)) {
+      setIsStaleData(true);
+      handleRefresh();
+      toast.error("This ticket was already fulfilled or modified. Refreshing data...");
     } else {
-      toast.error(msg || "Failed to fulfill order");
+      toast.error(getFriendlyErrorMessage(err));
     }
   }
 

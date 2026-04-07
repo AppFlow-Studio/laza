@@ -42,6 +42,7 @@ import { Label }  from "@/components/ui/label";
 import { Badge }  from "@/components/ui/badge";
 import { useConfirmTicket } from "@/lib/hooks/queries/useOrderTickets";
 import type { ReceivedItem } from "@/lib/supabase/queries/orderTickets";
+import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
 
 interface LineItem {
 	itemId:         number;
@@ -122,7 +123,7 @@ export function ConfirmOrderSheet({
 					onConfirmed?.(result.hasDiscrepancy);
 				},
 				onError: (err: Error) => {
-					toast.error(err.message ?? "Failed to confirm order.");
+					toast.error(getFriendlyErrorMessage(err));
 				},
 			},
 		);
