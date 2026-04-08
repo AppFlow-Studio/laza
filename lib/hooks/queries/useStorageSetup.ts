@@ -43,7 +43,7 @@ export function useBulkAssignItems() {
                 data.storageSpaceId,
                 data.items,
                 userInfo.id,
-                userInfo.members?.organizations.organization_id,
+                userInfo.members?.organization_id,
                 userInfo.role as "super_admin" | "admin" | "employee", // added
             );
         },
