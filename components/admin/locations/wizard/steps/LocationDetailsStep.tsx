@@ -3,8 +3,14 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Store, Warehouse } from "lucide-react";
+import { Store, Warehouse, MapPin, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState, useCallback } from "react";
+import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
+
+const LIBRARIES: ("places")[] = ["places"];
+const MAP_CONTAINER_STYLE = { width: "100%", height: "300px" };
+const DEFAULT_CENTER = { lat: 40.73, lng: -73.93 };
 
 const locationSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -17,6 +23,8 @@ const locationSchema = z.object({
         country: z.string().optional(),
     }),
     is_active: z.boolean(),
+    latitude: z.number().nullable().optional(),
+    longitude: z.number().nullable().optional(),
 });
 
 export type LocationFormData = z.infer<typeof locationSchema>;
@@ -35,6 +43,7 @@ export default function LocationDetailsStep({
         handleSubmit,
         watch,
         setValue,
+        getValues,
         formState: { errors },
     } = useForm<LocationFormData>({
         resolver: zodResolver(locationSchema),
@@ -49,17 +58,86 @@ export default function LocationDetailsStep({
                 country: "US",
             },
             is_active: true,
+            latitude: null,
+            longitude: null,
         },
     });
 
     const selectedType = watch("location_type");
+    const latitude = watch("latitude");
+    const longitude = watch("longitude");
+
+    const [geocoding, setGeocoding] = useState(false);
+    const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(
+        defaultValues?.latitude != null && defaultValues?.longitude != null
+            ? { lat: defaultValues.latitude, lng: defaultValues.longitude }
+            : DEFAULT_CENTER
+    );
+
+    const { isLoaded } = useJsApiLoader({
+        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
+        libraries: LIBRARIES,
+    });
+
+    const markerPosition =
+        latitude != null && longitude != null ? { lat: latitude, lng: longitude } : null;
+
+    const handleMapClick = useCallback(
+        (e: google.maps.MapMouseEvent) => {
+            if (e.latLng) {
+                setValue("latitude", e.latLng.lat());
+                setValue("longitude", e.latLng.lng());
+            }
+        },
+        [setValue]
+    );
+
+    const handleMarkerDragEnd = useCallback(
+        (e: google.maps.MapMouseEvent) => {
+            if (e.latLng) {
+                setValue("latitude", e.latLng.lat());
+                setValue("longitude", e.latLng.lng());
+            }
+        },
+        [setValue]
+    );
+
+    const handleGeocode = async () => {
+        const { address } = getValues();
+        const parts = [address.street, address.city, address.state, address.zip].filter(Boolean);
+        if (parts.length === 0) return;
+
+        setGeocoding(true);
+        try {
+            const encoded = encodeURIComponent(parts.join(", "));
+            const res = await fetch(
+                `https://maps.googleapis.com/maps/api/geocode/json?address=${encoded}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+            );
+            const data = await res.json();
+            if (data.status === "OK" && data.results[0]) {
+                const { lat, lng } = data.results[0].geometry.location;
+                setValue("latitude", lat);
+                setValue("longitude", lng);
+                setMapCenter({ lat, lng });
+            }
+        } catch {
+            // silently fail
+        } finally {
+            setGeocoding(false);
+        }
+    };
+
+    const clearCoords = () => {
+        setValue("latitude", null);
+        setValue("longitude", null);
+    };
 
     const inputClass = (hasError?: boolean) =>
         cn(
             "w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all",
             hasError
                 ? "border-rose-400 focus:ring-rose-500"
-                : "border-gray-200 focus:ring-indigo-500",
+                : "border-gray-200 focus:ring-indigo-500"
         );
 
     return (
@@ -119,7 +197,7 @@ export default function LocationDetailsStep({
                                 "p-4 border-2 rounded-xl text-left transition-all",
                                 selectedType === value
                                     ? "border-indigo-500 bg-indigo-50"
-                                    : "border-gray-200 hover:border-gray-300 bg-white",
+                                    : "border-gray-200 hover:border-gray-300 bg-white"
                             )}
                         >
                             <div className="flex items-center gap-3">
@@ -127,12 +205,8 @@ export default function LocationDetailsStep({
                                     <Icon className="w-5 h-5 text-indigo-600" />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-semibold text-gray-900">
-                                        {label}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                        {description}
-                                    </p>
+                                    <p className="text-sm font-semibold text-gray-900">{label}</p>
+                                    <p className="text-xs text-gray-500">{description}</p>
                                 </div>
                             </div>
                         </button>
@@ -226,6 +300,87 @@ export default function LocationDetailsStep({
                 )}
             </div>
 
+            {/* Map Location Picker */}
+            <div>
+                <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Map Pin
+                    </label>
+                    <button
+                        type="button"
+                        onClick={handleGeocode}
+                        disabled={geocoding || !isLoaded}
+                        className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {geocoding ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                            <MapPin className="w-3 h-3" />
+                        )}
+                        Use address
+                    </button>
+                </div>
+                <p className="text-xs text-zinc-500 mb-2">
+                    Click the map to drop a pin, or drag to adjust. Used for the stores map view.
+                </p>
+
+                {isLoaded ? (
+                    <div className="rounded-xl overflow-hidden border border-gray-200">
+                        <GoogleMap
+                            mapContainerStyle={MAP_CONTAINER_STYLE}
+                            center={mapCenter}
+                            zoom={markerPosition ? 15 : 11}
+                            onClick={handleMapClick}
+                            options={{
+                                streetViewControl: false,
+                                mapTypeControl: false,
+                                fullscreenControl: false,
+                                clickableIcons: false,
+                                styles: [
+                                    {
+                                        featureType: "poi",
+                                        elementType: "labels",
+                                        stylers: [{ visibility: "off" }],
+                                    },
+                                ],
+                            }}
+                        >
+                            {markerPosition && (
+                                <Marker
+                                    position={markerPosition}
+                                    draggable
+                                    onDragEnd={handleMarkerDragEnd}
+                                />
+                            )}
+                        </GoogleMap>
+                    </div>
+                ) : (
+                    <div
+                        className="rounded-xl bg-zinc-100 animate-pulse border border-gray-200"
+                        style={{ height: 300 }}
+                    />
+                )}
+
+                {markerPosition ? (
+                    <div className="flex items-center gap-1.5 mt-1.5 text-xs text-zinc-500">
+                        <MapPin className="w-3 h-3 text-indigo-500 flex-shrink-0" />
+                        <span>
+                            {markerPosition.lat.toFixed(6)}, {markerPosition.lng.toFixed(6)}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={clearCoords}
+                            className="ml-1 text-zinc-400 hover:text-rose-500 transition-colors"
+                            title="Clear pin"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                ) : (
+                    <p className="text-xs text-zinc-400 mt-1.5">No pin set — location won't appear on map.</p>
+                )}
+            </div>
+
             {/* Active toggle */}
             <div className="flex items-center gap-3">
                 <input
@@ -234,10 +389,7 @@ export default function LocationDetailsStep({
                     {...register("is_active")}
                     className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                <label
-                    htmlFor="is_active"
-                    className="text-sm font-medium text-gray-700"
-                >
+                <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
                     Active
                 </label>
             </div>

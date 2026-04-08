@@ -136,7 +136,12 @@ export async function createLocation(location: {
         country?: string;
     };
     is_active?: boolean;
+    latitude?: number | null;
+    longitude?: number | null;
 }) {
+    const { auth } = await import('@clerk/nextjs/server');
+    const { userId } = await auth();
+
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
         .from('locations')
@@ -145,6 +150,29 @@ export async function createLocation(location: {
         .single();
 
     if (error) throw error;
+
+    // Pre-populate location_catalog with all org items so the new location
+    // has access to every item without manual super-admin assignment
+    const { data: items } = await supabase
+        .from('items')
+        .select('id')
+        .eq('organization_id', location.organization_id);
+
+    if (items && items.length > 0 && userId) {
+        const catalogRecords = items.map((item: { id: string | number }) => ({
+            location_id: data.id,
+            item_id: item.id,
+            assigned_by: userId,
+            assigned_at: new Date().toISOString(),
+        }));
+
+        const { error: catalogError } = await supabase
+            .from('location_catalog')
+            .upsert(catalogRecords, { onConflict: 'location_id,item_id' });
+
+        if (catalogError) throw catalogError;
+    }
+
     return data as Location;
 }
 

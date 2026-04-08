@@ -125,6 +125,8 @@ export default function LocationSetupWizard() {
                 name: locationData.name,
                 address: locationData.address,
                 is_active: locationData.is_active,
+                latitude: locationData.latitude ?? null,
+                longitude: locationData.longitude ?? null,
             });
 
             // 2. Create all storage spaces in parallel
