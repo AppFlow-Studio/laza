@@ -101,6 +101,7 @@ export async function createTicket(input: CreateTicketInput) {
             warehouse_location_id: input.warehouseLocationId,
             status: input.initialStatus,
             requested_by: input.requestedBy,
+            title: input.title ?? null,
             notes: input.notes ?? null,
             delivery_type: input.deliveryType ?? null,
             submitted_at:

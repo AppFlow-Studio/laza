@@ -26,16 +26,14 @@ import {
 import { Sheet } from "react-modal-sheet";
 import { toast } from "react-hot-toast";
 
-import {
-    useWarehouseCatalog,
-    useWarehouseLocation,
-} from "@/lib/hooks/queries/useWarehouse";
+import { useWarehouseCatalog } from "@/lib/hooks/queries/useWarehouse";
 import { useCategories } from "@/lib/hooks/queries/useCategories";
 import { useCreateTicket } from "@/lib/hooks/queries/useOrderTickets";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { WarehouseCatalogItem } from "@/lib/supabase/queries/warehouse";
 import { CreateTicketInput } from "@/lib/supabase/queries/orderTickets";
 import { useOrganization } from "@clerk/nextjs";
+import { useLocations } from "@/lib/hooks/queries/useLocations";
 import {
     getItemShipmentHistory,
     type ShipmentBoxConfig,
@@ -569,8 +567,14 @@ export default function NewOrderPage() {
     const { organization } = useOrganization();
     const organizationId = organization?.id ?? "";
 
-    const { data: warehouseLocation } = useWarehouseLocation();
-    const warehouseLocationId = warehouseLocation?.id ?? "";
+    // ── Warehouse selector ─────────────────────────────────────────────────────
+    const { data: locations } = useLocations();
+    const warehouseLocations = useMemo(
+        () => (locations ?? []).filter((l) => l.location_type === "warehouse"),
+        [locations],
+    );
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
+    const warehouseLocationId = selectedWarehouseId;
 
     const { data: rawCatalogItems, isLoading: catalogLoading } =
         useWarehouseCatalog();
@@ -583,7 +587,6 @@ export default function NewOrderPage() {
     const [cart, setCart] = useState<Record<number, CartEntry>>({});
     const [notes, setNotes] = useState("");
     const [deliveryType, setDeliveryType] = useState<DeliveryType>("company");
-    // Mobile order-review sheet
     const [reviewSheetOpen, setReviewSheetOpen] = useState(false);
 
     // ── Restore local draft on mount (network failure recovery) ──────────────
@@ -761,7 +764,11 @@ export default function NewOrderPage() {
     // ── Actions ──────────────────────────────────────────────────────────────────
     const handleDraft = async () => {
         if (missingContext) {
-            toast.error("Missing location context — try refreshing the page.");
+            toast.error(
+                !warehouseLocationId
+                    ? "Select a warehouse first"
+                    : "Missing location context — try refreshing",
+            );
             return;
         }
         try {
@@ -782,7 +789,11 @@ export default function NewOrderPage() {
 
     const handleSubmit = async () => {
         if (missingContext) {
-            toast.error("Missing location context — try refreshing the page.");
+            toast.error(
+                !warehouseLocationId
+                    ? "Select a warehouse first"
+                    : "Missing location context — try refreshing",
+            );
             return;
         }
         if (!validateOrder()) return;
@@ -823,39 +834,46 @@ export default function NewOrderPage() {
                 </div>
                 {!warehouseLocationId && !catalogLoading && (
                     <div className="ml-auto flex items-center gap-1.5 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg">
-                        <AlertCircle size={11} /> Warehouse not configured
+                        <AlertCircle size={11} /> Select a warehouse to continue
                     </div>
                 )}
             </div>
-
-            {warehouseLocation && (
-                <div className="flex items-center gap-2.5 px-6 py-2.5 mx-6 my-3.5 rounded-xl bg-indigo-50 border-b border-indigo-100">
-                    <Warehouse
-                        size={13}
-                        className="text-indigo-500 flex-shrink-0"
-                    />
-                    <span className="text-sm font-medium text-indigo-700">
-                        Sourcing from <strong>{warehouseLocation.name}:</strong>
-                    </span>
-                    {warehouseLocation.address && (
-                        <span className="text-sm text-indigo-400 ml-1">
-                            {typeof warehouseLocation.address === "object"
-                                ? [
-                                      (warehouseLocation.address as any).street,
-                                      (warehouseLocation.address as any).city,
-                                  ]
-                                      .filter(Boolean)
-                                      .join(", ")
-                                : warehouseLocation.address}
-                        </span>
-                    )}
-                </div>
-            )}
 
             {/* ── Two-column layout ── */}
             <div className="flex flex-1 min-h-0">
                 {/* ── LEFT: Catalog (full-width on mobile, 1fr on desktop) ── */}
                 <div className="flex-1 flex flex-col md:border-r border-gray-100 overflow-hidden">
+                    {/* ── Warehouse selector banner ── */}
+                    <div className="flex items-center gap-3 px-5 py-3 mx-5 mt-4 mb-1 rounded-xl bg-indigo-50 border border-indigo-100 flex-shrink-0">
+                        <Warehouse
+                            size={13}
+                            className="text-indigo-500 flex-shrink-0"
+                        />
+                        <span className="text-xs font-medium text-indigo-800 whitespace-nowrap">
+                            Source warehouse:
+                        </span>
+                        <select
+                            value={selectedWarehouseId}
+                            onChange={(e) =>
+                                setSelectedWarehouseId(e.target.value)
+                            }
+                            className="flex-1 max-w-xs border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option value="" disabled hidden>
+                                Select a warehouse
+                            </option>
+                            {warehouseLocations.map((loc) => (
+                                <option key={loc.id} value={loc.id}>
+                                    {loc.name}
+                                </option>
+                            ))}
+                        </select>
+                        {selectedWarehouseId && (
+                            <span className="text-[10px] text-indigo-600 font-semibold flex items-center gap-1">
+                                <CheckCircle2 size={10} /> Selected
+                            </span>
+                        )}
+                    </div>
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 px-4 sm:px-5 py-3.5 border-b border-gray-100 flex-shrink-0">
                         <div className="relative flex-1">
                             <Search
@@ -956,36 +974,37 @@ export default function NewOrderPage() {
                 </div>
 
                 {/* ── RIGHT: Order summary — hidden on mobile, visible md+ ── */}
-                <div className="hidden md:flex w-72 flex-col flex-shrink-0 bg-gray-50/50">
-                    {/* Stats */}
-                    <div className="px-4 pt-4 pb-3 border-b border-gray-100 bg-white flex-shrink-0">
-                        <div className="flex items-center gap-2 mb-3">
+                <div className="hidden md:flex w-[420px] flex-col flex-shrink-0 bg-gray-50/50 border-l border-gray-100">
+                    {/* Stats header */}
+                    <div className="px-5 pt-5 pb-4 border-b border-gray-100 bg-white flex-shrink-0">
+                        <div className="flex items-center gap-2 mb-4">
                             <ShoppingCart
-                                size={14}
+                                size={15}
                                 className="text-indigo-500"
                             />
-                            <span className="text-sm font-bold text-gray-900">
+                            <span className="text-base font-bold text-gray-900">
                                 Order summary
                             </span>
                             {hasItems && (
                                 <span className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
-                                    {totalItems}
+                                    {totalItems} item
+                                    {totalItems !== 1 ? "s" : ""}
                                 </span>
                             )}
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-3">
                             {[
                                 { val: totalItems, label: "Line items" },
                                 { val: totalBoxes, label: "Total boxes" },
                             ].map(({ val, label }) => (
                                 <div
                                     key={label}
-                                    className="bg-gray-100 rounded-lg px-3 py-2"
+                                    className="bg-gray-100 rounded-xl px-4 py-3"
                                 >
-                                    <div className="text-lg font-bold text-gray-900 tracking-tight">
+                                    <div className="text-2xl font-bold text-gray-900 tracking-tight">
                                         {val}
                                     </div>
-                                    <div className="text-[10px] text-gray-400 mt-0.5">
+                                    <div className="text-xs text-gray-400 mt-0.5">
                                         {label}
                                     </div>
                                 </div>
@@ -993,23 +1012,23 @@ export default function NewOrderPage() {
                         </div>
                     </div>
 
-                    {/* Cart items */}
-                    <div className="flex-1 overflow-y-auto px-3 py-3">
+                    {/* Cart items — scrollable middle section */}
+                    <div className="flex-1 overflow-y-auto px-5 py-4">
                         {!hasItems ? (
-                            <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                            <div className="flex flex-col items-center justify-center h-full text-center py-10">
                                 <ShoppingCart
-                                    size={24}
-                                    className="text-gray-200 mb-2"
+                                    size={28}
+                                    className="text-gray-200 mb-3"
                                 />
-                                <p className="text-xs font-medium text-gray-400">
+                                <p className="text-sm font-medium text-gray-400">
                                     No items added yet
                                 </p>
-                                <p className="text-[11px] text-gray-300 mt-1">
+                                <p className="text-xs text-gray-300 mt-1">
                                     Browse the catalog and add box quantities
                                 </p>
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-1.5">
+                            <div className="flex flex-col gap-2">
                                 {cartEntries.map((entry) => (
                                     <CartRow
                                         key={entry.item.id}
@@ -1023,54 +1042,62 @@ export default function NewOrderPage() {
                         )}
                     </div>
 
-                    {/* Delivery + title + notes + actions */}
-                    <div className="px-3 pb-4 pt-3 border-t border-gray-100 bg-white flex-shrink-0 flex flex-col gap-3">
+                    {/* Delivery + title + notes + actions — fixed bottom */}
+                    <div className="px-5 pb-5 pt-4 border-t border-gray-100 bg-white flex-shrink-0 flex flex-col gap-4">
                         <DeliveryTypeSelector
                             value={deliveryType}
                             onChange={setDeliveryType}
                         />
 
-                        {/* Order Title */}
-                        <div>
-                            <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
-                                Order Title{" "}
-                                <span className="font-normal text-gray-300">
-                                    (optional)
-                                </span>
-                            </label>
-                            <input
-                                type="text"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder="e.g. Nutella for Bay Ridge…"
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                            />
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                    Order Title{" "}
+                                    <span className="font-normal text-gray-300">
+                                        (optional)
+                                    </span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    placeholder="e.g. Nutella restock…"
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                    Notes{" "}
+                                    <span className="font-normal text-gray-300">
+                                        (optional)
+                                    </span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    placeholder="e.g. Prioritize Nutella…"
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                            </div>
                         </div>
 
-                        {/* Notes */}
-                        <div>
-                            <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
-                                Notes{" "}
-                                <span className="font-normal text-gray-300">
-                                    (optional)
-                                </span>
-                            </label>
-                            <textarea
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                                rows={2}
-                                placeholder="e.g. Please prioritize Nutella…"
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                            />
-                        </div>
-
-                        <div className="flex flex-col gap-2">
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleDraft}
+                                disabled={
+                                    !hasItems || isSubmitting || missingContext
+                                }
+                                className="flex-1 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 text-sm font-semibold transition-all"
+                            >
+                                Save Draft
+                            </button>
                             <button
                                 onClick={handleSubmit}
                                 disabled={
                                     !hasItems || isSubmitting || missingContext
                                 }
-                                className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all hover:enabled:-translate-y-px hover:enabled:shadow-[0_4px_12px_rgba(99,102,241,.3)] flex items-center justify-center gap-2"
+                                className="flex-[2] py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all hover:enabled:-translate-y-px hover:enabled:shadow-[0_4px_12px_rgba(99,102,241,.3)] flex items-center justify-center gap-2"
                             >
                                 {isSubmitting && (
                                     <Loader2
@@ -1080,21 +1107,11 @@ export default function NewOrderPage() {
                                 )}
                                 Submit Order
                             </button>
-                            <button
-                                onClick={handleDraft}
-                                disabled={
-                                    !hasItems || isSubmitting || missingContext
-                                }
-                                className="w-full py-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 text-sm font-semibold transition-all"
-                            >
-                                Save as Draft
-                            </button>
                         </div>
 
                         <p className="text-[10px] text-gray-300 text-center leading-relaxed">
                             Submitting sends this order to the warehouse for
-                            fulfillment. Store admins cannot see warehouse stock
-                            levels.
+                            fulfillment.
                         </p>
                     </div>
                 </div>
@@ -1107,7 +1124,8 @@ export default function NewOrderPage() {
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold text-gray-900 truncate">
                                 {totalItems} item{totalItems !== 1 ? "s" : ""} ·{" "}
-                                {totalBoxes} box{totalBoxes !== 1 ? "es" : ""}
+                                {totalBoxes} box
+                                {totalBoxes !== 1 ? "es" : ""}
                             </p>
                             <p className="text-[11px] text-gray-400">
                                 Tap to review before submitting
@@ -1141,7 +1159,6 @@ export default function NewOrderPage() {
                     <Sheet.Header />
                     <Sheet.Content>
                         <div className="overflow-y-auto px-4 pb-10">
-                            {/* Header */}
                             <div className="flex items-center gap-2 mb-4">
                                 <ShoppingCart
                                     size={16}
@@ -1151,11 +1168,11 @@ export default function NewOrderPage() {
                                     Order Summary
                                 </span>
                                 <span className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
-                                    {totalItems} item{totalItems !== 1 ? "s" : ""}
+                                    {totalItems} item
+                                    {totalItems !== 1 ? "s" : ""}
                                 </span>
                             </div>
 
-                            {/* Stats row */}
                             <div className="grid grid-cols-2 gap-2 mb-4">
                                 {[
                                     { val: totalItems, label: "Line items" },
@@ -1175,7 +1192,6 @@ export default function NewOrderPage() {
                                 ))}
                             </div>
 
-                            {/* Cart items */}
                             <div className="flex flex-col gap-1.5 mb-5">
                                 {cartEntries.map((entry) => (
                                     <CartRow
@@ -1183,9 +1199,7 @@ export default function NewOrderPage() {
                                         entry={entry}
                                         onRemove={() => {
                                             handleRemove(entry.item.id);
-                                            if (
-                                                Object.keys(cart).length <= 1
-                                            ) {
+                                            if (Object.keys(cart).length <= 1) {
                                                 setReviewSheetOpen(false);
                                             }
                                         }}
@@ -1193,10 +1207,35 @@ export default function NewOrderPage() {
                                 ))}
                             </div>
 
-                            {/* Divider */}
                             <div className="border-t border-gray-100 mb-4" />
 
-                            {/* Delivery + Title + Notes */}
+                            {/* Warehouse selector in sheet */}
+                            <div className="flex items-center gap-3 px-4 py-2.5 mb-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                                <Warehouse
+                                    size={13}
+                                    className="text-indigo-500 flex-shrink-0"
+                                />
+                                <span className="text-xs font-medium text-indigo-800 whitespace-nowrap">
+                                    Warehouse:
+                                </span>
+                                <select
+                                    value={selectedWarehouseId}
+                                    onChange={(e) =>
+                                        setSelectedWarehouseId(e.target.value)
+                                    }
+                                    className="flex-1 border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="" disabled hidden>
+                                        Select a warehouse
+                                    </option>
+                                    {warehouseLocations.map((loc) => (
+                                        <option key={loc.id} value={loc.id}>
+                                            {loc.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
                             <div className="flex flex-col gap-4 mb-5">
                                 <DeliveryTypeSelector
                                     value={deliveryType}
@@ -1240,7 +1279,6 @@ export default function NewOrderPage() {
                                 </div>
                             </div>
 
-                            {/* Action buttons */}
                             <div className="flex flex-col gap-2">
                                 <button
                                     onClick={() => {

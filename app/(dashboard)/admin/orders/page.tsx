@@ -21,10 +21,17 @@ import {
     List,
     MapPin,
 } from "lucide-react";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { useAllTickets } from "@/lib/hooks/queries/useOrderTickets";
 import { useOrganization } from "@clerk/nextjs";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 type TicketStatus =
     | "draft"
     | "submitted"
@@ -33,7 +40,6 @@ type TicketStatus =
     | "confirmed"
     | "rejected"
     | "cancelled";
-
 type ViewMode = "list" | "grid";
 
 type RawTicket = {
@@ -80,24 +86,20 @@ type RawTicket = {
     }[];
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function getItemCount(ticket: RawTicket): number {
-    return ticket.order_ticket_items?.length ?? 0;
+function getItemCount(t: RawTicket) {
+    return t.order_ticket_items?.length ?? 0;
 }
-
-function getTotalBoxes(ticket: RawTicket): number {
+function getTotalBoxes(t: RawTicket) {
     return (
-        ticket.order_ticket_items?.reduce(
-            (sum, line) => sum + (line.quantity_boxes ?? 0),
+        t.order_ticket_items?.reduce(
+            (s, l) => s + (l.quantity_boxes ?? 0),
             0,
         ) ?? 0
     );
 }
-
-function shortId(uuid: string): string {
+function shortId(uuid: string) {
     return uuid.slice(-8).toUpperCase();
 }
-
 function relativeDate(iso: string) {
     const days = Math.floor(
         (Date.now() - new Date(iso).getTime()) / 86_400_000,
@@ -112,11 +114,6 @@ function relativeDate(iso: string) {
     }).format(new Date(iso));
 }
 
-// ─── Grid layout — single source of truth ─────────────────────────────────────
-// dot | ID | Title | Date | Location | Contents | Status | Arrow
-const GRID_COLS = "10px 100px 1fr 86px 100px 160px 130px 20px";
-
-// ─── Status config ────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<
     TicketStatus,
     {
@@ -177,7 +174,6 @@ const STATUS_CONFIG: Record<
         accent: "bg-gray-200",
     },
 };
-
 const ALL_STATUSES: TicketStatus[] = [
     "draft",
     "submitted",
@@ -188,7 +184,6 @@ const ALL_STATUSES: TicketStatus[] = [
     "cancelled",
 ];
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: TicketStatus }) {
     const { label, icon, badge } = STATUS_CONFIG[status];
     return (
@@ -215,206 +210,14 @@ function FilterChip({
     return (
         <button
             onClick={onClick}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-100 ${
-                active
-                    ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-white text-gray-500 border-gray-200 hover:border-violet-300 hover:text-indigo-600 hover:bg-violet-50"
-            }`}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-100 ${active ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-500 border-gray-200 hover:border-violet-300 hover:text-indigo-600 hover:bg-violet-50"}`}
         >
             {label}
             <span
-                className={`text-[10px] px-1 py-0.5 rounded ${
-                    active
-                        ? "bg-white/20 text-white/80"
-                        : "bg-gray-100 text-gray-400"
-                }`}
+                className={`text-[10px] px-1 py-0.5 rounded ${active ? "bg-white/20 text-white/80" : "bg-gray-100 text-gray-400"}`}
             >
                 {count}
             </span>
-        </button>
-    );
-}
-
-// ─── List row ─────────────────────────────────────────────────────────────────
-function TicketRow({ ticket }: { ticket: RawTicket }) {
-    const router = useRouter();
-    const { dot } = STATUS_CONFIG[ticket.status];
-    const dateToShow = ticket.submitted_at ?? ticket.created_at;
-    const itemCount = getItemCount(ticket);
-    const totalBoxes = getTotalBoxes(ticket);
-
-    return (
-        <button
-            onClick={() => router.push(`/admin/orders/${ticket.id}`)}
-            className="group w-full text-left"
-        >
-            <div
-                className="grid gap-3 items-center px-4 py-3 bg-white border border-gray-200 rounded-xl hover:border-violet-300 hover:shadow-[0_1px_8px_rgba(99,102,241,0.08)] hover:-translate-y-px transition-all duration-100"
-                style={{ gridTemplateColumns: GRID_COLS }}
-            >
-                {/* 1 — Status dot */}
-                <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
-
-                {/* 2 — Ticket ID */}
-                <span
-                    style={{
-                        fontFamily:
-                            "var(--font-mono, 'JetBrains Mono', monospace)",
-                    }}
-                    className="text-xs font-medium text-gray-600 truncate"
-                    title={ticket.id}
-                >
-                    …{shortId(ticket.id)}
-                </span>
-
-                {/* 3 — Title */}
-                <span
-                    className="text-xs font-medium truncate"
-                    title={ticket.title ?? ""}
-                >
-                    {ticket.title ? (
-                        <span className="text-gray-800">{ticket.title}</span>
-                    ) : (
-                        <span className="text-gray-300 italic">No title</span>
-                    )}
-                </span>
-
-                {/* 4 — Date */}
-                <div className="flex items-center gap-1 text-xs text-gray-400">
-                    <CalendarDays size={11} className="flex-shrink-0" />
-                    {relativeDate(dateToShow)}
-                </div>
-
-                {/* 5 — Location */}
-                <div className="flex items-center gap-1 text-xs text-gray-400 truncate">
-                    <MapPin size={11} className="flex-shrink-0 text-gray-300" />
-                    <span className="truncate">
-                        {ticket.requesting_location?.name ?? "—"}
-                    </span>
-                </div>
-
-                {/* 6 — Contents */}
-                <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-xs text-gray-500">
-                        <span className="font-semibold text-gray-800">
-                            {itemCount}
-                        </span>{" "}
-                        items
-                    </span>
-                    <span className="text-xs text-gray-500">
-                        <span className="font-semibold text-gray-800">
-                            {totalBoxes}
-                        </span>{" "}
-                        boxes
-                    </span>
-                    {ticket.is_auto_approved && (
-                        <span className="hidden xl:inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
-                            Auto
-                        </span>
-                    )}
-                </div>
-
-                {/* 7 — Status badge */}
-                <div className="shrink-0">
-                    <StatusBadge status={ticket.status} />
-                </div>
-
-                {/* 8 — Arrow */}
-                <ChevronRight
-                    size={14}
-                    className="shrink-0 text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all"
-                />
-            </div>
-        </button>
-    );
-}
-
-// ─── Grid card ────────────────────────────────────────────────────────────────
-function TicketCard({ ticket }: { ticket: RawTicket }) {
-    const router = useRouter();
-    const { accent } = STATUS_CONFIG[ticket.status];
-    const dateToShow = ticket.submitted_at ?? ticket.created_at;
-    const itemCount = getItemCount(ticket);
-    const totalBoxes = getTotalBoxes(ticket);
-
-    return (
-        <button
-            onClick={() => router.push(`/admin/orders/${ticket.id}`)}
-            className="group w-full text-left"
-        >
-            <div className="relative bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-violet-300 hover:shadow-[0_2px_12px_rgba(99,102,241,0.1)] hover:-translate-y-0.5 transition-all duration-150">
-                <div className={`h-[3px] w-full ${accent}`} />
-                <div className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="min-w-0 flex-1 mr-2">
-                            {ticket.title ? (
-                                <p className="text-sm font-semibold text-gray-900 truncate">
-                                    {ticket.title}
-                                </p>
-                            ) : (
-                                <p className="text-xs text-gray-300 italic">
-                                    No title
-                                </p>
-                            )}
-                            <div
-                                className="text-[10px] text-gray-400 mt-0.5"
-                                style={{
-                                    fontFamily: "var(--font-mono, monospace)",
-                                }}
-                                title={ticket.id}
-                            >
-                                <span className="text-gray-300">#</span>…
-                                {shortId(ticket.id)}
-                            </div>
-                        </div>
-                        <StatusBadge status={ticket.status} />
-                    </div>
-
-                    <div className="flex items-center gap-1 text-[11px] text-gray-300 mb-3">
-                        <CalendarDays size={10} />
-                        {relativeDate(dateToShow)}
-                    </div>
-
-                    <div className="space-y-1.5">
-                        {ticket.requesting_location && (
-                            <div className="flex justify-between items-center py-1 border-b border-gray-50">
-                                <span className="text-[11px] text-gray-400">
-                                    Location
-                                </span>
-                                <span className="text-xs font-semibold text-gray-800 truncate max-w-[110px]">
-                                    {ticket.requesting_location.name}
-                                </span>
-                            </div>
-                        )}
-                        <div className="flex justify-between items-center py-1 border-b border-gray-50">
-                            <span className="text-[11px] text-gray-400">
-                                Items
-                            </span>
-                            <span className="text-xs font-semibold text-gray-800">
-                                {itemCount}
-                            </span>
-                        </div>
-                        <div className="flex justify-between items-center py-1 border-b border-gray-50 last:border-0">
-                            <span className="text-[11px] text-gray-400">
-                                Boxes
-                            </span>
-                            <span className="text-xs font-semibold text-gray-800">
-                                {totalBoxes}
-                            </span>
-                        </div>
-                        {ticket.notes && (
-                            <div className="flex justify-between items-center py-1">
-                                <span className="text-[11px] text-gray-400">
-                                    Note
-                                </span>
-                                <span className="text-[11px] text-gray-400 italic truncate max-w-[120px]">
-                                    {ticket.notes}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
         </button>
     );
 }
@@ -448,13 +251,95 @@ function StatCard({
     );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+function TicketCard({ ticket }: { ticket: RawTicket }) {
+    const router = useRouter();
+    const { accent } = STATUS_CONFIG[ticket.status];
+    const dateToShow = ticket.submitted_at ?? ticket.created_at;
+    return (
+        <button
+            onClick={() => router.push(`/admin/orders/${ticket.id}`)}
+            className="group w-full text-left"
+        >
+            <div className="relative bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-violet-300 hover:shadow-[0_2px_12px_rgba(99,102,241,0.1)] hover:-translate-y-0.5 transition-all duration-150">
+                <div className={`h-[3px] w-full ${accent}`} />
+                <div className="p-4">
+                    <div className="flex items-start justify-between mb-2">
+                        <div className="min-w-0 flex-1 mr-2">
+                            {ticket.title ? (
+                                <p className="text-sm font-semibold text-gray-900 truncate">
+                                    {ticket.title}
+                                </p>
+                            ) : (
+                                <p className="text-xs text-gray-300 italic">
+                                    No title
+                                </p>
+                            )}
+                            <div
+                                className="text-[10px] text-gray-400 mt-0.5"
+                                style={{
+                                    fontFamily: "var(--font-mono, monospace)",
+                                }}
+                                title={ticket.id}
+                            >
+                                <span className="text-gray-300">#</span>…
+                                {shortId(ticket.id)}
+                            </div>
+                        </div>
+                        <StatusBadge status={ticket.status} />
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] text-gray-300 mb-3">
+                        <CalendarDays size={10} />
+                        {relativeDate(dateToShow)}
+                    </div>
+                    <div className="space-y-1.5">
+                        {ticket.requesting_location && (
+                            <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                                <span className="text-[11px] text-gray-400">
+                                    Location
+                                </span>
+                                <span className="text-xs font-semibold text-gray-800 truncate max-w-[110px]">
+                                    {ticket.requesting_location.name}
+                                </span>
+                            </div>
+                        )}
+                        <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                            <span className="text-[11px] text-gray-400">
+                                Items
+                            </span>
+                            <span className="text-xs font-semibold text-gray-800">
+                                {getItemCount(ticket)}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center py-1 border-b border-gray-50 last:border-0">
+                            <span className="text-[11px] text-gray-400">
+                                Boxes
+                            </span>
+                            <span className="text-xs font-semibold text-gray-800">
+                                {getTotalBoxes(ticket)}
+                            </span>
+                        </div>
+                        {ticket.notes && (
+                            <div className="flex justify-between items-center py-1">
+                                <span className="text-[11px] text-gray-400">
+                                    Note
+                                </span>
+                                <span className="text-[11px] text-gray-400 italic truncate max-w-[120px]">
+                                    {ticket.notes}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </button>
+    );
+}
+
 export default function AdminOrdersPage() {
+    const router = useRouter();
     const { organization } = useOrganization();
     const organizationId = organization?.id ?? "";
-
     const { data: tickets, isLoading } = useAllTickets(organizationId, {});
-
     const [activeFilter, setActiveFilter] = useState<TicketStatus | "all">(
         "all",
     );
@@ -497,7 +382,7 @@ export default function AdminOrdersPage() {
 
     return (
         <div className="min-h-screen bg-white">
-            {/* ── Header ── */}
+            {/* Header */}
             <div className="px-6 pt-6 pb-5 border-b border-gray-100">
                 <div className="flex items-start justify-between gap-4">
                     <div>
@@ -512,21 +397,13 @@ export default function AdminOrdersPage() {
                         <div className="flex border border-gray-200 rounded-lg overflow-hidden">
                             <button
                                 onClick={() => setViewMode("grid")}
-                                className={`w-8 h-8 flex items-center justify-center transition-colors ${
-                                    viewMode === "grid"
-                                        ? "bg-indigo-600 text-white"
-                                        : "bg-white text-gray-400 hover:bg-gray-50 hover:text-indigo-600"
-                                }`}
+                                className={`w-8 h-8 flex items-center justify-center transition-colors ${viewMode === "grid" ? "bg-indigo-600 text-white" : "bg-white text-gray-400 hover:bg-gray-50 hover:text-indigo-600"}`}
                             >
                                 <LayoutGrid size={14} />
                             </button>
                             <button
                                 onClick={() => setViewMode("list")}
-                                className={`w-8 h-8 flex items-center justify-center transition-colors ${
-                                    viewMode === "list"
-                                        ? "bg-indigo-600 text-white"
-                                        : "bg-white text-gray-400 hover:bg-gray-50 hover:text-indigo-600"
-                                }`}
+                                className={`w-8 h-8 flex items-center justify-center transition-colors ${viewMode === "list" ? "bg-indigo-600 text-white" : "bg-white text-gray-400 hover:bg-gray-50 hover:text-indigo-600"}`}
                             >
                                 <List size={14} />
                             </button>
@@ -539,7 +416,6 @@ export default function AdminOrdersPage() {
                         </Link>
                     </div>
                 </div>
-
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
                     <StatCard
                         label="Total orders"
@@ -575,8 +451,9 @@ export default function AdminOrdersPage() {
                 </div>
             </div>
 
-            {/* ── Body ── */}
+            {/* Body */}
             <div className="px-6 py-5">
+                {/* Filters */}
                 <div className="flex items-center gap-3 flex-wrap mb-5">
                     <div className="relative">
                         <Search
@@ -627,37 +504,146 @@ export default function AdminOrdersPage() {
                         </p>
                     </div>
                 ) : viewMode === "list" ? (
-                    <>
-                        {/* Column headers — same GRID_COLS as rows */}
-                        <div
-                            className="hidden sm:grid gap-3 px-4 mb-2"
-                            style={{ gridTemplateColumns: GRID_COLS }}
-                        >
-                            {[
-                                "",
-                                "Ticket ID",
-                                "Title",
-                                "Date",
-                                "Location",
-                                "Contents",
-                                "Status",
-                                "",
-                            ].map((h, i) => (
-                                <span
-                                    key={i}
-                                    className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold"
-                                >
-                                    {h}
-                                </span>
-                            ))}
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            {filtered.map((t) => (
-                                <TicketRow key={t.id} ticket={t} />
-                            ))}
-                        </div>
-                    </>
+                    /* ── TABLE VIEW using shadcn Table ── */
+                    <div className="rounded-xl border border-gray-200 overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-gray-50 hover:bg-gray-50 border-b border-gray-200">
+                                    <TableHead className="w-4 pl-5 pr-2" />
+                                    <TableHead className="w-28 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                        Ticket ID
+                                    </TableHead>
+                                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                        Title
+                                    </TableHead>
+                                    <TableHead className="w-24 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                        Date
+                                    </TableHead>
+                                    <TableHead className="w-36 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                        Location
+                                    </TableHead>
+                                    <TableHead className="w-44 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                        Contents
+                                    </TableHead>
+                                    <TableHead className="w-36 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                        Status
+                                    </TableHead>
+                                    <TableHead className="w-6 pr-5 pl-2" />
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filtered.map((ticket) => {
+                                    const { dot } =
+                                        STATUS_CONFIG[ticket.status];
+                                    const dateToShow =
+                                        ticket.submitted_at ??
+                                        ticket.created_at;
+                                    return (
+                                        <TableRow
+                                            key={ticket.id}
+                                            onClick={() =>
+                                                router.push(
+                                                    `/admin/orders/${ticket.id}`,
+                                                )
+                                            }
+                                            className="group cursor-pointer border-b border-gray-100 hover:bg-gray-50/70 transition-colors"
+                                        >
+                                            <TableCell className="pl-5 pr-2">
+                                                <div
+                                                    className={`w-2 h-2 rounded-full ${dot}`}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <span
+                                                    style={{
+                                                        fontFamily:
+                                                            "var(--font-mono, 'JetBrains Mono', monospace)",
+                                                    }}
+                                                    className="text-xs font-medium text-gray-500"
+                                                    title={ticket.id}
+                                                >
+                                                    …{shortId(ticket.id)}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="max-w-0">
+                                                <span className="block text-xs font-medium truncate">
+                                                    {ticket.title ? (
+                                                        <span className="text-gray-800">
+                                                            {ticket.title}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-300 italic">
+                                                            No title
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-1 text-xs text-gray-400 whitespace-nowrap">
+                                                    <CalendarDays
+                                                        size={11}
+                                                        className="flex-shrink-0"
+                                                    />
+                                                    {relativeDate(dateToShow)}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-1 text-xs text-gray-400 min-w-0">
+                                                    <MapPin
+                                                        size={11}
+                                                        className="flex-shrink-0 text-gray-300"
+                                                    />
+                                                    <span className="truncate">
+                                                        {ticket
+                                                            .requesting_location
+                                                            ?.name ?? "—"}
+                                                    </span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-xs text-gray-500">
+                                                        <span className="font-semibold text-gray-800">
+                                                            {getItemCount(
+                                                                ticket,
+                                                            )}
+                                                        </span>{" "}
+                                                        items
+                                                    </span>
+                                                    <span className="text-xs text-gray-500">
+                                                        <span className="font-semibold text-gray-800">
+                                                            {getTotalBoxes(
+                                                                ticket,
+                                                            )}
+                                                        </span>{" "}
+                                                        boxes
+                                                    </span>
+                                                    {ticket.is_auto_approved && (
+                                                        <span className="hidden xl:inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                                                            Auto
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <StatusBadge
+                                                    status={ticket.status}
+                                                />
+                                            </TableCell>
+                                            <TableCell className="pr-5 pl-2">
+                                                <ChevronRight
+                                                    size={14}
+                                                    className="text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all"
+                                                />
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                    </div>
                 ) : (
+                    /* ── GRID VIEW ── */
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {filtered.map((t) => (
                             <TicketCard key={t.id} ticket={t} />
