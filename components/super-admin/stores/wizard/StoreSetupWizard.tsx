@@ -154,6 +154,8 @@ export default function StoreSetupWizard() {
                 name:            storeData.name,
                 address:         storeData.address,
                 is_active:       storeData.is_active,
+                latitude:        storeData.latitude ?? null,
+                longitude:       storeData.longitude ?? null,
             });
 
             // 2. Create storage spaces in parallel
