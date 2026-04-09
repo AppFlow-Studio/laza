@@ -10,8 +10,7 @@ import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 import { useCreateLocation, useLocationWithDetails } from '@/lib/hooks/queries/useLocations';
 import { useCreateStorageSpace, useBulkAssignItems } from '@/lib/hooks/queries/useStorageSetup';
 import { useCreateInvitation } from '@/lib/hooks/queries/useUsers';
-import { useCreateInventorySnapshot } from '@/lib/hooks/queries/useInventorySnapshot';
-import { useItems } from '@/lib/hooks/queries/useItems';
+import { useSeedAllItemsToLocation } from '@/lib/hooks/queries/useInventorySnapshot';
 import StoreWizardSidebar from './StoreWizardSidebar';
 import StoreDetailsStep from './steps/StoreDetailsStep';
 import type { StoreFormData } from './steps/StoreDetailsStep';
@@ -31,12 +30,11 @@ export default function StoreSetupWizard() {
     const organizationId = userInfo?.members?.organization_id;
     const userId = userInfo?.id;
 
-    const createLocationMutation   = useCreateLocation();
-    const createStorageSpaceMutation = useCreateStorageSpace();
-    const bulkAssignMutation       = useBulkAssignItems();
-    const createInvitationMutation = useCreateInvitation();
-    const inventorySnapshotMutation = useCreateInventorySnapshot();
-    const { data: allItems = [] } = useItems();
+    const createLocationMutation      = useCreateLocation();
+    const createStorageSpaceMutation  = useCreateStorageSpace();
+    const bulkAssignMutation          = useBulkAssignItems();
+    const createInvitationMutation    = useCreateInvitation();
+    const seedAllItemsMutation        = useSeedAllItemsToLocation();
 
     // ── Wizard state ─────────────────────────────────────────────────────────
     const [currentStep, setCurrentStep]       = useState(1);
@@ -198,35 +196,29 @@ export default function StoreSetupWizard() {
             }
             if (assignPromises.length > 0) await Promise.all(assignPromises);
 
-            // 4. Auto-populate ALL org items into item_locations so the store
-            //    inventory is never empty on day one. Items manually assigned in
-            //    step 3 keep their entered quantities; everything else is seeded
-            //    into the first storage space with current_quantity = 0.
-            const manuallyAssignedItemIds = new Set<string>();
+            // 4. Seed ALL org items into item_locations so the store is never
+            //    empty on day one. Items manually assigned in step 3 keep their
+            //    quantities; everything else lands in the first storage space
+            //    with current_quantity = 0. Fetched server-side so it is never
+            //    dependent on whether the client's React query cache has loaded.
+            const manuallyAssignedItemIds: string[] = [];
             for (const assignment of Object.values(itemAssignments)) {
                 for (const itemId of assignment.selectedItems) {
-                    manuallyAssignedItemIds.add(String(itemId));
+                    manuallyAssignedItemIds.push(String(itemId));
                 }
             }
 
             const firstStorageSpaceId = storageResults[0]?.id;
             if (firstStorageSpaceId) {
-                const unassignedItems = (allItems as any[])
-                    .filter(item => !manuallyAssignedItemIds.has(String(item.id)))
-                    .map(item => ({
-                        itemId: String(item.id),
-                        storageSpaceId: firstStorageSpaceId,
-                    }));
-
-                if (unassignedItems.length > 0) {
-                    await inventorySnapshotMutation.mutateAsync({
-                        locationId: location.id,
-                        userId,
-                        items: unassignedItems,
-                    }).catch(err => {
-                        console.error('Auto-populate items failed (non-fatal):', err);
-                    });
-                }
+                await seedAllItemsMutation.mutateAsync({
+                    locationId: location.id,
+                    organizationId,
+                    storageSpaceId: firstStorageSpaceId,
+                    userId,
+                    alreadyAssignedItemIds: manuallyAssignedItemIds,
+                }).catch(err => {
+                    console.error('Auto-populate items failed (non-fatal):', err);
+                });
             }
 
             // 5. Send admin invitation if not skipped

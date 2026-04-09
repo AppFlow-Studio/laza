@@ -21,6 +21,43 @@ export interface SnapshotItem {
 //  * Uses upsert so it's safe to call even if some records already exist
 //  * (e.g. if the steps was partially re-run).
 //  */
+/**
+ * seedAllItemsToLocation
+ *
+ * Fetches every item in the org from the DB and seeds item_locations rows for
+ * any item not already present in the location (i.e. not manually assigned).
+ * Called server-side so it never depends on the client's React query cache.
+ */
+export async function seedAllItemsToLocation(
+    locationId: string,
+    organizationId: string,
+    storageSpaceId: string,
+    userId: string,
+    alreadyAssignedItemIds: string[] = [],
+): Promise<void> {
+    const supabase = createServerSupabaseClient();
+
+    const { data: items, error: itemsError } = await supabase
+        .from('items')
+        .select('id')
+        .eq('organization_id', organizationId);
+
+    if (itemsError) throw itemsError;
+    if (!items || items.length === 0) return;
+
+    const assigned = new Set(alreadyAssignedItemIds.map(String));
+    const toSeed: SnapshotItem[] = items
+        .filter((item: { id: string | number }) => !assigned.has(String(item.id)))
+        .map((item: { id: string | number }) => ({
+            itemId: String(item.id),
+            storageSpaceId,
+        }));
+
+    if (toSeed.length === 0) return;
+
+    await createInventorySnapshot(locationId, userId, toSeed);
+}
+
 export async function createInventorySnapshot(
     locationId: string,
     userId: string,

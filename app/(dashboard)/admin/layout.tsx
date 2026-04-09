@@ -34,10 +34,18 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar";
 import Image from "next/image";
-import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
-import { useLocation } from "@/lib/hooks/queries/useLocations";
+import { useLocations } from "@/lib/hooks/queries/useLocations";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useAdminStore } from "@/lib/stores/adminStore";
+import { useEffect } from "react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown } from "lucide-react";
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
 const navigation = [
@@ -55,23 +63,67 @@ function SidebarLocationBlock() {
     const { state } = useSidebar();
     const isCollapsed = state === "collapsed";
 
-    const { data: userInfo } = useUserInfo();
-    const { data: location } = useLocation(
-        userInfo?.assigned_location_id ?? "",
-    );
+    const { data: locations, isLoading } = useLocations();
+    const { selectedLocationId, setSelectedLocationId } = useAdminStore();
 
-    console.log(userInfo); 
-    
+    // Auto-set selected location when locations load
+    useEffect(() => {
+        if (!locations?.length) return;
+        const ids = locations.map((l) => l.id);
+        if (!selectedLocationId || !ids.includes(selectedLocationId)) {
+            setSelectedLocationId(ids[0]);
+        }
+    }, [locations, selectedLocationId, setSelectedLocationId]);
 
-    // Don't render anything in collapsed mode — it would overflow
     if (isCollapsed) return null;
+
+    const selectedLocation = locations?.find((l) => l.id === selectedLocationId);
+    const multipleLocations = (locations?.length ?? 0) > 1;
+
+    if (isLoading) {
+        return (
+            <div className="mx-2 mt-1 rounded-xl px-3 py-2 bg-indigo-50 border border-indigo-100">
+                <Skeleton className="w-full h-5" />
+            </div>
+        );
+    }
+
+    if (multipleLocations) {
+        return (
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button className="w-full rounded-xl px-3 py-2 bg-indigo-50 border border-indigo-100 flex items-center gap-2 text-indigo-700 text-xs font-medium hover:bg-indigo-100 transition-colors">
+                        <Warehouse size={13} className="shrink-0" />
+                        <span className="truncate flex-1 text-left">
+                            {selectedLocation?.name ?? "Select location"}
+                        </span>
+                        <ChevronDown size={12} className="shrink-0 opacity-60" />
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                    {locations!.map((loc) => (
+                        <DropdownMenuItem
+                            key={loc.id}
+                            onSelect={() => setSelectedLocationId(loc.id)}
+                            className={cn(
+                                "text-xs",
+                                loc.id === selectedLocationId && "font-semibold text-indigo-700"
+                            )}
+                        >
+                            {loc.name}
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+        );
+    }
 
     return (
         <div className="mx-2 mt-1 rounded-xl px-3 py-2 bg-indigo-50 border border-indigo-100">
-            {location ? (
+            {selectedLocation ? (
                 <div className="flex items-center gap-2 text-indigo-700 text-xs font-medium">
                     <Warehouse size={13} className="shrink-0" />
-                    <span className="truncate">{location.name}</span>
+                    <span className="truncate">{selectedLocation.name}</span>
                 </div>
             ) : (
                 <Skeleton className="w-full h-5" />

@@ -15,7 +15,7 @@ export async function getAllLocations(organizationId: string) {
     // Get caller role and location assignments
     const { data: caller } = await supabase
         .from('users')
-        .select('role, assigned_location_id')
+        .select('role')
         .eq('id', userId)
         .single();
 
@@ -55,9 +55,16 @@ export async function getAllLocations(organizationId: string) {
         return data.filter((l: any) => assignedIds.includes(l.id)) as Location[];
     }
 
-    // Employee: only their single assigned location
-    if (callerRole === 'employee' && caller?.assigned_location_id) {
-        return data.filter((l: any) => l.id === caller.assigned_location_id) as Location[];
+    // Employee: only their assigned location (from junction table)
+    if (callerRole === 'employee') {
+        const { data: empAssignments } = await supabase
+            .from('user_location_assignments')
+            .select('location_id')
+            .eq('user_id', userId);
+
+        const empLocationId = empAssignments?.[0]?.location_id ?? null;
+        if (!empLocationId) return [];
+        return data.filter((l: any) => l.id === empLocationId) as Location[];
     }
 
     return [];
@@ -111,10 +118,10 @@ export async function getLocationWithDetails(id: string) {
     if (storageError) throw storageError;
 
     const { data: employees, error: employeesError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('assigned_location_id', id)
-        .eq('is_active', true);
+        .from('user_location_assignments')
+        .select('user_id, users!inner(id, is_active)')
+        .eq('location_id', id)
+        .eq('users.is_active', true);
 
     if (employeesError) throw employeesError;
 
