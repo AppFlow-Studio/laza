@@ -2180,7 +2180,6 @@ export type Database = {
       }
       users: {
         Row: {
-          assigned_location_id: string | null
           avatar_url: string | null
           created_at: string
           email: string | null
@@ -2193,7 +2192,6 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          assigned_location_id?: string | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
@@ -2206,7 +2204,6 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          assigned_location_id?: string | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
@@ -2218,15 +2215,7 @@ export type Database = {
           role?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "users_assigned_location_id_fkey"
-            columns: ["assigned_location_id"]
-            isOneToOne: false
-            referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       warehouse_expense_rates: {
         Row: {

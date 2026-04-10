@@ -57,7 +57,7 @@ export default function EmployeeCard({ employee, onEdit, onDelete }: EmployeeCar
 
             <div className="flex items-center gap-2 mb-4 text-sm text-zinc-600">
                 <MapPin className="w-4 h-4" />
-                <span>{employee.assigned_location_id ? 'Assigned' : 'Unassigned'}</span>
+                <span>{(employee as any).assigned_locations?.length > 0 ? 'Assigned' : 'Unassigned'}</span>
             </div>
 
             <div className={cn(

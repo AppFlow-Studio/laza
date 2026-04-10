@@ -6,11 +6,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { useUpdateUser } from '@/lib/hooks/queries/useUsers';
+import { useUpdateUser, useUserLocationAssignments } from '@/lib/hooks/queries/useUsers';
 import { useLocations } from '@/lib/hooks/queries/useLocations';
 import toast from 'react-hot-toast';
 import { User } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';
+import { Check } from 'lucide-react';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -21,15 +22,13 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { AlertTriangle, UserX } from 'lucide-react';
-import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
+import { UserX } from 'lucide-react';
 
 const editUserSchema = z.object({
-    role: z.enum(['admin', 'employee']),
+    role: z.enum(['admin', 'employee', 'super_admin']),
     assigned_location_id: z.string().nullable().optional(),
     is_active: z.boolean(),
 }).refine((data) => {
-    // Location required for employees
     if (data.role === 'employee' && !data.assigned_location_id) {
         return false;
     }
@@ -49,10 +48,21 @@ interface EditUserModalProps {
 
 export default function EditUserModal({ user, onSuccess, onClose }: EditUserModalProps) {
     const updateUserMutation = useUpdateUser();
- 
     const { data: locations } = useLocations();
+    const { data: currentAssignments = [] } = useUserLocationAssignments(user.id);
+
     const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
     const [pendingFormData, setPendingFormData] = useState<EditUserFormData | null>(null);
+
+    // Admin multi-location state — populated from the junction table query
+    const [adminLocationIds, setAdminLocationIds] = useState<string[]>([]);
+
+    // Sync junction table data into state once loaded
+    const [assignmentsLoaded, setAssignmentsLoaded] = useState(false);
+    if (currentAssignments.length > 0 && !assignmentsLoaded) {
+        if (user.role === 'admin') setAdminLocationIds(currentAssignments);
+        setAssignmentsLoaded(true);
+    }
 
     const {
         register,
@@ -63,8 +73,11 @@ export default function EditUserModal({ user, onSuccess, onClose }: EditUserModa
     } = useForm<EditUserFormData>({
         resolver: zodResolver(editUserSchema),
         defaultValues: {
-            role: user.role || 'employee',
-            assigned_location_id: user.assigned_location_id || null,
+            role: (user.role as 'admin' | 'employee' | 'super_admin') || 'employee',
+            // Employee's location comes from the junction table (first assignment)
+            assigned_location_id: user.role === 'employee'
+                ? (currentAssignments[0] ?? null)
+                : null,
             is_active: user.is_active ?? true,
         },
     });
@@ -72,14 +85,26 @@ export default function EditUserModal({ user, onSuccess, onClose }: EditUserModa
     const selectedRole = watch('role');
     const isActive = watch('is_active');
 
+    const handleRoleChange = (role: 'admin' | 'employee' | 'super_admin') => {
+        setValue('role', role);
+        setValue('assigned_location_id', null);
+        if (role !== 'admin') setAdminLocationIds([]);
+    };
+
+    const toggleAdminLocation = (locationId: string) => {
+        setAdminLocationIds(prev =>
+            prev.includes(locationId)
+                ? prev.filter(id => id !== locationId)
+                : [...prev, locationId]
+        );
+    };
+
     const onSubmit = async (data: EditUserFormData) => {
-        // Confirm before deactivating
         if (!data.is_active && user.is_active) {
             setPendingFormData(data);
             setShowDeactivateConfirm(true);
             return;
         }
-
         await executeUpdate(data);
     };
 
@@ -89,14 +114,14 @@ export default function EditUserModal({ user, onSuccess, onClose }: EditUserModa
             const result = await updateUserMutation.mutateAsync({
                 userId: user.id,
                 role: data.role,
-                assigned_location_id: data.assigned_location_id || null,
+                assigned_location_id: data.role === 'employee' ? (data.assigned_location_id || null) : null,
+                assigned_location_ids: data.role === 'admin' ? adminLocationIds : undefined,
                 is_active: data.is_active,
             });
 
             if (result.success) {
                 toast.success(result.message);
                 onSuccess();
-                onClose();
             } else {
                 toast.error(result.message);
             }
@@ -106,9 +131,7 @@ export default function EditUserModal({ user, onSuccess, onClose }: EditUserModa
     };
 
     const handleConfirmDeactivate = () => {
-        if (pendingFormData) {
-            executeUpdate(pendingFormData);
-        }
+        if (pendingFormData) executeUpdate(pendingFormData);
         setShowDeactivateConfirm(false);
         setPendingFormData(null);
     };
@@ -125,6 +148,7 @@ export default function EditUserModal({ user, onSuccess, onClose }: EditUserModa
     return (
         <>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                {/* Read-only user info */}
                 <div className="p-4 bg-zinc-50 rounded-lg">
                     <p className="text-sm text-zinc-600 mb-1">Email</p>
                     <p className="font-medium text-zinc-900">{user.email}</p>
@@ -139,27 +163,25 @@ export default function EditUserModal({ user, onSuccess, onClose }: EditUserModa
                     </p>
                 </div>
 
+                {/* Role */}
                 <div>
                     <Label htmlFor="role" className="mb-2">Role *</Label>
                     <select
                         id="role"
                         {...register('role')}
-                        onChange={(e) => {
-                            setValue('role', e.target.value as 'admin' | 'employee');
-                            if (e.target.value === 'admin') {
-                                setValue('assigned_location_id', null);
-                            }
-                        }}
+                        onChange={(e) => handleRoleChange(e.target.value as 'admin' | 'employee' | 'super_admin')}
                         className="w-full px-3 py-2 border border-zinc-200 rounded-lg"
                     >
                         <option value="employee">Employee</option>
                         <option value="admin">Admin</option>
+                        <option value="super_admin">Super Admin</option>
                     </select>
                     {errors.role && (
                         <p className="text-sm text-red-500 mt-1">{errors.role.message}</p>
                     )}
                 </div>
 
+                {/* Employee: single location */}
                 {selectedRole === 'employee' && (
                     <div>
                         <Label htmlFor="assigned_location_id" className="mb-2">
@@ -186,6 +208,54 @@ export default function EditUserModal({ user, onSuccess, onClose }: EditUserModa
                     </div>
                 )}
 
+                {/* Admin: multi-location */}
+                {selectedRole === 'admin' && (
+                    <div>
+                        <Label className="mb-2 block">Assigned Locations</Label>
+                        <p className="text-xs text-zinc-500 mb-3">
+                            Leave empty to grant access to all locations.
+                        </p>
+                        <div className="border border-zinc-200 rounded-lg overflow-hidden divide-y divide-zinc-100 max-h-52 overflow-y-auto">
+                            {locations?.map((location) => {
+                                const selected = adminLocationIds.includes(location.id);
+                                return (
+                                    <button
+                                        key={location.id}
+                                        type="button"
+                                        onClick={() => toggleAdminLocation(location.id)}
+                                        className={cn(
+                                            "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
+                                            selected ? "bg-indigo-50" : "hover:bg-zinc-50"
+                                        )}
+                                    >
+                                        <div className={cn(
+                                            "w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
+                                            selected ? "bg-indigo-500 border-indigo-500" : "border-zinc-300"
+                                        )}>
+                                            {selected && <Check className="w-3 h-3 text-white" />}
+                                        </div>
+                                        <span className={cn(
+                                            "text-sm font-medium",
+                                            selected ? "text-indigo-900" : "text-zinc-800"
+                                        )}>
+                                            {location.name}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <p className={cn(
+                            "text-xs mt-2",
+                            adminLocationIds.length > 0 ? "text-indigo-600 font-medium" : "text-zinc-400"
+                        )}>
+                            {adminLocationIds.length === 0
+                                ? 'No locations selected — access to all locations'
+                                : `${adminLocationIds.length} location${adminLocationIds.length !== 1 ? 's' : ''} selected`}
+                        </p>
+                    </div>
+                )}
+
+                {/* Status */}
                 <div>
                     <Label className="mb-2 block">Status</Label>
                     <div className="flex items-center gap-3">
@@ -223,7 +293,6 @@ export default function EditUserModal({ user, onSuccess, onClose }: EditUserModa
                 </div>
             </form>
 
-            {/* Deactivate User Confirmation Dialog */}
             <AlertDialog open={showDeactivateConfirm} onOpenChange={setShowDeactivateConfirm}>
                 <AlertDialogContent className="sm:max-w-[425px]">
                     <AlertDialogHeader>
@@ -257,4 +326,3 @@ export default function EditUserModal({ user, onSuccess, onClose }: EditUserModa
         </>
     );
 }
-

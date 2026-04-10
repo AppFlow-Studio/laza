@@ -366,12 +366,13 @@ export default function AllStoresPage() {
 		});
 	}, [stores, searchQuery]);
 
-	// Employee counts per location
+	// Employee counts per location (using assigned_locations array from junction table)
 	const employeesByLocation = useMemo(() => {
 		const map: Record<string, number> = {};
 		(employees ?? []).forEach((emp: any) => {
-			const locId = emp.assigned_location_id;
-			if (locId) map[locId] = (map[locId] ?? 0) + 1;
+			(emp.assigned_locations ?? []).forEach((loc: any) => {
+				if (loc?.id) map[loc.id] = (map[loc.id] ?? 0) + 1;
+			});
 		});
 		return map;
 	}, [employees]);

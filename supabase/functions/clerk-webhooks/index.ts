@@ -24,14 +24,12 @@ Deno.serve(async (req) => {
     switch (event.type) {
         case "user.created": {
             // Handle user creation
-            // Extract metadata from publicMetadata
             const publicMetadata = event.data.public_metadata || {};
-            const organizationId = publicMetadata.organizationId;
             const role = publicMetadata.role || null;
             const assignedLocationId =
                 publicMetadata.assigned_location_id || null;
 
-            // Insert user
+            // Insert user (no assigned_location_id — stored in junction table)
             const { data: user, error } = await supabase
                 .from("users")
                 .insert([
@@ -44,7 +42,6 @@ Deno.serve(async (req) => {
                         last_name: event.data.last_name,
                         avatar_url: event.data.image_url,
                         role: role,
-                        assigned_location_id: assignedLocationId,
                         is_active: true,
                         created_at: new Date(
                             event.data.created_at,
@@ -64,22 +61,18 @@ Deno.serve(async (req) => {
                 });
             }
 
-            // If organizationId exists, create member record
-            if (organizationId) {
-                // Note: The members record will be created by organizationMembership.created event
-                // But we can also create it here if needed
+            // If employee with a location, create junction row
+            if (role === "employee" && assignedLocationId) {
+                await supabase
+                    .from("user_location_assignments")
+                    .insert({ user_id: event.data.id, location_id: assignedLocationId });
             }
 
             return new Response(JSON.stringify({ user }), { status: 200 });
         }
 
         case "user.updated": {
-            // Handle user update
-            const publicMetadata = event.data.public_metadata || {};
-            const role = publicMetadata.role || null;
-            const assignedLocationId =
-                publicMetadata.assigned_location_id || null;
-
+            // Handle user update (profile fields only — location managed via membership events)
             const { data: user, error } = await supabase
                 .from("users")
                 .update({
@@ -87,8 +80,6 @@ Deno.serve(async (req) => {
                     first_name: event.data.first_name,
                     last_name: event.data.last_name,
                     avatar_url: event.data.image_url,
-                    role: role,
-                    assigned_location_id: assignedLocationId,
                     updated_at: new Date(event.data.updated_at).toISOString(),
                 })
                 .eq("id", event.data.id)
@@ -198,10 +189,7 @@ Deno.serve(async (req) => {
 
             const { data: userData, error: userError } = await supabase
                 .from("users")
-                .update({
-                    role: safeRole,
-                    assigned_location_id: assignedLocationId,
-                })
+                .update({ role: safeRole })
                 .eq("id", userId)
                 .select()
                 .single();
@@ -218,16 +206,25 @@ Deno.serve(async (req) => {
                 );
             }
 
-            // Sync user_location_assignments for admin role
-            if (role === "admin" && userId) {
+            // Sync user_location_assignments for all roles
+            if (userId) {
                 // Clear existing assignments first
                 await supabase
                     .from("user_location_assignments")
                     .delete()
                     .eq("user_id", userId);
 
-                // Insert new assignments if any
-                if (assignedLocationIds.length > 0) {
+                if (role === "employee" && assignedLocationId) {
+                    // Employee: exactly one junction row
+                    const { error: assignError } = await supabase
+                        .from("user_location_assignments")
+                        .insert({ user_id: userId, location_id: assignedLocationId });
+
+                    if (assignError) {
+                        console.error("Error inserting location assignment:", assignError);
+                    }
+                } else if (role === "admin" && assignedLocationIds.length > 0) {
+                    // Admin: one row per location
                     const { error: assignError } = await supabase
                         .from("user_location_assignments")
                         .insert(
@@ -238,12 +235,10 @@ Deno.serve(async (req) => {
                         );
 
                     if (assignError) {
-                        console.error(
-                            "Error inserting location assignments:",
-                            assignError,
-                        );
+                        console.error("Error inserting location assignments:", assignError);
                     }
                 }
+                // super_admin: no junction rows
             }
 
             if (error) {
@@ -314,9 +309,6 @@ Deno.serve(async (req) => {
                 .from("users")
                 .update({
                     role: role,
-                    assigned_location_id:
-                        event.data.public_metadata?.assigned_location_id ||
-                        null,
                     updated_at: new Date(event.data.updated_at).toISOString(),
                 })
                 .eq("id", event.data.public_user_data?.user_id)
@@ -341,6 +333,8 @@ Deno.serve(async (req) => {
 
             // Sync user_location_assignments on membership update
             const updatedUserId = event.data.public_user_data?.user_id;
+            const updatedLocationId: string | null =
+                event.data.public_metadata?.assigned_location_id || null;
             const updatedLocationIds: string[] =
                 event.data.public_metadata?.assigned_location_ids ?? [];
 
@@ -351,8 +345,17 @@ Deno.serve(async (req) => {
                     .delete()
                     .eq("user_id", updatedUserId);
 
-                // Re-insert if admin with locations
-                if (role === "admin" && updatedLocationIds.length > 0) {
+                if (role === "employee" && updatedLocationId) {
+                    // Employee: exactly one junction row
+                    const { error: assignError } = await supabase
+                        .from("user_location_assignments")
+                        .insert({ user_id: updatedUserId, location_id: updatedLocationId });
+
+                    if (assignError) {
+                        console.error("Error updating location assignment:", assignError);
+                    }
+                } else if (role === "admin" && updatedLocationIds.length > 0) {
+                    // Admin: one row per location
                     const { error: assignError } = await supabase
                         .from("user_location_assignments")
                         .insert(
@@ -363,12 +366,10 @@ Deno.serve(async (req) => {
                         );
 
                     if (assignError) {
-                        console.error(
-                            "Error updating location assignments:",
-                            assignError,
-                        );
+                        console.error("Error updating location assignments:", assignError);
                     }
                 }
+                // super_admin: no junction rows
             }
 
             return new Response(JSON.stringify({ data }), { status: 200 });

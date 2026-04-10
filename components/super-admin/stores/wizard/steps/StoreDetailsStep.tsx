@@ -81,7 +81,7 @@ export default function StoreDetailsStep({
     );
 
     const { isLoaded } = useJsApiLoader({
-        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
+        googleMapsApiKey: "",
         libraries: LIBRARIES,
     });
 
