@@ -603,21 +603,27 @@ export default function SuperAdminOrdersPage() {
 
                                                 {/* Contents */}
                                                 <TableCell className="px-3">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <span className="text-xs text-gray-500">
-                                                            <span className="font-semibold text-gray-800">
-                                                                {itemCount}
-                                                            </span>{" "}
-                                                            items
-                                                        </span>
-                                                        <span className="text-xs text-gray-500">
-                                                            <span className="font-semibold text-gray-800">
-                                                                {totalBoxes}
-                                                            </span>{" "}
-                                                            boxes
-                                                        </span>
+                                                    <div className="flex flex-col gap-0.5 min-w-0">
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-xs text-gray-500">
+                                                                <span className="font-semibold text-gray-800">
+                                                                    {itemCount}
+                                                                </span>{" "}
+                                                                items
+                                                            </span>
+                                                            <span className="text-xs text-gray-500">
+                                                                <span className="font-semibold text-gray-800">
+                                                                    {totalBoxes}
+                                                                </span>{" "}
+                                                                boxes
+                                                            </span>
+                                                        </div>
                                                         {ticket.notes && (
-                                                            <span className="hidden xl:block text-[11px] text-gray-300 italic truncate max-w-[80px]">
+                                                            <span
+                                                                className="text-[11px] text-gray-400 italic truncate max-w-[160px] cursor-default"
+                                                                title={ticket.notes}
+                                                            >
+                                                                <span className="not-italic font-medium text-gray-300 mr-0.5">Notes:</span>
                                                                 {ticket.notes}
                                                             </span>
                                                         )}
