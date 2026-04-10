@@ -2,10 +2,10 @@
 
 /**
  * TASK 3.3 — Store Admin: Ticket Detail Page
- * File: app/(dashboard)/admin/orders/[palletId]/page.tsx
+ * File: app/(dashboard)/admin/orders/[id]/page.tsx
  */
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -23,8 +23,12 @@ import {
     AlertTriangle,
     RotateCcw,
     X,
+    Pencil,
+    Check,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase/client";
 import {
     useTicket,
     useCreateTicket,
@@ -48,7 +52,6 @@ type TicketStatus =
 
 type DeliveryType = "company" | "self";
 
-// Shape from getTicketById() — includes items + logs join
 type TicketItem = {
     id: string;
     item_id: number;
@@ -68,7 +71,6 @@ type TicketItem = {
 
 type TicketLog = {
     id: string;
-    // note: ticket_id is NOT selected in getTicketById() — omit it
     previous_status: TicketStatus | null;
     new_status: TicketStatus;
     changed_by: string;
@@ -76,8 +78,6 @@ type TicketLog = {
     created_at: string;
 };
 
-// address is a JSONB column — Supabase returns it as Json (unknown at runtime).
-// We parse it ourselves in helpers below rather than trusting the type.
 type LocationAddress = {
     street?: string;
     city?: string;
@@ -101,9 +101,6 @@ type TicketDelivery = {
     notes: string | null;
 };
 
-// Exactly mirrors the getTicketById() select shape — every joined table included.
-// Use NonNullable<Awaited<ReturnType<typeof getTicketById>>> in production
-// once the query file is regenerated after migrations (Task 1.13).
 type Ticket = {
     id: string;
     organization_id: string;
@@ -115,7 +112,7 @@ type Ticket = {
     confirmed_by: string | null;
     rejection_reason: string | null;
     notes: string | null;
-    // delivery_type lives on order_tickets (Task 1.43, Schema v2 §5.7)
+    title: string | null;
     delivery_type: DeliveryType | null;
     submitted_at: string | null;
     fulfilled_at: string | null;
@@ -124,47 +121,31 @@ type Ticket = {
     updated_at: string;
     is_auto_approved: boolean;
     parent_ticket_id: string | null;
-    // address is JSONB → Supabase types it as `Json` (not a typed object)
-    requesting_location: {
-        id: string;
-        name: string;
-        address: unknown; // Json from Supabase — parse with parseAddress() helper
-    } | null;
-    warehouse_location: {
-        id: string;
-        name: string;
-    } | null;
+    requesting_location: { id: string; name: string; address: unknown } | null;
+    warehouse_location: { id: string; name: string } | null;
     order_ticket_items: TicketItem[];
     order_ticket_logs: TicketLog[];
     ticket_deliveries: TicketDelivery[];
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// address is JSONB — Supabase types it as `unknown`. Parse it safely.
 function parseAddress(raw: unknown): LocationAddress {
-    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    if (raw && typeof raw === "object" && !Array.isArray(raw))
         return raw as LocationAddress;
-    }
     if (typeof raw === "string") {
         try {
             return JSON.parse(raw) as LocationAddress;
-        } catch {
-            /* fall through */
-        }
+        } catch {}
     }
     return {};
 }
-
 function formatAddress(raw: unknown): string {
     const a = parseAddress(raw);
     return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "—";
 }
-
 function shortId(uuid: string) {
     return `…${uuid.slice(-8).toUpperCase()}`;
 }
-
 function formatDate(iso: string) {
     return new Intl.DateTimeFormat("en-US", {
         month: "short",
@@ -174,7 +155,6 @@ function formatDate(iso: string) {
         minute: "2-digit",
     }).format(new Date(iso));
 }
-
 function formatDateShort(iso: string) {
     return new Intl.DateTimeFormat("en-US", {
         month: "short",
@@ -183,14 +163,10 @@ function formatDateShort(iso: string) {
     }).format(new Date(iso));
 }
 
-// ─── Status config ─────────────────────────────────────────────────────────
+// ─── Status config ────────────────────────────────────────────────────────────
 const STATUS_META: Record<
     TicketStatus,
-    {
-        label: string;
-        badge: string;
-        dot: string;
-    }
+    { label: string; badge: string; dot: string }
 > = {
     draft: {
         label: "Draft",
@@ -239,8 +215,6 @@ const STATUS_META: Record<
     },
 };
 
-// Timeline steps store admins see (excludes in_transit / delivered — those are
-// warehouse-internal; store admin just sees fulfilled → confirmed)
 const TIMELINE_STEPS: TicketStatus[] = [
     "draft",
     "submitted",
@@ -248,6 +222,146 @@ const TIMELINE_STEPS: TicketStatus[] = [
     "fulfilled",
     "confirmed",
 ];
+
+// ─── Inline title editor ──────────────────────────────────────────────────────
+function TitleEditor({ ticket }: { ticket: Ticket }) {
+    const queryClient = useQueryClient();
+    const [editing, setEditing] = useState(false);
+    const [value, setValue] = useState(ticket.title ?? "");
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (editing) inputRef.current?.focus();
+    }, [editing]);
+
+    const { mutate: saveTitle, isPending } = useMutation({
+        mutationFn: async (newTitle: string) => {
+            const { data, error } = await supabase
+                .from("order_tickets")
+                .update({ title: newTitle.trim() || null })
+                .eq("id", ticket.id)
+                .select("id, title");
+            if (error) throw error;
+            // Supabase RLS silent block: query succeeded but 0 rows matched
+            if (!data || data.length === 0) {
+                throw new Error(
+                    "Update blocked — check RLS policy on order_tickets UPDATE",
+                );
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["ticket", ticket.id] });
+            toast.success("Title saved");
+            setEditing(false);
+        },
+        onError: (err: any) => {
+            console.error("Title update failed:", err?.message);
+            toast.error("Failed to save title");
+        },
+    });
+
+    const handleSave = () => {
+        if (value.trim() === (ticket.title ?? "")) {
+            setEditing(false);
+            return;
+        }
+        saveTitle(value);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") handleSave();
+        if (e.key === "Escape") {
+            setValue(ticket.title ?? "");
+            setEditing(false);
+        }
+    };
+
+    if (editing) {
+        return (
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+                <input
+                    ref={inputRef}
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Add order title…"
+                    className="text-lg font-bold text-gray-900 bg-transparent border-b-2 border-indigo-400 outline-none w-full max-w-sm placeholder:text-gray-300 placeholder:font-normal placeholder:text-base"
+                />
+                <button
+                    onClick={handleSave}
+                    disabled={isPending}
+                    className="w-6 h-6 flex items-center justify-center rounded-full bg-indigo-600 text-white hover:bg-indigo-700 flex-shrink-0 transition-colors"
+                >
+                    {isPending ? (
+                        <Loader2 size={10} className="animate-spin" />
+                    ) : (
+                        <Check size={10} />
+                    )}
+                </button>
+                <button
+                    onClick={() => {
+                        setValue(ticket.title ?? "");
+                        setEditing(false);
+                    }}
+                    className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 flex-shrink-0 transition-colors"
+                >
+                    <X size={10} />
+                </button>
+            </div>
+        );
+    }
+
+    if (ticket.title) {
+        return (
+            <div className="flex items-center gap-2 min-w-0 flex-1 group">
+                <div className="min-w-0">
+                    <h1 className="text-lg font-bold text-gray-900 truncate">
+                        {ticket.title}
+                    </h1>
+                    <p
+                        className="text-[11px] text-gray-400"
+                        style={{ fontFamily: "var(--font-mono, monospace)" }}
+                    >
+                        {shortId(ticket.id)}
+                    </p>
+                </div>
+                <button
+                    onClick={() => setEditing(true)}
+                    className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all flex-shrink-0"
+                    title="Edit title"
+                >
+                    <Pencil size={11} />
+                </button>
+            </div>
+        );
+    }
+
+    // No title — show placeholder that opens editor on click
+    return (
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="min-w-0">
+                <button
+                    onClick={() => setEditing(true)}
+                    className="flex items-center gap-1.5 text-gray-400 hover:text-indigo-600 transition-colors group"
+                >
+                    <span className="text-sm font-medium italic">
+                        Add title
+                    </span>
+                    <Pencil
+                        size={11}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    />
+                </button>
+                <p
+                    className="text-[11px] text-gray-400 mt-0.5"
+                    style={{ fontFamily: "var(--font-mono, monospace)" }}
+                >
+                    {shortId(ticket.id)}
+                </p>
+            </div>
+        </div>
+    );
+}
 
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: TicketStatus }) {
@@ -267,7 +381,6 @@ function StatusBadge({ status }: { status: TicketStatus }) {
 // ─── Timeline ────────────────────────────────────────────────────────────────
 function StatusTimeline({ status }: { status: TicketStatus }) {
     const isTerminal = status === "rejected" || status === "cancelled";
-    // Map in_transit / delivered / confirmed all to "fulfilled" position for display
     const displayStatus =
         status === "in_transit" || status === "delivered"
             ? "fulfilled"
@@ -281,20 +394,17 @@ function StatusTimeline({ status }: { status: TicketStatus }) {
             <p className="text-[10px] font-bold tracking-widest uppercase text-gray-400 mb-3">
                 Order progress
             </p>
-
-            {/* ── Horizontal layout — sm and above ── */}
+            {/* Horizontal — sm+ */}
             <div className="hidden sm:flex items-start">
                 {TIMELINE_STEPS.map((step, i) => {
                     const isDone = !isTerminal && i < currentIdx;
                     const isActive = !isTerminal && i === currentIdx;
                     const isReject = isTerminal && step === "submitted";
-
                     return (
                         <div
                             key={step}
                             className="flex-1 flex flex-col items-center relative"
                         >
-                            {/* Connector line */}
                             {i < TIMELINE_STEPS.length - 1 && (
                                 <div
                                     className="absolute top-[10px] left-[calc(50%+11px)] right-[calc(-50%+11px)] h-[2px] z-0"
@@ -305,17 +415,8 @@ function StatusTimeline({ status }: { status: TicketStatus }) {
                                     }}
                                 />
                             )}
-                            {/* Dot */}
                             <div
-                                className={`relative z-10 w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-all ${
-                                    isReject
-                                        ? "border-red-400 bg-red-400"
-                                        : isDone
-                                          ? "border-indigo-600 bg-indigo-600"
-                                          : isActive
-                                            ? "border-indigo-600 bg-white ring-4 ring-indigo-100"
-                                            : "border-gray-200 bg-white"
-                                }`}
+                                className={`relative z-10 w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-all ${isReject ? "border-red-400 bg-red-400" : isDone ? "border-indigo-600 bg-indigo-600" : isActive ? "border-indigo-600 bg-white ring-4 ring-indigo-100" : "border-gray-200 bg-white"}`}
                             >
                                 {isReject ? (
                                     <X size={10} className="text-white" />
@@ -329,15 +430,8 @@ function StatusTimeline({ status }: { status: TicketStatus }) {
                                     <div className="w-2 h-2 rounded-full bg-indigo-600" />
                                 ) : null}
                             </div>
-                            {/* Label */}
                             <span
-                                className={`mt-1.5 text-[10px] text-center leading-tight font-medium ${
-                                    isReject
-                                        ? "text-red-500 font-semibold"
-                                        : isDone || isActive
-                                          ? "text-gray-800 font-semibold"
-                                          : "text-gray-400"
-                                }`}
+                                className={`mt-1.5 text-[10px] text-center leading-tight font-medium ${isReject ? "text-red-500 font-semibold" : isDone || isActive ? "text-gray-800 font-semibold" : "text-gray-400"}`}
                             >
                                 {STATUS_META[step].label}
                             </span>
@@ -345,29 +439,18 @@ function StatusTimeline({ status }: { status: TicketStatus }) {
                     );
                 })}
             </div>
-
-            {/* ── Vertical layout — mobile only ── */}
+            {/* Vertical — mobile */}
             <div className="flex flex-col sm:hidden">
                 {TIMELINE_STEPS.map((step, i) => {
                     const isDone = !isTerminal && i < currentIdx;
                     const isActive = !isTerminal && i === currentIdx;
                     const isReject = isTerminal && step === "submitted";
                     const isLast = i === TIMELINE_STEPS.length - 1;
-
                     return (
                         <div key={step} className="flex items-start gap-3">
-                            {/* Dot + vertical connector */}
                             <div className="flex flex-col items-center flex-shrink-0">
                                 <div
-                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                                        isReject
-                                            ? "border-red-400 bg-red-400"
-                                            : isDone
-                                              ? "border-indigo-600 bg-indigo-600"
-                                              : isActive
-                                                ? "border-indigo-600 bg-white ring-4 ring-indigo-100"
-                                                : "border-gray-200 bg-white"
-                                    }`}
+                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isReject ? "border-red-400 bg-red-400" : isDone ? "border-indigo-600 bg-indigo-600" : isActive ? "border-indigo-600 bg-white ring-4 ring-indigo-100" : "border-gray-200 bg-white"}`}
                                 >
                                     {isReject ? (
                                         <X size={9} className="text-white" />
@@ -393,15 +476,8 @@ function StatusTimeline({ status }: { status: TicketStatus }) {
                                     />
                                 )}
                             </div>
-                            {/* Label */}
                             <span
-                                className={`text-xs leading-tight pt-0.5 font-medium ${
-                                    isReject
-                                        ? "text-red-500 font-semibold"
-                                        : isDone || isActive
-                                          ? "text-gray-800 font-semibold"
-                                          : "text-gray-400"
-                                }`}
+                                className={`text-xs leading-tight pt-0.5 font-medium ${isReject ? "text-red-500 font-semibold" : isDone || isActive ? "text-gray-800 font-semibold" : "text-gray-400"}`}
                             >
                                 {STATUS_META[step].label}
                             </span>
@@ -416,8 +492,7 @@ function StatusTimeline({ status }: { status: TicketStatus }) {
 // ─── Status banner ────────────────────────────────────────────────────────────
 function StatusBanner({ ticket }: { ticket: Ticket }) {
     const { status, rejection_reason, parent_ticket_id } = ticket;
-
-    if (status === "draft") {
+    if (status === "draft")
         return (
             <div className="flex items-start gap-2.5 p-3 bg-yellow-50 border border-yellow-200 rounded-xl mb-5 text-yellow-800 text-xs">
                 <FileEdit
@@ -430,8 +505,7 @@ function StatusBanner({ ticket }: { ticket: Ticket }) {
                 </span>
             </div>
         );
-    }
-    if (status === "submitted") {
+    if (status === "submitted")
         return (
             <div className="flex items-start gap-2.5 p-3 bg-blue-50 border border-blue-200 rounded-xl mb-5 text-blue-800 text-xs">
                 <Send
@@ -444,8 +518,7 @@ function StatusBanner({ ticket }: { ticket: Ticket }) {
                 </span>
             </div>
         );
-    }
-    if (status === "processing") {
+    if (status === "processing")
         return (
             <div className="flex items-start gap-2.5 p-3 bg-yellow-50 border border-yellow-200 rounded-xl mb-5 text-yellow-800 text-xs">
                 <Loader2
@@ -458,7 +531,6 @@ function StatusBanner({ ticket }: { ticket: Ticket }) {
                 </span>
             </div>
         );
-    }
     if (
         status === "fulfilled" ||
         status === "in_transit" ||
@@ -502,7 +574,7 @@ function StatusBanner({ ticket }: { ticket: Ticket }) {
             </div>
         );
     }
-    if (status === "confirmed") {
+    if (status === "confirmed")
         return (
             <div className="flex items-start gap-2.5 p-3 bg-green-50 border border-green-200 rounded-xl mb-5 text-green-800 text-xs">
                 <CheckCircle2
@@ -515,8 +587,7 @@ function StatusBanner({ ticket }: { ticket: Ticket }) {
                 </span>
             </div>
         );
-    }
-    if (status === "rejected") {
+    if (status === "rejected")
         return (
             <div className="p-4 bg-red-50 border border-red-200 rounded-xl mb-5">
                 <div className="flex items-center gap-1.5 text-red-700 font-bold text-[11px] uppercase tracking-wide mb-2">
@@ -527,8 +598,7 @@ function StatusBanner({ ticket }: { ticket: Ticket }) {
                 </p>
             </div>
         );
-    }
-    if (status === "cancelled") {
+    if (status === "cancelled")
         return (
             <div className="flex items-start gap-2.5 p-3 bg-gray-50 border border-gray-200 rounded-xl mb-5 text-gray-600 text-xs">
                 <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
@@ -537,7 +607,6 @@ function StatusBanner({ ticket }: { ticket: Ticket }) {
                 </span>
             </div>
         );
-    }
     return null;
 }
 
@@ -559,7 +628,6 @@ function ItemsTable({
 
     return (
         <div className="border border-gray-200 rounded-xl overflow-hidden">
-            {/* Header */}
             <div
                 className="grid gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100"
                 style={{
@@ -584,8 +652,6 @@ function ItemsTable({
                     </span>
                 ))}
             </div>
-
-            {/* Rows */}
             {order_ticket_items.map((line) => {
                 const name =
                     line.items?.short_label ??
@@ -601,7 +667,6 @@ function ItemsTable({
                     !isFullFilled;
                 const isZeroFill =
                     line.fulfilled_boxes !== null && line.fulfilled_boxes === 0;
-
                 const fulBadge = isFullFilled ? (
                     <span className="text-[10px] font-semibold bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">
                         Full
@@ -615,7 +680,6 @@ function ItemsTable({
                         None
                     </span>
                 ) : null;
-
                 const fulTextClass = isFullFilled
                     ? "text-green-700 font-semibold"
                     : isPartialFill
@@ -634,7 +698,6 @@ function ItemsTable({
                                   : "1fr 90px 90px",
                         }}
                     >
-                        {/* Name */}
                         <div>
                             <div className="text-sm font-semibold text-gray-900">
                                 {name}
@@ -651,15 +714,11 @@ function ItemsTable({
                                 </div>
                             )}
                         </div>
-
-                        {/* SKU (non-draft, non-fulfilled views) */}
                         {!showFulfilled && !isDraftEditing && (
                             <div className="text-xs text-gray-600 font-semibold">
                                 {line.quantity_boxes} boxes
                             </div>
                         )}
-
-                        {/* Draft: editable qty */}
                         {isDraftEditing && (
                             <div className="flex items-center">
                                 <input
@@ -677,8 +736,6 @@ function ItemsTable({
                                 />
                             </div>
                         )}
-
-                        {/* Fulfilled view */}
                         {showFulfilled && (
                             <>
                                 <div className="text-xs font-semibold text-gray-700">
@@ -699,13 +756,12 @@ function ItemsTable({
 
 // ─── Timeline log ─────────────────────────────────────────────────────────────
 function TimelineLog({ logs }: { logs: TicketLog[] }) {
-    if (!logs.length) {
+    if (!logs.length)
         return (
             <p className="text-xs text-gray-400 py-4 text-center">
                 No activity yet.
             </p>
         );
-    }
     return (
         <div className="flex flex-col gap-0">
             {logs.map((log, i) => {
@@ -713,7 +769,6 @@ function TimelineLog({ logs }: { logs: TicketLog[] }) {
                 const isLast = i === logs.length - 1;
                 return (
                     <div key={log.id} className="flex gap-3">
-                        {/* Line + dot */}
                         <div className="flex flex-col items-center">
                             <div
                                 className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${meta?.dot ?? "bg-gray-300"}`}
@@ -722,7 +777,6 @@ function TimelineLog({ logs }: { logs: TicketLog[] }) {
                                 <div className="w-px flex-1 bg-gray-100 my-1" />
                             )}
                         </div>
-                        {/* Content */}
                         <div className="pb-4 flex-1 min-w-0">
                             <div className="text-xs font-semibold text-gray-800">
                                 {meta?.label ?? log.new_status}
@@ -752,30 +806,24 @@ export default function TicketDetailPage() {
     const { data: userInfo } = useUserInfo();
     const { data: warehouseLocation } = useWarehouseLocation();
 
-    // useTicket(id) → getTicketById(id) — joins items + logs + deliveries.
-    // Cast to our local Ticket type which mirrors the select shape exactly.
     const { data: rawTicket, isLoading } = useTicket(ticketId);
     const ticket = rawTicket as Ticket | undefined;
 
     const { mutate: submitTicket, isPending: isSubmitting } = useSubmitTicket();
-
-    // Mutations
     const { mutate: createTicket, isPending: isResubmitting } =
         useCreateTicket();
 
     const [activeTab, setActiveTab] = useState<"items" | "log">("items");
 
-    // ── Loading state ──
-    if (isLoading) {
+    if (isLoading)
         return (
             <div className="flex items-center justify-center min-h-[400px] gap-2 text-gray-400">
                 <Loader2 size={18} className="animate-spin" />
                 <span className="text-sm">Loading order…</span>
             </div>
         );
-    }
 
-    if (!ticket) {
+    if (!ticket)
         return (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-center px-6">
                 <Package size={32} className="text-gray-200 mb-3" />
@@ -790,13 +838,11 @@ export default function TicketDetailPage() {
                 </button>
             </div>
         );
-    }
 
     const t = ticket;
     const { status } = t;
     const isDraft = status === "draft";
 
-    // ── Derived values ──
     const totalBoxes = t.order_ticket_items.reduce(
         (s, i) => s + i.quantity_boxes,
         0,
@@ -806,8 +852,6 @@ export default function TicketDetailPage() {
             i.fulfilled_boxes !== null && i.fulfilled_boxes < i.quantity_boxes,
     );
 
-    // ── Resubmit as new draft (rejected flow) ──
-    // Copies all items from the rejected ticket into a fresh draft
     const handleResubmit = () => {
         if (!userInfo || !warehouseLocation) return;
         createTicket(
@@ -839,51 +883,41 @@ export default function TicketDetailPage() {
         <div className="min-h-screen bg-white">
             {/* ── Top bar ── */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
-                {/* Left: back + ID + badges */}
-                <div className="flex items-center gap-2 flex-wrap">
+                {/* Left: back + title (or ID + add title) + badges */}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
                     <button
                         onClick={() => router.push("/admin/orders")}
-                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg transition-all"
+                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg transition-all flex-shrink-0"
                     >
                         <ArrowLeft size={12} /> Orders
                     </button>
 
-                    {/* Ticket ID */}
-                    <span
-                        style={{ fontFamily: "var(--font-mono, monospace)" }}
-                        className="text-sm font-medium text-gray-600"
-                        title={t.id}
-                    >
-                        {shortId(t.id)}
-                    </span>
+                    {/* Title editor — shows title or "Add title" if null */}
+                    <TitleEditor ticket={t} />
 
-                    <StatusBadge status={status} />
-
-                    {/* Partial fulfillment badge */}
-                    {hasPartialFulfillment && (
-                        <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">
-                            Partial fill
-                        </span>
-                    )}
-
-                    {/* Auto-approved badge */}
-                    {t.is_auto_approved && (
-                        <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
-                            Auto-approved
-                        </span>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <StatusBadge status={status} />
+                        {hasPartialFulfillment && (
+                            <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">
+                                Partial fill
+                            </span>
+                        )}
+                        {t.is_auto_approved && (
+                            <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                                Auto-approved
+                            </span>
+                        )}
+                    </div>
                 </div>
 
                 {/* Right: action buttons */}
-                <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
-                    {/* Cancel — only when submitted. Component self-hides for other statuses. */}
+                <div className="flex items-center gap-2 sm:ml-auto flex-wrap flex-shrink-0">
                     <CancelOrderDialog
                         ticketId={t.id}
                         status={status}
                         onCancelled={() => router.push("/admin/orders")}
                     />
 
-                    {/* Submit — only on draft */}
                     {status === "draft" && (
                         <button
                             onClick={() => {
@@ -910,7 +944,6 @@ export default function TicketDetailPage() {
                         </button>
                     )}
 
-                    {/* Resubmit — only on rejected */}
                     {status === "rejected" && (
                         <button
                             onClick={handleResubmit}
@@ -926,7 +959,6 @@ export default function TicketDetailPage() {
                         </button>
                     )}
 
-                    {/* View remainder ticket — for partial fulfillment */}
                     {hasPartialFulfillment && t.parent_ticket_id && (
                         <Link
                             href={`/admin/orders/${t.parent_ticket_id}`}
@@ -940,12 +972,9 @@ export default function TicketDetailPage() {
 
             {/* ── Body ── */}
             <div className="px-4 sm:px-6 py-5 grid grid-cols-1 md:grid-cols-[1fr_272px] gap-5 max-w-6xl">
-                {/* ── LEFT ── */}
+                {/* LEFT */}
                 <div>
-                    {/* Timeline */}
                     <StatusTimeline status={status} />
-
-                    {/* Status-specific banner */}
                     <StatusBanner ticket={t} />
 
                     {/* Tabs */}
@@ -954,23 +983,16 @@ export default function TicketDetailPage() {
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                className={`px-4 py-2 text-xs font-semibold capitalize transition-all border-b-2 -mb-px ${
-                                    activeTab === tab
-                                        ? "text-indigo-600 border-indigo-600"
-                                        : "text-gray-400 border-transparent hover:text-gray-700"
-                                }`}
+                                className={`px-4 py-2 text-xs font-semibold capitalize transition-all border-b-2 -mb-px ${activeTab === tab ? "text-indigo-600 border-indigo-600" : "text-gray-400 border-transparent hover:text-gray-700"}`}
                             >
                                 {tab === "items" ? "Items" : "Activity log"}
                             </button>
                         ))}
                     </div>
 
-                    {/* Items tab */}
                     {activeTab === "items" && (
                         <>
                             <ItemsTable ticket={t} isDraftEditing={isDraft} />
-
-                            {/* Draft notes edit */}
                             {isDraft && (
                                 <div className="mt-4">
                                     <label className="text-xs font-semibold text-gray-600 block mb-1.5">
@@ -987,15 +1009,13 @@ export default function TicketDetailPage() {
                         </>
                     )}
 
-                    {/* Log tab */}
                     {activeTab === "log" && (
                         <TimelineLog logs={t.order_ticket_logs ?? []} />
                     )}
                 </div>
 
-                {/* ── RIGHT: Sidebar ── */}
+                {/* RIGHT: Sidebar */}
                 <div className="flex flex-col gap-3">
-                    {/* Order details card */}
                     <div className="bg-white border border-gray-200 rounded-xl p-4">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
                             Order details
@@ -1066,7 +1086,6 @@ export default function TicketDetailPage() {
                                 },
                                 {
                                     key: "Delivery",
-                                    // prefer ticket_deliveries[0].delivery_type if set, fallback to ticket field
                                     val:
                                         (t.ticket_deliveries?.[0]
                                             ?.delivery_type ??
@@ -1109,7 +1128,6 @@ export default function TicketDetailPage() {
                         </div>
                     </div>
 
-                    {/* Notes — readonly if not draft */}
                     {t.notes && status !== "draft" && (
                         <div className="bg-white border border-gray-200 rounded-xl p-4">
                             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
@@ -1121,7 +1139,6 @@ export default function TicketDetailPage() {
                         </div>
                     )}
 
-                    {/* Remainder ticket shortcut */}
                     {hasPartialFulfillment && t.parent_ticket_id && (
                         <div className="bg-white border border-violet-200 rounded-xl p-4">
                             <p className="text-[10px] font-bold uppercase tracking-widest text-violet-400 mb-2">

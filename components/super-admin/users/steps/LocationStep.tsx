@@ -119,12 +119,14 @@ export default function LocationStep({ role, defaultValues, onSubmit }: Location
 	const { data: locations } = useLocations();
 
 	// Show ALL locations — stores and warehouse — sorted: stores first, then warehouse
-	const allLocations = [...(locations ?? [])].sort((a, b) => {
-		const aType = getLocationType(a);
-		const bType = getLocationType(b);
-		if (aType === bType) return a.name.localeCompare(b.name);
-		return aType === 'store' ? -1 : 1;
-	});
+	const allLocations = [...(locations ?? [])]
+    .filter((location) => role === 'super_admin' || getLocationType(location) !== 'warehouse')
+    .sort((a, b) => {
+        const aType = getLocationType(a);
+        const bType = getLocationType(b);
+        if (aType === bType) return a.name.localeCompare(b.name);
+        return aType === 'store' ? -1 : 1;
+    });
 
 	const { handleSubmit, watch, setValue } = useForm<LocationStepData>({
 		resolver: zodResolver(locationSchema),
