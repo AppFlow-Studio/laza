@@ -10,7 +10,6 @@ import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 import { useCreateLocation, useLocationWithDetails } from '@/lib/hooks/queries/useLocations';
 import { useCreateStorageSpace, useBulkAssignItems } from '@/lib/hooks/queries/useStorageSetup';
 import { useCreateInvitation } from '@/lib/hooks/queries/useUsers';
-import { useSeedAllItemsToLocation } from '@/lib/hooks/queries/useInventorySnapshot';
 import StoreWizardSidebar from './StoreWizardSidebar';
 import StoreDetailsStep from './steps/StoreDetailsStep';
 import type { StoreFormData } from './steps/StoreDetailsStep';
@@ -34,7 +33,6 @@ export default function StoreSetupWizard() {
     const createStorageSpaceMutation  = useCreateStorageSpace();
     const bulkAssignMutation          = useBulkAssignItems();
     const createInvitationMutation    = useCreateInvitation();
-    const seedAllItemsMutation        = useSeedAllItemsToLocation();
 
     // ── Wizard state ─────────────────────────────────────────────────────────
     const [currentStep, setCurrentStep]       = useState(1);
@@ -196,32 +194,7 @@ export default function StoreSetupWizard() {
             }
             if (assignPromises.length > 0) await Promise.all(assignPromises);
 
-            // 4. Seed ALL org items into item_locations so the store is never
-            //    empty on day one. Items manually assigned in step 3 keep their
-            //    quantities; everything else lands in the first storage space
-            //    with current_quantity = 0. Fetched server-side so it is never
-            //    dependent on whether the client's React query cache has loaded.
-            const manuallyAssignedItemIds: string[] = [];
-            for (const assignment of Object.values(itemAssignments)) {
-                for (const itemId of assignment.selectedItems) {
-                    manuallyAssignedItemIds.push(String(itemId));
-                }
-            }
-
-            const firstStorageSpaceId = storageResults[0]?.id;
-            if (firstStorageSpaceId) {
-                await seedAllItemsMutation.mutateAsync({
-                    locationId: location.id,
-                    organizationId,
-                    storageSpaceId: firstStorageSpaceId,
-                    userId,
-                    alreadyAssignedItemIds: manuallyAssignedItemIds,
-                }).catch(err => {
-                    console.error('Auto-populate items failed (non-fatal):', err);
-                });
-            }
-
-            // 5. Send admin invitation if not skipped
+            // 4. Send admin invitation if not skipped
             if (inviteData?.email) {
                 await createInvitationMutation.mutateAsync({
                     email:              inviteData.email,
@@ -392,7 +365,7 @@ export default function StoreSetupWizard() {
                             <div className="flex gap-2">
                                 {currentStep === 4 && (
                                     <p className="text-sm text-zinc-400 self-center mr-2">
-                                        Use the buttons above to invite or skip
+                                        Use the form above to invite or skip
                                     </p>
                                 )}
 

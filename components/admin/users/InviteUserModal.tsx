@@ -17,7 +17,7 @@ const inviteSchema = z.object({
     email: z.string().email('Invalid email address'),
     first_name: z.string().optional(),
     last_name: z.string().optional(),
-    role: z.enum(['admin', 'employee'], {
+    role: z.enum(['employee'], {
         errorMap: () => ({ message: 'Please select a role' }),
     }),
     assigned_location_id: z.string().nullable().optional(),
@@ -146,29 +146,6 @@ export default function InviteUserModal({ organizationId, onSuccess, onClose }: 
                             <div>
                                 <h3 className="font-semibold text-zinc-900">Employee</h3>
                                 <p className="text-xs text-zinc-500">Manage inventory at assigned location</p>
-                            </div>
-                        </div>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setValue('role', 'admin');
-                            setValue('assigned_location_id', null);
-                        }}
-                        className={cn(
-                            "p-4 border-2 rounded-lg text-left transition-all",
-                            selectedRole === 'admin'
-                                ? "border-indigo-500 bg-indigo-50"
-                                : "border-zinc-200 hover:border-zinc-300"
-                        )}
-                    >
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-indigo-100 rounded-lg">
-                                <Building2 className="w-5 h-5 text-indigo-600" />
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-zinc-900">Admin</h3>
-                                <p className="text-xs text-zinc-500">Full access to all locations</p>
                             </div>
                         </div>
                     </button>
