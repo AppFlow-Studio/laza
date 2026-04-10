@@ -38,7 +38,11 @@ import {
     getItemShipmentHistory,
     type ShipmentBoxConfig,
 } from "@/lib/supabase/queries/itemShipmentHistory";
-import { getFriendlyErrorMessage, isNetworkError } from "@/lib/utils/errorMessages";
+import {
+    getFriendlyErrorMessage,
+    isNetworkError,
+} from "@/lib/utils/errorMessages";
+import { useAdminStore } from "@/lib/stores/adminStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -561,7 +565,7 @@ export default function NewOrderPage() {
     const router = useRouter();
 
     const { data: userInfo } = useUserInfo();
-    const requestingLocationId = userInfo?.assigned_location_id ?? "";
+    const { selectedLocationId: requestingLocationId } = useAdminStore();
     const requestedBy = userInfo?.id ?? "";
 
     const { organization } = useOrganization();
@@ -599,16 +603,25 @@ export default function NewOrderPage() {
             const raw = localStorage.getItem("laza_order_draft");
             if (!raw) return;
             const draft = JSON.parse(raw) as {
-                cart: Record<string, { boxes: number; configId: string | null }>;
+                cart: Record<
+                    string,
+                    { boxes: number; configId: string | null }
+                >;
                 notes: string;
                 deliveryType: DeliveryType;
             };
             const restored: Record<number, CartEntry> = {};
             for (const [id, entry] of Object.entries(draft.cart ?? {})) {
                 const item = rawCatalogItems.find((i) => i.id === Number(id));
-                if (item && item.box_quantity != null && item.box_quantity > 0) {
+                if (
+                    item &&
+                    item.box_quantity != null &&
+                    item.box_quantity > 0
+                ) {
                     restored[Number(id)] = {
-                        item: item as WarehouseCatalogItem & { box_quantity: number },
+                        item: item as WarehouseCatalogItem & {
+                            box_quantity: number;
+                        },
                         boxes: entry.boxes,
                         selectedConfig: null,
                     };
@@ -618,9 +631,13 @@ export default function NewOrderPage() {
                 setCart(restored);
                 setNotes(draft.notes ?? "");
                 setDeliveryType(draft.deliveryType ?? "company");
-                toast.success("Restored your previously saved draft.", { duration: 4000 });
+                toast.success("Restored your previously saved draft.", {
+                    duration: 4000,
+                });
             }
-        } catch { /* ignore corrupt drafts */ }
+        } catch {
+            /* ignore corrupt drafts */
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [rawCatalogItems]);
 
@@ -705,7 +722,7 @@ export default function NewOrderPage() {
         status: "draft" | "submitted",
     ): CreateTicketInput => ({
         organizationId,
-        requestingLocationId,
+        requestingLocationId: requestingLocationId || "",
         warehouseLocationId,
         requestedBy,
         initialStatus: status,
@@ -730,18 +747,28 @@ export default function NewOrderPage() {
         try {
             const draft = {
                 cart: Object.fromEntries(
-                    cartEntries.map((e) => [e.item.id, { boxes: e.boxes, configId: e.selectedConfig?.id ?? null }])
+                    cartEntries.map((e) => [
+                        e.item.id,
+                        {
+                            boxes: e.boxes,
+                            configId: e.selectedConfig?.id ?? null,
+                        },
+                    ]),
                 ),
                 notes,
                 deliveryType,
                 savedAt: new Date().toISOString(),
             };
             localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-        } catch { /* localStorage may be unavailable */ }
+        } catch {
+            /* localStorage may be unavailable */
+        }
     };
 
     const clearLocalDraft = () => {
-        try { localStorage.removeItem(DRAFT_KEY); } catch {}
+        try {
+            localStorage.removeItem(DRAFT_KEY);
+        } catch {}
     };
 
     // ── Validate before submission ───────────────────────────────────────────
@@ -780,7 +807,10 @@ export default function NewOrderPage() {
             const msg = err instanceof Error ? err.message : "";
             if (isNetworkError(msg)) {
                 saveDraftLocally();
-                toast.error("Connection lost. Your draft has been saved locally — it will be restored when you return.", { duration: 5000 });
+                toast.error(
+                    "Connection lost. Your draft has been saved locally — it will be restored when you return.",
+                    { duration: 5000 },
+                );
             } else {
                 toast.error(getFriendlyErrorMessage(err));
             }
@@ -798,6 +828,8 @@ export default function NewOrderPage() {
         }
         if (!validateOrder()) return;
 
+        console.log(buildPayload("submitted"));
+
         try {
             await createTicket(buildPayload("submitted"));
             clearLocalDraft();
@@ -807,7 +839,10 @@ export default function NewOrderPage() {
             const msg = err instanceof Error ? err.message : "";
             if (isNetworkError(msg)) {
                 saveDraftLocally();
-                toast.error("Connection lost. Your order has been saved as a local draft. Please try submitting again when your connection is restored.", { duration: 6000 });
+                toast.error(
+                    "Connection lost. Your order has been saved as a local draft. Please try submitting again when your connection is restored.",
+                    { duration: 6000 },
+                );
             } else {
                 toast.error(getFriendlyErrorMessage(err));
             }

@@ -33,6 +33,7 @@ import {
     useTicket,
     useCreateTicket,
     useSubmitTicket,
+    useConfirmTicket,
 } from "@/lib/hooks/queries/useOrderTickets";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
@@ -610,6 +611,163 @@ function StatusBanner({ ticket }: { ticket: Ticket }) {
     return null;
 }
 
+// ─── Confirm Receipt Modal ───────────────────────────────────────────────────
+function ConfirmReceiptModal({
+    ticket,
+    onClose,
+}: {
+    ticket: Ticket;
+    onClose: () => void;
+}) {
+    const { mutate: confirmTicket, isPending } = useConfirmTicket();
+
+    // Pre-fill with fulfilled_boxes; admin can correct if actual differs
+    const [quantities, setQuantities] = useState<Record<string, number>>(
+        Object.fromEntries(
+            ticket.order_ticket_items.map((item) => [
+                item.id,
+                item.fulfilled_boxes ?? item.quantity_boxes,
+            ]),
+        ),
+    );
+
+    const handleConfirm = () => {
+        const receivedItems = ticket.order_ticket_items.map((item) => ({
+            itemId: item.item_id,
+            actualBoxesReceived: quantities[item.id] ?? 0,
+        }));
+        confirmTicket(
+            { ticketId: ticket.id, receivedItems },
+            {
+                onSuccess: () => {
+                    toast.success("Order confirmed — inventory updated!");
+                    onClose();
+                },
+                onError: (err: any) => {
+                    toast.error(err?.message ?? "Failed to confirm order");
+                },
+            },
+        );
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-sm font-bold text-gray-900">
+                            Confirm Receipt
+                        </h2>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                            Enter the actual boxes received for each item.
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
+
+                {/* Items */}
+                <div className="px-5 py-3 max-h-72 overflow-y-auto divide-y divide-gray-50">
+                    {ticket.order_ticket_items.map((item) => {
+                        const name =
+                            item.items?.short_label ??
+                            item.items?.name ??
+                            `Item ${item.item_id}`;
+                        const fulfilled =
+                            item.fulfilled_boxes ?? item.quantity_boxes;
+                        const actual = quantities[item.id] ?? fulfilled;
+                        const hasDiscrepancy = actual !== fulfilled;
+                        return (
+                            <div
+                                key={item.id}
+                                className="py-3 flex items-center gap-3"
+                            >
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-semibold text-gray-800 truncate">
+                                        {name}
+                                    </div>
+                                    <div className="text-[11px] text-gray-400 mt-0.5">
+                                        Fulfilled:{" "}
+                                        <span className="font-medium text-gray-600">
+                                            {fulfilled} boxes
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[11px] text-gray-400">
+                                            Received:
+                                        </span>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={999}
+                                            value={actual}
+                                            onChange={(e) =>
+                                                setQuantities((prev) => ({
+                                                    ...prev,
+                                                    [item.id]: Math.max(
+                                                        0,
+                                                        Number(e.target.value),
+                                                    ),
+                                                }))
+                                            }
+                                            onKeyDown={(e) =>
+                                                [
+                                                    ".",
+                                                    "e",
+                                                    "E",
+                                                    "-",
+                                                    "+",
+                                                ].includes(e.key) &&
+                                                e.preventDefault()
+                                            }
+                                            className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"
+                                        />
+                                    </div>
+                                    {hasDiscrepancy && (
+                                        <span className="text-[10px] text-amber-600 font-medium">
+                                            ⚠ Discrepancy
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Footer */}
+                <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+                    <button
+                        onClick={onClose}
+                        disabled={isPending}
+                        className="px-4 py-2 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleConfirm}
+                        disabled={isPending}
+                        className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all disabled:opacity-50 shadow-[0_2px_8px_rgba(22,163,74,.25)]"
+                    >
+                        {isPending ? (
+                            <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                            <CheckCircle2 size={12} />
+                        )}
+                        Confirm Receipt
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Items table ──────────────────────────────────────────────────────────────
 function ItemsTable({
     ticket,
@@ -814,6 +972,7 @@ export default function TicketDetailPage() {
         useCreateTicket();
 
     const [activeTab, setActiveTab] = useState<"items" | "log">("items");
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
 
     if (isLoading)
         return (
@@ -941,6 +1100,19 @@ export default function TicketDetailPage() {
                                 <Send size={12} />
                             )}
                             Submit Order
+                        </button>
+                    )}
+
+                    {/* Confirm Receipt — visible when order is fulfilled/in_transit/delivered */}
+                    {(status === "fulfilled" ||
+                        status === "in_transit" ||
+                        status === "delivered") && (
+                        <button
+                            onClick={() => setShowConfirmModal(true)}
+                            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all hover:enabled:-translate-y-px shadow-[0_2px_8px_rgba(22,163,74,.25)]"
+                        >
+                            <CheckCircle2 size={12} />
+                            Confirm Receipt
                         </button>
                     )}
 
@@ -1166,6 +1338,12 @@ export default function TicketDetailPage() {
                     )}
                 </div>
             </div>
+            {showConfirmModal && (
+                <ConfirmReceiptModal
+                    ticket={t}
+                    onClose={() => setShowConfirmModal(false)}
+                />
+            )}
         </div>
     );
 }

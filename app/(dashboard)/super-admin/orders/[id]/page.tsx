@@ -698,9 +698,9 @@ export default function SuperAdminTicketDetailPage() {
     }
 
     function handleFulfillPartial() {
-        if (!userInfo?.userId) return;
+        if (!userInfo?.id) return;
         fulfillPartial(
-            { ticketId, adminUserId: userInfo.userId },
+            { ticketId, adminUserId: userInfo.id },
             {
                 onSuccess: (result: any) => {
                     if (result?.remainder_ticket_id)

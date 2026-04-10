@@ -17,7 +17,11 @@
 
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
-type NotificationType = "order_submitted" | "order_fulfilled" | "order_rejected";
+type NotificationType =
+    | "order_submitted"
+    | "order_fulfilled"
+    | "order_rejected"
+    | "order_confirmed";
 
 export async function sendOrderNotification(
     type: NotificationType,
@@ -34,7 +38,7 @@ export async function sendOrderNotification(
             {
                 body: {
                     type,
-                    ticket_id:       ticketId,
+                    ticket_id: ticketId,
                     organization_id: organizationId,
                 },
             },

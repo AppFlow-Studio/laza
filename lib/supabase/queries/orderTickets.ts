@@ -29,7 +29,7 @@ export interface CreateTicketInput {
     requestingLocationId: string;
     warehouseLocationId: string;
     requestedBy: string;
-    title?: string
+    title?: string;
     notes?: string;
     initialStatus: "draft" | "submitted";
     items: Array<{
@@ -125,6 +125,8 @@ export async function createTicket(input: CreateTicketInput) {
         .from("order_ticket_items")
         .insert(lineItems);
 
+    console.log(lineItems, itemsError);
+
     if (itemsError) throw itemsError;
 
     await insertTicketLog(
@@ -139,8 +141,12 @@ export async function createTicket(input: CreateTicketInput) {
     );
 
     if (input.initialStatus === "submitted") {
-        await sendOrderNotification("order_submitted", ticket.id, input.organizationId);
-      }
+        await sendOrderNotification(
+            "order_submitted",
+            ticket.id,
+            input.organizationId,
+        );
+    }
 
     return ticket;
 }
@@ -390,20 +396,28 @@ export async function updateTicketStatus(
 
     if (newStatus === "fulfilled") {
         const { data: org } = await supabase
-          .from("order_tickets")
-          .select("organization_id")
-          .eq("id", ticketId)
-          .single();
-        await sendOrderNotification("order_fulfilled", ticketId, org?.organization_id);
-      }
-      if (newStatus === "rejected") {
+            .from("order_tickets")
+            .select("organization_id")
+            .eq("id", ticketId)
+            .single();
+        await sendOrderNotification(
+            "order_fulfilled",
+            ticketId,
+            org?.organization_id,
+        );
+    }
+    if (newStatus === "rejected") {
         const { data: org } = await supabase
-          .from("order_tickets")
-          .select("organization_id")
-          .eq("id", ticketId)
-          .single();
-        await sendOrderNotification("order_rejected", ticketId, org?.organization_id);
-      }
+            .from("order_tickets")
+            .select("organization_id")
+            .eq("id", ticketId)
+            .single();
+        await sendOrderNotification(
+            "order_rejected",
+            ticketId,
+            org?.organization_id,
+        );
+    }
 
     return updated;
 }
@@ -481,7 +495,7 @@ export async function confirmTicket(
         .from("order_tickets")
         .select(
             `
-      id, status, requesting_location_id,
+      id, status, requesting_location_id, organization_id,
       order_ticket_items (
         id, item_id, fulfilled_boxes, fulfilled_units,
         items ( id, name ),
@@ -504,6 +518,7 @@ export async function confirmTicket(
     }
 
     const storeLocationId = ticket.requesting_location_id;
+    const storeOrgId = ticket.organization_id;
     const discrepancies: ConfirmResult["discrepancies"] = [];
 
     for (const received of receivedItems) {
@@ -515,7 +530,10 @@ export async function confirmTicket(
 
         const expectedBoxes = ticketItem.fulfilled_boxes ?? 0;
         const actualBoxes = received.actualBoxesReceived;
-        const itemName: any = ticketItem.items ?? `Item ${received.itemId}`;
+        const rawItem = Array.isArray(ticketItem.items)
+            ? ticketItem.items[0]
+            : ticketItem.items;
+        const itemName: string = rawItem?.name ?? `Item ${received.itemId}`;
         const fulfillmentLines =
             ticketItem.order_ticket_fulfillment_lines ?? [];
 
@@ -557,6 +575,7 @@ export async function confirmTicket(
             const { error } = await supabase.from("item_locations").insert({
                 item_id: received.itemId,
                 location_id: storeLocationId,
+                organization_id: storeOrgId,
                 current_quantity: totalPiecesToAdd,
             });
             if (error) throw error;
@@ -568,6 +587,7 @@ export async function confirmTicket(
             .insert({
                 item_id: received.itemId,
                 location_id: storeLocationId,
+                organization_id: storeOrgId,
                 user_id: userId,
                 previous_quantity: previousQty,
                 new_quantity: newQty,
@@ -630,6 +650,8 @@ export async function confirmTicket(
 
     // Phase 6: capture payment here.
     // await capturePaymentHold(ticketId, actualReceivedValue);
+
+    await sendOrderNotification("order_confirmed", ticketId, storeOrgId);
 
     return { ticket: confirmed, discrepancies, hasDiscrepancy };
 }
