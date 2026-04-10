@@ -11,6 +11,7 @@ import { useCreateLocation, useLocationWithDetails } from '@/lib/hooks/queries/u
 import { useCreateStorageSpace, useBulkAssignItems } from '@/lib/hooks/queries/useStorageSetup';
 import { useCreateInvitation } from '@/lib/hooks/queries/useUsers';
 import { useCreateInventorySnapshot } from '@/lib/hooks/queries/useInventorySnapshot';
+import { useItems } from '@/lib/hooks/queries/useItems';
 import StoreWizardSidebar from './StoreWizardSidebar';
 import StoreDetailsStep from './steps/StoreDetailsStep';
 import type { StoreFormData } from './steps/StoreDetailsStep';
@@ -35,6 +36,7 @@ export default function StoreSetupWizard() {
     const bulkAssignMutation       = useBulkAssignItems();
     const createInvitationMutation = useCreateInvitation();
     const inventorySnapshotMutation = useCreateInventorySnapshot();
+    const { data: allItems = [] } = useItems();
 
     // ── Wizard state ─────────────────────────────────────────────────────────
     const [currentStep, setCurrentStep]       = useState(1);
@@ -154,6 +156,8 @@ export default function StoreSetupWizard() {
                 name:            storeData.name,
                 address:         storeData.address,
                 is_active:       storeData.is_active,
+                latitude:        storeData.latitude ?? null,
+                longitude:       storeData.longitude ?? null,
             });
 
             // 2. Create storage spaces in parallel
@@ -194,30 +198,35 @@ export default function StoreSetupWizard() {
             }
             if (assignPromises.length > 0) await Promise.all(assignPromises);
 
-            // 4. Create inventory snapshot — ensures every assigned item has an
-            //    item_locations row with current_quantity = 0 so employees can
-            //    start counting on day one. Also writes initial inventory_logs
-            //    entries and resolves the auto-generated low_stock alerts that
-            //    fire from the check_low_stock trigger (since 0 < min_quantity).
-            //    Non-blocking: a failure here does not prevent store creation.
-            const snapshotItems: { itemId: string; storageSpaceId: string }[] = [];
-            for (const [tempId, assignment] of Object.entries(itemAssignments)) {
-                if (assignment.selectedItems.size === 0) continue;
-                const realId = idMap.get(tempId);
-                if (!realId) continue;
+            // 4. Auto-populate ALL org items into item_locations so the store
+            //    inventory is never empty on day one. Items manually assigned in
+            //    step 3 keep their entered quantities; everything else is seeded
+            //    into the first storage space with current_quantity = 0.
+            const manuallyAssignedItemIds = new Set<string>();
+            for (const assignment of Object.values(itemAssignments)) {
                 for (const itemId of assignment.selectedItems) {
-                    snapshotItems.push({ itemId, storageSpaceId: realId });
+                    manuallyAssignedItemIds.add(String(itemId));
                 }
             }
 
-            if (snapshotItems.length > 0) {
-                await inventorySnapshotMutation.mutateAsync({
-                    locationId: location.id,
-                    userId,
-                    items: snapshotItems,
-                }).catch(err => {
-                    console.error('Inventory snapshot failed (non-fatal):', err);
-                });
+            const firstStorageSpaceId = storageResults[0]?.id;
+            if (firstStorageSpaceId) {
+                const unassignedItems = (allItems as any[])
+                    .filter(item => !manuallyAssignedItemIds.has(String(item.id)))
+                    .map(item => ({
+                        itemId: String(item.id),
+                        storageSpaceId: firstStorageSpaceId,
+                    }));
+
+                if (unassignedItems.length > 0) {
+                    await inventorySnapshotMutation.mutateAsync({
+                        locationId: location.id,
+                        userId,
+                        items: unassignedItems,
+                    }).catch(err => {
+                        console.error('Auto-populate items failed (non-fatal):', err);
+                    });
+                }
             }
 
             // 5. Send admin invitation if not skipped

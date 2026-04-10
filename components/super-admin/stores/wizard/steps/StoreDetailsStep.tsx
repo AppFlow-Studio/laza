@@ -4,8 +4,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocations } from "@/lib/hooks/queries/useLocations";
-import { Copy } from "lucide-react";
+import { Copy, MapPin, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState, useCallback } from "react";
+import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
+
+const LIBRARIES: ("places")[] = ["places"];
+const MAP_CONTAINER_STYLE = { width: "100%", height: "300px" };
+const DEFAULT_CENTER = { lat: 40.73, lng: -73.93 };
 
 const storeSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -18,6 +24,8 @@ const storeSchema = z.object({
     }),
     is_active: z.boolean(),
     clone_from_id: z.string().nullable(),
+    latitude: z.number().nullable().optional(),
+    longitude: z.number().nullable().optional(),
 });
 
 export type StoreFormData = z.infer<typeof storeSchema>;
@@ -41,6 +49,7 @@ export default function StoreDetailsStep({
         handleSubmit,
         watch,
         setValue,
+        getValues,
         formState: { errors },
     } = useForm<StoreFormData>({
         resolver: zodResolver(storeSchema),
@@ -55,10 +64,79 @@ export default function StoreDetailsStep({
             },
             is_active: true,
             clone_from_id: null,
+            latitude: null,
+            longitude: null,
         },
     });
 
     const cloneFromId = watch("clone_from_id");
+    const latitude = watch("latitude");
+    const longitude = watch("longitude");
+
+    const [geocoding, setGeocoding] = useState(false);
+    const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(
+        defaultValues?.latitude != null && defaultValues?.longitude != null
+            ? { lat: defaultValues.latitude, lng: defaultValues.longitude }
+            : DEFAULT_CENTER
+    );
+
+    const { isLoaded } = useJsApiLoader({
+        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
+        libraries: LIBRARIES,
+    });
+
+    const markerPosition =
+        latitude != null && longitude != null ? { lat: latitude, lng: longitude } : null;
+
+    const handleMapClick = useCallback(
+        (e: google.maps.MapMouseEvent) => {
+            if (e.latLng) {
+                setValue("latitude", e.latLng.lat());
+                setValue("longitude", e.latLng.lng());
+            }
+        },
+        [setValue]
+    );
+
+    const handleMarkerDragEnd = useCallback(
+        (e: google.maps.MapMouseEvent) => {
+            if (e.latLng) {
+                setValue("latitude", e.latLng.lat());
+                setValue("longitude", e.latLng.lng());
+            }
+        },
+        [setValue]
+    );
+
+    const handleGeocode = async () => {
+        const { address } = getValues();
+        const parts = [address.street, address.city, address.state, address.zip].filter(Boolean);
+        if (parts.length === 0) return;
+
+        setGeocoding(true);
+        try {
+            const encoded = encodeURIComponent(parts.join(", "));
+            const res = await fetch(
+                `https://maps.googleapis.com/maps/api/geocode/json?address=${encoded}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+            );
+            const data = await res.json();
+            if (data.status === "OK" && data.results[0]) {
+                const { lat, lng } = data.results[0].geometry.location;
+                setValue("latitude", lat);
+                setValue("longitude", lng);
+                setMapCenter({ lat, lng });
+            }
+        } catch {
+            // silently fail
+        } finally {
+            setGeocoding(false);
+        }
+    };
+
+    const clearCoords = () => {
+        setValue("latitude", null);
+        setValue("longitude", null);
+    };
 
     const inputClass = (hasError?: boolean) =>
         cn(
@@ -173,6 +251,87 @@ export default function StoreDetailsStep({
                     <p className="text-xs text-rose-500 font-medium mt-1">
                         {errors.address.zip.message}
                     </p>
+                )}
+            </div>
+
+            {/* Map Location Picker */}
+            <div>
+                <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Map Pin
+                    </label>
+                    <button
+                        type="button"
+                        onClick={handleGeocode}
+                        disabled={geocoding || !isLoaded}
+                        className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {geocoding ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                            <MapPin className="w-3 h-3" />
+                        )}
+                        Use address
+                    </button>
+                </div>
+                <p className="text-xs text-zinc-500 mb-2">
+                    Click the map to drop a pin, or drag to adjust. Used for the stores map view.
+                </p>
+
+                {isLoaded ? (
+                    <div className="rounded-xl overflow-hidden border border-gray-200">
+                        <GoogleMap
+                            mapContainerStyle={MAP_CONTAINER_STYLE}
+                            center={mapCenter}
+                            zoom={markerPosition ? 15 : 11}
+                            onClick={handleMapClick}
+                            options={{
+                                streetViewControl: false,
+                                mapTypeControl: false,
+                                fullscreenControl: false,
+                                clickableIcons: false,
+                                styles: [
+                                    {
+                                        featureType: "poi",
+                                        elementType: "labels",
+                                        stylers: [{ visibility: "off" }],
+                                    },
+                                ],
+                            }}
+                        >
+                            {markerPosition && (
+                                <Marker
+                                    position={markerPosition}
+                                    draggable
+                                    onDragEnd={handleMarkerDragEnd}
+                                />
+                            )}
+                        </GoogleMap>
+                    </div>
+                ) : (
+                    <div
+                        className="rounded-xl bg-zinc-100 animate-pulse border border-gray-200"
+                        style={{ height: 300 }}
+                    />
+                )}
+
+                {markerPosition ? (
+                    <div className="flex items-center gap-1.5 mt-1.5 text-xs text-zinc-500">
+                        <MapPin className="w-3 h-3 text-indigo-500 flex-shrink-0" />
+                        <span>
+                            {markerPosition.lat.toFixed(6)}, {markerPosition.lng.toFixed(6)}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={clearCoords}
+                            className="ml-1 text-zinc-400 hover:text-rose-500 transition-colors"
+                            title="Clear pin"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                ) : (
+                    <p className="text-xs text-zinc-400 mt-1.5">No pin set — store won't appear on map.</p>
                 )}
             </div>
 
