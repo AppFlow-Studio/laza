@@ -1,668 +1,1078 @@
 "use client";
 
 /**
- * TASK 3.5 — Super Admin: Orders Queue Page
- * File: app/(dashboard)/super-admin/orders/page.tsx
+ * TASK 3.2 (updated) — New Order Creation
+ * File: app/(dashboard)/super-admin/orders/new/page.tsx
+ *        app/(dashboard)/admin/orders/new/page.tsx  (same file, shared)
+ *
+ * New in this version:
+ *   1. Shipment box config selector per item (D1/F1 — po_item_box_configs)
+ *      → Each item shows available shipment configs; admin picks which
+ *        shipment's pieces_per_box to use when ordering.
+ *      → Falls back to items.box_quantity if no shipment history.
+ *
+ *   2. Warehouse picker (replaces static "Sourcing from" banner)
+ *      → Fetches all warehouse-type locations and lets admin select one.
+ *
+ *   3. Store picker (super admin only — passed via `isSuperAdmin` prop)
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-    Package,
-    ChevronRight,
-    Clock,
-    CheckCircle2,
-    XCircle,
-    Loader2,
-    Send,
-    Truck,
-    AlertCircle,
+    ArrowLeft,
     Search,
-    FileEdit,
-    Plus,
+    Package,
+    ShoppingCart,
+    X,
+    AlertCircle,
+    Boxes,
+    CheckCircle2,
+    Loader2,
+    Truck,
+    Store,
+    MapPin,
+    Warehouse,
+    ChevronDown,
 } from "lucide-react";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import { useAllTickets } from "@/lib/hooks/queries/useOrderTickets";
+import { toast } from "react-hot-toast";
 import { useOrganization } from "@clerk/nextjs";
-import Link from "next/link";
+import { useWarehouseCatalog } from "@/lib/hooks/queries/useWarehouse";
+import { useCategories } from "@/lib/hooks/queries/useCategories";
+import { useCreateTicket } from "@/lib/hooks/queries/useOrderTickets";
+import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
+import { useLocations } from "@/lib/hooks/queries/useLocations";
+import { WarehouseCatalogItem } from "@/lib/supabase/queries/warehouse";
+import { CreateTicketInput } from "@/lib/supabase/queries/orderTickets";
+import {
+    getItemShipmentHistory,
+    type ShipmentBoxConfig,
+} from "@/lib/supabase/queries/itemShipmentHistory";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type TicketStatus =
-    | "draft"
-    | "submitted"
-    | "processing"
-    | "fulfilled"
-    | "in_transit"
-    | "delivered"
-    | "confirmed"
-    | "rejected"
-    | "cancelled";
 
-type QueueTicket = {
-    id: string;
-    organization_id: string;
-    requesting_location_id: string;
-    status: TicketStatus;
-    requested_by: string;
-    submitted_at: string | null;
-    created_at: string;
-    is_auto_approved: boolean;
-    title: string | null;
-    notes: string | null;
-    requesting_location: { id: string; name: string } | null;
-    order_ticket_items: { id: string; quantity_boxes: number }[];
+type DeliveryType = "company" | "self";
+
+// Cart entry — carries the selected box config so quantity_units is correct
+type CartEntry = {
+    item: WarehouseCatalogItem & { box_quantity: number };
+    boxes: number;
+    selectedConfig: ShipmentBoxConfig | null;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function shortId(uuid: string) {
-    return `…${uuid.slice(-8).toUpperCase()}`;
-}
-function relativeDate(iso: string) {
-    const diff = Date.now() - new Date(iso).getTime();
-    const days = Math.floor(diff / 86_400_000);
-    if (days === 0) return "Today";
-    if (days === 1) return "Yesterday";
-    if (days < 7) return `${days}d ago`;
-    if (days < 30) return `${Math.floor(days / 7)}w ago`;
-    return new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-    }).format(new Date(iso));
-}
-function getItemCount(t: QueueTicket) {
-    return t.order_ticket_items?.length ?? 0;
-}
-function getTotalBoxes(t: QueueTicket) {
-    return (
-        t.order_ticket_items?.reduce(
-            (s, i) => s + (i.quantity_boxes ?? 0),
-            0,
-        ) ?? 0
-    );
+
+function validateBoxQty(val: string | number): {
+    ok: boolean;
+    value?: number;
+    error?: string;
+} {
+    const n = Number(val);
+    if (val === "" || val === null || val === undefined)
+        return { ok: false, error: "Required" };
+    if (!Number.isInteger(n)) return { ok: false, error: "Whole boxes only" };
+    if (n < 1) return { ok: false, error: "Minimum 1 box" };
+    if (n > 999) return { ok: false, error: "Maximum 999 boxes" };
+    return { ok: true, value: n };
 }
 
-// ─── Status config ────────────────────────────────────────────────────────────
-const STATUS_META: Record<
-    TicketStatus,
-    { label: string; badge: string; dot: string; icon: React.ReactNode }
-> = {
-    draft: {
-        label: "Draft",
-        badge: "bg-gray-100 text-gray-500",
-        dot: "bg-gray-300",
-        icon: <FileEdit size={10} />,
-    },
-    submitted: {
-        label: "Submitted",
-        badge: "bg-blue-50 text-blue-700",
-        dot: "bg-blue-500",
-        icon: <Send size={10} />,
-    },
-    processing: {
-        label: "Processing",
-        badge: "bg-yellow-50 text-yellow-700",
-        dot: "bg-yellow-500",
-        icon: <Clock size={10} className="animate-[spin_3s_linear_infinite]" />,
-    },
-    fulfilled: {
-        label: "Fulfilled",
-        badge: "bg-violet-50 text-violet-700",
-        dot: "bg-violet-500",
-        icon: <Truck size={10} />,
-    },
-    in_transit: {
-        label: "In Transit",
-        badge: "bg-indigo-50 text-indigo-700",
-        dot: "bg-indigo-500",
-        icon: <Truck size={10} />,
-    },
-    delivered: {
-        label: "Delivered",
-        badge: "bg-teal-50 text-teal-700",
-        dot: "bg-teal-500",
-        icon: <Package size={10} />,
-    },
-    confirmed: {
-        label: "Confirmed",
-        badge: "bg-green-50 text-green-700",
-        dot: "bg-green-500",
-        icon: <CheckCircle2 size={10} />,
-    },
-    rejected: {
-        label: "Rejected",
-        badge: "bg-red-50 text-red-700",
-        dot: "bg-red-500",
-        icon: <XCircle size={10} />,
-    },
-    cancelled: {
-        label: "Cancelled",
-        badge: "bg-gray-100 text-gray-400",
-        dot: "bg-gray-200",
-        icon: <XCircle size={10} />,
-    },
-};
-
-const FILTER_CHIPS: { key: TicketStatus | "all"; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "submitted", label: "Needs action" },
-    { key: "processing", label: "Processing" },
-    { key: "fulfilled", label: "Fulfilled" },
-    { key: "confirmed", label: "Confirmed" },
-    { key: "rejected", label: "Rejected" },
-];
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: TicketStatus }) {
-    const { label, badge, icon } = STATUS_META[status] ?? STATUS_META.draft;
-    return (
-        <span
-            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${badge}`}
-        >
-            {icon}
-            {label}
-        </span>
-    );
+function effectivePiecesPerBox(
+    item: WarehouseCatalogItem & { box_quantity: number },
+    config: ShipmentBoxConfig | null,
+): number {
+    return config?.piecesPerBox ?? item.box_quantity;
 }
 
-function FilterChip({
-    label,
-    active,
-    count,
-    onClick,
+// ─── useItemShipmentConfigs ───────────────────────────────────────────────────
+
+function useItemShipmentConfigs(
+    itemId: number | null,
+    organizationId: string,
+): { configs: ShipmentBoxConfig[]; loading: boolean } {
+    const [configs, setConfigs] = useState<ShipmentBoxConfig[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!itemId || !organizationId) return;
+        setLoading(true);
+        getItemShipmentHistory(itemId, organizationId)
+            .then((result) => {
+                console.log("shipment configs for item", itemId, result);
+                setConfigs(result);
+            })
+            .finally(() => setLoading(false));
+    }, [itemId, organizationId]);
+
+    return { configs, loading };
+}
+
+// ─── ShipmentConfigPicker ─────────────────────────────────────────────────────
+
+function ShipmentConfigPicker({
+    item,
+    organizationId,
+    selectedConfig,
+    hasError,
+    onSelect,
 }: {
-    label: string;
-    active: boolean;
-    count: number;
-    onClick: () => void;
+    item: WarehouseCatalogItem & { box_quantity: number };
+    organizationId: string;
+    selectedConfig: ShipmentBoxConfig | null;
+    hasError?: boolean;
+    onSelect: (config: ShipmentBoxConfig | null) => void;
 }) {
+    const { configs, loading } = useItemShipmentConfigs(
+        item.id,
+        organizationId,
+    );
+
+    if (loading) {
+        return (
+            <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-2 py-1">
+                <Loader2 size={9} className="animate-spin" /> Loading shipment
+                configs…
+            </div>
+        );
+    }
+
+    if (configs.length === 0) {
+        return (
+            <div className="flex items-center gap-1 mt-2 text-[10px] text-gray-400 py-1">
+                <Boxes size={9} className="text-gray-300" />
+                {item.box_quantity} {item.unit_of_measure}/box (default)
+            </div>
+        );
+    }
+
+    const tabs = configs.map((cfg) => ({
+        key: cfg.id,
+        label:
+            cfg.poNumber ??
+            (cfg.poDate
+                ? new Date(cfg.poDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      year: "numeric",
+                  })
+                : `${cfg.piecesPerBox}/box`),
+        sub: `${cfg.piecesPerBox} ${item.unit_of_measure}/box`,
+        config: cfg,
+    }));
+
+    const activeKey = selectedConfig?.id ?? null;
+
     return (
-        <button
-            onClick={onClick}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-100 ${active ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-500 border-gray-200 hover:border-violet-300 hover:text-indigo-600 hover:bg-violet-50"}`}
-        >
-            {label}
-            <span
-                className={`text-[10px] px-1 py-0.5 rounded ${active ? "bg-white/20 text-white/80" : "bg-gray-100 text-gray-400"}`}
-            >
-                {count}
-            </span>
-        </button>
+        <div className="mt-2">
+            <p className="text-[10px] font-semibold text-gray-400 tracking-widest mb-1.5">
+                Box config
+            </p>
+            <div className="flex gap-1 flex-wrap">
+                {tabs.map((tab) => {
+                    const isActive = activeKey === tab.key;
+                    return (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => onSelect(tab.config)}
+                            className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all ${
+                                isActive
+                                    ? "border-indigo-400 bg-indigo-50 text-indigo-700"
+                                    : hasError
+                                      ? "border-red-300 bg-red-50 hover:border-red-400"
+                                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                            }`}
+                        >
+                            <span
+                                className={`text-[11px] font-semibold leading-tight ${isActive ? "text-indigo-700" : "text-gray-700"}`}
+                            >
+                                {tab.label}
+                            </span>
+                            <span
+                                className={`text-[10px] mt-0.5 leading-tight ${isActive ? "text-indigo-500" : "text-gray-400"}`}
+                            >
+                                {tab.sub}
+                            </span>
+                            {isActive && (
+                                <div className="w-1 h-1 rounded-full bg-indigo-500 mt-1" />
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {hasError && (
+                <p className="mt-1.5 text-[11px] text-red-500 font-medium flex items-center gap-1">
+                    <AlertCircle size={10} /> Choose a box config to proceed
+                </p>
+            )}
+
+            {selectedConfig &&
+                (selectedConfig.supplierName || selectedConfig.poDate) && (
+                    <p className="text-[10px] text-gray-400 mt-1.5">
+                        {[
+                            selectedConfig.supplierName,
+                            selectedConfig.poDate &&
+                                new Date(
+                                    selectedConfig.poDate,
+                                ).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    year: "numeric",
+                                }),
+                        ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                    </p>
+                )}
+        </div>
     );
 }
 
-function StoreBadge({ name }: { name: string }) {
-    const palettes = [
-        "bg-violet-100 text-violet-700",
-        "bg-blue-100 text-blue-700",
-        "bg-emerald-100 text-emerald-700",
-        "bg-amber-100 text-amber-700",
-        "bg-rose-100 text-rose-700",
-        "bg-teal-100 text-teal-700",
-    ];
-    const idx = (name.charCodeAt(0) ?? 0) % palettes.length;
-    return (
-        <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${palettes[idx]}`}
-        >
-            {name.slice(0, 2).toUpperCase()}
-        </span>
-    );
-}
+// ─── DeliveryTypeSelector ─────────────────────────────────────────────────────
 
-function StatCard({
-    label,
+function DeliveryTypeSelector({
     value,
-    sub,
-    iconBg,
-    icon,
-    highlight,
+    onChange,
 }: {
-    label: string;
-    value: number;
-    sub?: string;
-    iconBg: string;
-    icon: React.ReactNode;
-    highlight?: boolean;
+    value: DeliveryType;
+    onChange: (v: DeliveryType) => void;
 }) {
+    const options = [
+        {
+            value: "company" as DeliveryType,
+            label: "Company delivery",
+            sublabel: "Warehouse delivers to your store",
+            icon: <Truck size={15} className="flex-shrink-0" />,
+        },
+        {
+            value: "self" as DeliveryType,
+            label: "Self-pickup",
+            sublabel: "You collect directly from the warehouse",
+            icon: <Store size={15} className="flex-shrink-0" />,
+        },
+    ];
+
+    return (
+        <div className="flex flex-col gap-2">
+            <label className="text-[11px] font-semibold text-gray-500">
+                Delivery method
+            </label>
+            <div className="grid grid-cols-1 gap-2">
+                {options.map((opt) => {
+                    const active = value === opt.value;
+                    return (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => onChange(opt.value)}
+                            className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${
+                                active
+                                    ? "border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100"
+                                    : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                            }`}
+                        >
+                            <div
+                                className={`mt-0.5 ${active ? "text-indigo-600" : "text-gray-400"}`}
+                            >
+                                {opt.icon}
+                            </div>
+                            <div className="min-w-0">
+                                <div
+                                    className={`text-xs font-semibold ${active ? "text-indigo-700" : "text-gray-700"}`}
+                                >
+                                    {opt.label}
+                                </div>
+                                <div className="text-[10px] text-gray-400 mt-0.5">
+                                    {opt.sublabel}
+                                </div>
+                                {opt.value === "self" && active && (
+                                    <div className="text-[10px] text-emerald-600 font-semibold mt-1">
+                                        No delivery cost
+                                    </div>
+                                )}
+                                {opt.value === "company" && active && (
+                                    <div className="text-[10px] text-amber-600 font-medium mt-1">
+                                        Cost calculated at fulfillment
+                                    </div>
+                                )}
+                            </div>
+                            <div
+                                className={`ml-auto mt-0.5 w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 transition-all ${
+                                    active
+                                        ? "border-indigo-500 bg-indigo-500"
+                                        : "border-gray-300 bg-white"
+                                }`}
+                            />
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+// ─── CatalogItemRow ───────────────────────────────────────────────────────────
+
+function CatalogItemRow({
+    item,
+    cartEntry,
+    organizationId,
+    onAdd,
+    onRemove,
+    onQtyChange,
+    onConfigChange,
+}: {
+    item: WarehouseCatalogItem & { box_quantity: number };
+    cartEntry?: CartEntry;
+    organizationId: string;
+    onAdd: (
+        item: WarehouseCatalogItem & { box_quantity: number },
+        boxes: number,
+        config: ShipmentBoxConfig | null,
+    ) => void;
+    onRemove: (itemId: number) => void;
+    onQtyChange: (itemId: number, boxes: number) => void;
+    onConfigChange: (itemId: number, config: ShipmentBoxConfig | null) => void;
+}) {
+    const [configError, setConfigError] = useState(false);
+    const [inputVal, setInputVal] = useState(String(cartEntry?.boxes ?? 1));
+    const [error, setError] = useState<string | null>(null);
+    const [showConfigPicker, setShowConfigPicker] = useState(false);
+    const [localConfig, setLocalConfig] = useState<ShipmentBoxConfig | null>(
+        cartEntry?.selectedConfig ?? null,
+    );
+    const { configs: availableConfigs } = useItemShipmentConfigs(
+        item.id,
+        organizationId,
+    );
+    const requiresConfigSelection = availableConfigs.length > 0;
+
+    const inCart = !!cartEntry;
+    const displayBoxes = parseInt(inputVal) || 1;
+    const ppb = effectivePiecesPerBox(item, localConfig);
+
+    useEffect(() => {
+        setLocalConfig(cartEntry?.selectedConfig ?? null);
+    }, [cartEntry?.selectedConfig]);
+
+    const handleInputChange = (val: string) => {
+        if (val.includes(".")) return;
+        setInputVal(val);
+        const v = validateBoxQty(val);
+        setError(v.ok ? null : (v.error ?? null));
+        if (v.ok && inCart) onQtyChange(item.id, v.value!);
+    };
+
+    const adjust = (delta: number) => {
+        const next = Math.max(1, Math.min(999, displayBoxes + delta));
+        setInputVal(String(next));
+        setError(null);
+        if (inCart) onQtyChange(item.id, next);
+    };
+
+    const handleAdd = () => {
+        const v = validateBoxQty(inputVal);
+        if (!v.ok) {
+            setError(v.error ?? null);
+            return;
+        }
+        if (requiresConfigSelection && !localConfig) {
+            setConfigError(true);
+            setShowConfigPicker(true);
+            return;
+        }
+        setError(null);
+        setConfigError(false);
+        onAdd(item, v.value!, localConfig);
+    };
+
     return (
         <div
-            className={`bg-white border rounded-xl p-4 ${highlight ? "border-blue-200 ring-2 ring-blue-50" : "border-gray-200"}`}
+            className={`flex flex-col p-3.5 rounded-xl border transition-all ${
+                inCart
+                    ? "border-indigo-300 bg-indigo-50/40"
+                    : "border-gray-200 bg-white hover:border-violet-200 hover:shadow-[0_1px_6px_rgba(99,102,241,0.07)]"
+            }`}
         >
-            <div
-                className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${iconBg}`}
-            >
-                {icon}
+            <div className="flex items-start gap-3">
+                {/* Item info */}
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-gray-900">
+                            {item.name}
+                        </span>
+                        {inCart && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded-full">
+                                <CheckCircle2 size={9} /> In order
+                            </span>
+                        )}
+                    </div>
+                    {item.sku && (
+                        <span
+                            style={{
+                                fontFamily: "var(--font-mono, monospace)",
+                            }}
+                            className="text-[10px] text-gray-400 mt-0.5 block"
+                        >
+                            {item.sku}
+                        </span>
+                    )}
+
+                    <button
+                        onClick={() => setShowConfigPicker((p) => !p)}
+                        className={`flex items-center gap-1 mt-1.5 text-[11px] transition-colors group ${
+                            configError
+                                ? "text-red-500 hover:text-red-600"
+                                : "text-gray-500 hover:text-indigo-600"
+                        }`}
+                    >
+                        <Boxes
+                            size={10}
+                            className="text-gray-300 group-hover:text-indigo-400 flex-shrink-0"
+                        />
+                        <span>
+                            {ppb} {item.unit_of_measure}/box
+                            {localConfig && (
+                                <span className="ml-1 text-indigo-500 font-semibold">
+                                    ·{" "}
+                                    {localConfig.poNumber ?? "Custom shipment"}
+                                </span>
+                            )}
+                        </span>
+                        <ChevronDown
+                            size={10}
+                            className={`ml-0.5 transition-transform ${showConfigPicker ? "rotate-180" : ""}`}
+                        />
+                    </button>
+
+                    {showConfigPicker && (
+                        <ShipmentConfigPicker
+                            item={item}
+                            organizationId={organizationId}
+                            selectedConfig={localConfig}
+                            hasError={configError}
+                            onSelect={(cfg) => {
+                                setLocalConfig(cfg);
+                                setConfigError(false);
+                                onConfigChange(item.id, cfg);
+                                setShowConfigPicker(false);
+                            }}
+                        />
+                    )}
+                </div>
+
+                {/* Qty controls */}
+                <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <div className="flex items-center">
+                        <button
+                            onClick={() => adjust(-1)}
+                            className="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-l-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
+                        >
+                            −
+                        </button>
+                        <input
+                            type="number"
+                            min={1}
+                            max={999}
+                            step={1}
+                            value={inputVal}
+                            onChange={(e) => handleInputChange(e.target.value)}
+                            onKeyDown={(e) =>
+                                [".", "e", "E", "-", "+"].includes(e.key) &&
+                                e.preventDefault()
+                            }
+                            className={`w-10 h-7 border-y text-center text-xs font-semibold text-gray-900 outline-none transition-all ${
+                                error
+                                    ? "border-red-400 bg-red-50"
+                                    : "border-gray-200 bg-white focus:border-indigo-400"
+                            }`}
+                            style={
+                                {
+                                    MozAppearance: "textfield",
+                                    appearance: "textfield",
+                                } as React.CSSProperties
+                            }
+                        />
+                        <button
+                            onClick={() => adjust(1)}
+                            className="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-r-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
+                        >
+                            +
+                        </button>
+                        <span className="ml-2 text-[11px] text-gray-400 w-16">
+                            = {displayBoxes * ppb} {item.unit_of_measure}
+                        </span>
+                    </div>
+
+                    {error && (
+                        <div className="flex items-center gap-1 text-[10px] text-red-500">
+                            <AlertCircle size={9} /> {error}
+                        </div>
+                    )}
+
+                    {inCart ? (
+                        <button
+                            onClick={() => onRemove(item.id)}
+                            className="text-[11px] font-semibold text-red-400 hover:text-red-600 flex items-center gap-1 transition-colors"
+                        >
+                            <X size={10} /> Remove
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleAdd}
+                            className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-lg transition-colors"
+                        >
+                            Add to order
+                        </button>
+                    )}
+                </div>
             </div>
-            <p className="text-2xl font-bold text-gray-900 tracking-tight">
-                {value}
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">{label}</p>
-            {sub && <p className="text-[10px] text-gray-300 mt-0.5">{sub}</p>}
+        </div>
+    );
+}
+
+// ─── CartRow ──────────────────────────────────────────────────────────────────
+
+function CartRow({
+    entry,
+    onRemove,
+}: {
+    entry: CartEntry;
+    onRemove: () => void;
+}) {
+    const ppb = effectivePiecesPerBox(entry.item, entry.selectedConfig);
+    return (
+        <div className="flex items-center gap-2.5 p-2.5 bg-white border border-gray-200 rounded-lg">
+            <div className="w-6 h-6 rounded-md bg-violet-100 flex items-center justify-center flex-shrink-0">
+                <Package size={11} className="text-violet-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-gray-800 truncate">
+                    {entry.item.name}
+                </div>
+                <div className="text-[11px] text-gray-400 mt-0.5">
+                    {entry.boxes} box{entry.boxes !== 1 ? "es" : ""} ·{" "}
+                    <span className="text-indigo-600 font-semibold">
+                        {entry.boxes * ppb} {entry.item.unit_of_measure}
+                    </span>
+                    {entry.selectedConfig && (
+                        <span className="ml-1 text-[10px] text-indigo-400">
+                            · {entry.selectedConfig.piecesPerBox}/box
+                        </span>
+                    )}
+                </div>
+            </div>
+            <button
+                onClick={onRemove}
+                className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 rounded transition-all"
+            >
+                <X size={11} />
+            </button>
         </div>
     );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-export default function SuperAdminOrdersPage() {
+
+export default function NewOrderPage() {
     const router = useRouter();
+
+    const { data: userInfo } = useUserInfo();
     const { organization } = useOrganization();
     const organizationId = organization?.id ?? "";
+    const requestedBy = userInfo?.id ?? "";
 
-    const { data: rawTickets, isLoading } = useAllTickets(organizationId);
-    const tickets = (rawTickets ?? []) as QueueTicket[];
+    // ── Locations ─────────────────────────────────────────────────────────────
+    const { data: locations } = useLocations();
 
-    const [activeFilter, setActiveFilter] = useState<TicketStatus | "all">(
-        "submitted",
+    const warehouseLocations = useMemo(
+        () => (locations ?? []).filter((l) => l.location_type === "warehouse"),
+        [locations],
     );
+
+    const storeLocations = useMemo(
+        () => (locations ?? []).filter((l) => l.location_type === "store"),
+        [locations],
+    );
+
+    // ── Selected warehouse & store ─────────────────────────────────────────────
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
+    const [selectedLocationId, setSelectedLocationId] = useState("");
+
+    const warehouseLocationId = selectedWarehouseId;
+    const requestingLocationId = selectedLocationId;
+
+    // ── Catalog ────────────────────────────────────────────────────────────────
+    const { data: rawCatalogItems, isLoading: catalogLoading } =
+        useWarehouseCatalog();
+    const { data: categories } = useCategories();
+    const { mutate: createTicket, isPending: isSubmitting } = useCreateTicket();
+
+    // ── Local state ────────────────────────────────────────────────────────────
+    const [title, setTitle] = useState("");
     const [search, setSearch] = useState("");
-    const [storeFilter, setStoreFilter] = useState("");
-    const [dateFilter, setDateFilter] = useState<
-        "today" | "week" | "month" | ""
-    >("");
+    const [categoryFilter, setCategoryFilter] = useState<number | "">("");
+    const [cart, setCart] = useState<Record<number, CartEntry>>({});
+    const [notes, setNotes] = useState("");
+    const [deliveryType, setDeliveryType] = useState<DeliveryType>("company");
 
-    const stores = useMemo(
+    // ── Filter orderable items ─────────────────────────────────────────────────
+    const orderableItems = useMemo(
         () =>
-            Array.from(
-                new Set(
-                    tickets
-                        .map((t) => t.requesting_location?.name)
-                        .filter(Boolean),
-                ),
-            ) as string[],
-        [tickets],
+            (rawCatalogItems ?? []).filter(
+                (
+                    item,
+                ): item is WarehouseCatalogItem & { box_quantity: number } =>
+                    item.box_quantity !== null && item.box_quantity > 0,
+            ),
+        [rawCatalogItems],
     );
 
-    const counts = useMemo(() => {
-        const map: Record<string, number> = { all: tickets.length };
-        FILTER_CHIPS.forEach(({ key }) => {
-            if (key !== "all")
-                map[key] = tickets.filter((t) => t.status === key).length;
-        });
-        return map;
-    }, [tickets]);
-
-    function isInDateRange(iso: string): boolean {
-        if (!dateFilter) return true;
-        const diff = Date.now() - new Date(iso).getTime();
-        if (dateFilter === "today") return diff < 86_400_000;
-        if (dateFilter === "week") return diff < 7 * 86_400_000;
-        if (dateFilter === "month") return diff < 30 * 86_400_000;
-        return true;
-    }
-
-    const filtered = useMemo(() => {
+    const filteredItems = useMemo(() => {
         const q = search.toLowerCase();
-        return tickets.filter((t) => {
-            const matchStatus =
-                activeFilter === "all" || t.status === activeFilter;
-            const matchStore =
-                !storeFilter || t.requesting_location?.name === storeFilter;
-            const matchDate = isInDateRange(t.submitted_at ?? t.created_at);
+        return orderableItems.filter((item) => {
             const matchSearch =
                 !q ||
-                t.id.toLowerCase().includes(q) ||
-                shortId(t.id).toLowerCase().includes(q) ||
-                (t.requesting_location?.name ?? "").toLowerCase().includes(q) ||
-                (t.title ?? "").toLowerCase().includes(q);
-            return matchStatus && matchStore && matchDate && matchSearch;
+                item.name.toLowerCase().includes(q) ||
+                (item.sku ?? "").toLowerCase().includes(q);
+            const matchCat =
+                !categoryFilter || (item as any).category_id === categoryFilter;
+            return matchSearch && matchCat;
         });
-    }, [tickets, activeFilter, storeFilter, dateFilter, search]);
+    }, [orderableItems, search, categoryFilter]);
 
-    const submittedCount = counts["submitted"] ?? 0;
-    const processingCount = counts["processing"] ?? 0;
-    const fulfilledCount = counts["fulfilled"] ?? 0;
+    // ── Cart stats ─────────────────────────────────────────────────────────────
+    const cartEntries = Object.values(cart);
+    const totalItems = cartEntries.length;
+    const totalBoxes = cartEntries.reduce((s, e) => s + e.boxes, 0);
+    const hasItems = totalItems > 0;
 
+    // ── Cart handlers ──────────────────────────────────────────────────────────
+    const handleAdd = useCallback(
+        (
+            item: WarehouseCatalogItem & { box_quantity: number },
+            boxes: number,
+            config: ShipmentBoxConfig | null,
+        ) => {
+            setCart((prev) => ({
+                ...prev,
+                [item.id]: { item, boxes, selectedConfig: config },
+            }));
+        },
+        [],
+    );
+
+    const handleRemove = useCallback((itemId: number) => {
+        setCart((prev) => {
+            const next = { ...prev };
+            delete next[itemId];
+            return next;
+        });
+    }, []);
+
+    const handleQtyChange = useCallback((itemId: number, boxes: number) => {
+        setCart((prev) =>
+            prev[itemId]
+                ? { ...prev, [itemId]: { ...prev[itemId], boxes } }
+                : prev,
+        );
+    }, []);
+
+    const handleConfigChange = useCallback(
+        (itemId: number, config: ShipmentBoxConfig | null) => {
+            setCart((prev) =>
+                prev[itemId]
+                    ? {
+                          ...prev,
+                          [itemId]: { ...prev[itemId], selectedConfig: config },
+                      }
+                    : prev,
+            );
+        },
+        [],
+    );
+
+    // ── Build payload ──────────────────────────────────────────────────────────
+    const buildPayload = (
+        status: "draft" | "submitted",
+    ): CreateTicketInput => ({
+        organizationId,
+        requestingLocationId,
+        warehouseLocationId,
+        requestedBy,
+        initialStatus: status,
+        deliveryType,
+        title: title.trim() || undefined,
+        notes: notes.trim() || undefined,
+        items: cartEntries.map((e) => {
+            const ppb = effectivePiecesPerBox(e.item, e.selectedConfig);
+            return {
+                itemId: e.item.id,
+                quantityBoxes: e.boxes,
+                quantityUnits: e.boxes * ppb,
+            };
+        }),
+    });
+
+    const missingContext =
+        !organizationId || !requestingLocationId || !warehouseLocationId;
+
+    const handleDraft = async () => {
+        if (missingContext) {
+            toast.error("Select a store and warehouse first");
+            return;
+        }
+        try {
+            await createTicket(buildPayload("draft"));
+            toast.success("Draft saved");
+            router.push("/super-admin/orders");
+        } catch {
+            toast.error("Failed to save draft");
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (missingContext) {
+            toast.error("Select a store and warehouse first");
+            return;
+        }
+        try {
+            await createTicket(buildPayload("submitted"));
+            toast.success("Order submitted to warehouse");
+            router.push("/super-admin/orders");
+        } catch {
+            toast.error("Failed to submit order");
+        }
+    };
+
+    // ─── Render ────────────────────────────────────────────────────────────────
     return (
-        <div className="min-h-screen bg-white">
-            {/* ── Header — matches admin layout exactly ── */}
-            <div className="px-6 pt-6 pb-5 border-b border-gray-100">
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-                            Orders
-                        </h1>
-                        <p className="text-xs text-gray-400 mt-1">
-                            All store orders across every location
-                        </p>
-                    </div>
-                    <Link
-                        href="/super-admin/orders/new"
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(99,102,241,.3)]"
-                    >
-                        <Plus size={13} /> New Order
-                    </Link>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-                    <StatCard
-                        label="Awaiting review"
-                        value={submittedCount}
-                        iconBg="bg-blue-50"
-                        icon={<Send size={15} className="text-blue-600" />}
-                        highlight={submittedCount > 0}
-                    />
-                    <StatCard
-                        label="Processing"
-                        value={processingCount}
-                        iconBg="bg-yellow-50"
-                        icon={<Clock size={15} className="text-yellow-600" />}
-                    />
-                    <StatCard
-                        label="Fulfilled"
-                        value={fulfilledCount}
-                        iconBg="bg-violet-50"
-                        icon={<Truck size={15} className="text-violet-600" />}
-                    />
-                    <StatCard
-                        label="Stores active"
-                        value={stores.length}
-                        iconBg="bg-gray-100"
-                        icon={<Package size={15} className="text-gray-500" />}
-                    />
+        <div className="flex flex-col h-screen bg-white">
+            {/* ── Top bar ── */}
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                <button
+                    onClick={() => router.back()}
+                    className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg transition-all"
+                >
+                    <ArrowLeft size={12} /> Orders
+                </button>
+                <div>
+                    <h1 className="text-lg font-bold text-gray-900 tracking-tight">
+                        New Order
+                    </h1>
+                    <p className="text-[11px] text-gray-400">
+                        Browse the warehouse catalog and build your order
+                    </p>
                 </div>
             </div>
 
-            {/* ── Body — matches admin layout exactly ── */}
-            <div className="px-6 py-5">
-                {/* Search + dropdowns + filter chips + attention banner — all in one row */}
-                <div className="flex items-center gap-3 flex-wrap mb-5">
-                    <div className="flex-1 relative">
-                        <Search
-                            size={13}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none"
-                        />
-                        <input
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search by ID, title or store…"
-                            className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                        />
-                    </div>
-
-                    {/* Attention banner — inline at the end */}
-                    {submittedCount > 0 && (
-                        <div className="ml-auto flex items-center gap-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800 font-medium shrink-0">
-                            <AlertCircle
-                                size={13}
-                                className="text-yellow-600 shrink-0"
-                            />
-                            {submittedCount} ticket
-                            {submittedCount !== 1 ? "s" : ""} need
-                            {submittedCount === 1 ? "s" : ""} your attention
-                        </div>
-                    )}
-                </div>
-                <div className="flex items-center gap-3 flex-wrap mb-5">
+            {/* ── Warehouse + Store selectors ── */}
+            <div className="flex items-center gap-3 px-6 py-3 border-b border-gray-100 flex-shrink-0">
+                {/* Warehouse selector */}
+                <div className="flex-1 flex items-center gap-3 px-4 py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl">
+                    <Warehouse
+                        size={13}
+                        className="text-indigo-500 flex-shrink-0"
+                    />
+                    <span className="text-xs font-medium text-indigo-800 whitespace-nowrap">
+                        Source warehouse:
+                    </span>
                     <select
-                        value={storeFilter}
-                        onChange={(e) => setStoreFilter(e.target.value)}
-                        className="py-2 px-3 text-xs border border-gray-200 rounded-lg outline-none focus:border-indigo-400 bg-white text-gray-600 cursor-pointer"
+                        value={selectedWarehouseId}
+                        onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                        className="flex-1 max-w-xs border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
-                        <option value="">All stores</option>
-                        {stores.map((s) => (
-                            <option key={s} value={s}>
-                                {s}
+                        <option value="" disabled hidden>
+                            Select a warehouse
+                        </option>
+                        {warehouseLocations.map((loc) => (
+                            <option key={loc.id} value={loc.id}>
+                                {loc.name}
                             </option>
                         ))}
                     </select>
+                    {selectedWarehouseId && (
+                        <span className="text-[10px] text-indigo-600 font-semibold flex items-center gap-1">
+                            <CheckCircle2 size={10} /> Selected
+                        </span>
+                    )}
+                </div>
 
+                {/* Store selector */}
+                <div className="flex-1 flex items-center gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+                    <MapPin
+                        size={13}
+                        className="text-amber-600 flex-shrink-0"
+                    />
+                    <span className="text-xs font-medium text-amber-800 whitespace-nowrap">
+                        Ordering for:
+                    </span>
                     <select
-                        value={dateFilter}
-                        onChange={(e) =>
-                            setDateFilter(e.target.value as typeof dateFilter)
-                        }
-                        className="py-2 px-3 text-xs border border-gray-200 rounded-lg outline-none focus:border-indigo-400 bg-white text-gray-600 cursor-pointer"
+                        value={selectedLocationId}
+                        onChange={(e) => setSelectedLocationId(e.target.value)}
+                        className="flex-1 max-w-xs border border-amber-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
-                        <option value="">All time</option>
-                        <option value="today">Today</option>
-                        <option value="week">This week</option>
-                        <option value="month">This month</option>
-                    </select>
-
-                    <div className="flex items-center gap-1.5">
-                        {FILTER_CHIPS.map(({ key, label }) => (
-                            <FilterChip
-                                key={key}
-                                label={label}
-                                active={activeFilter === key}
-                                count={
-                                    key === "all"
-                                        ? tickets.length
-                                        : (counts[key] ?? 0)
-                                }
-                                onClick={() => setActiveFilter(key)}
-                            />
+                        <option value="" disabled hidden>
+                            Select a store
+                        </option>
+                        {storeLocations.map((loc) => (
+                            <option key={loc.id} value={loc.id}>
+                                {loc.name}
+                            </option>
                         ))}
+                    </select>
+                    {selectedLocationId && (
+                        <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
+                            <CheckCircle2 size={10} /> Selected
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* ── Two-column layout ── */}
+            <div className="flex flex-1 min-h-0">
+                {/* ── LEFT: Catalog ── */}
+                <div className="flex-1 flex flex-col border-r border-gray-100 overflow-hidden">
+                    {/* Search + filter toolbar */}
+                    <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100 flex-shrink-0">
+                        <div className="relative flex-1">
+                            <Search
+                                size={13}
+                                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none"
+                            />
+                            <input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search by name or SKU…"
+                                className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                            />
+                        </div>
+                        <select
+                            value={categoryFilter}
+                            onChange={(e) =>
+                                setCategoryFilter(
+                                    e.target.value
+                                        ? Number(e.target.value)
+                                        : "",
+                                )
+                            }
+                            className="py-2 px-3 text-xs border border-gray-200 rounded-lg outline-none focus:border-indigo-400 bg-white text-gray-600 cursor-pointer"
+                        >
+                            <option value="">All categories</option>
+                            {(categories ?? []).map((c) => (
+                                <option key={c.id} value={c.id}>
+                                    {c.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="px-5 py-2 text-[11px] text-gray-300 flex-shrink-0">
+                        {filteredItems.length} item
+                        {filteredItems.length !== 1 ? "s" : ""} available to
+                        order
+                    </div>
+
+                    {/* Items list */}
+                    <div className="flex-1 overflow-y-auto px-5 pb-5">
+                        {catalogLoading ? (
+                            <div className="flex items-center justify-center py-16 gap-2 text-gray-400">
+                                <Loader2 size={16} className="animate-spin" />
+                                <span className="text-sm">
+                                    Loading catalog…
+                                </span>
+                            </div>
+                        ) : filteredItems.length === 0 &&
+                          orderableItems.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-center">
+                                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mb-3">
+                                    <Package
+                                        size={18}
+                                        className="text-gray-300"
+                                    />
+                                </div>
+                                <p className="text-sm font-medium text-gray-400">
+                                    No items in catalog
+                                </p>
+                                <p className="text-xs text-gray-300 mt-1">
+                                    Items need a box_quantity set before they
+                                    can be ordered
+                                </p>
+                            </div>
+                        ) : filteredItems.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-center">
+                                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mb-3">
+                                    <Search
+                                        size={18}
+                                        className="text-gray-300"
+                                    />
+                                </div>
+                                <p className="text-sm font-medium text-gray-400">
+                                    No items match
+                                </p>
+                                <p className="text-xs text-gray-300 mt-1">
+                                    Try a different search or category
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-2 pt-1">
+                                {filteredItems.map((item) => (
+                                    <CatalogItemRow
+                                        key={item.id}
+                                        item={item}
+                                        cartEntry={cart[item.id]}
+                                        organizationId={organizationId}
+                                        onAdd={handleAdd}
+                                        onRemove={handleRemove}
+                                        onQtyChange={handleQtyChange}
+                                        onConfigChange={handleConfigChange}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* ── Table ── */}
-                {isLoading ? (
-                    <div className="flex items-center justify-center py-24 gap-2 text-gray-400">
-                        <Loader2 size={16} className="animate-spin" />
-                        <span className="text-sm">Loading orders…</span>
-                    </div>
-                ) : filtered.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 text-center">
-                        <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-3">
-                            <Package size={20} className="text-gray-300" />
+                {/* ── RIGHT: Order summary ── */}
+                <div className="w-[420px] flex flex-col flex-shrink-0 bg-gray-50/50 border-l border-gray-100">
+                    {/* Stats header */}
+                    <div className="px-5 pt-5 pb-4 border-b border-gray-100 bg-white flex-shrink-0">
+                        <div className="flex items-center gap-2 mb-4">
+                            <ShoppingCart
+                                size={15}
+                                className="text-indigo-500"
+                            />
+                            <span className="text-base font-bold text-gray-900">
+                                Order summary
+                            </span>
+                            {hasItems && (
+                                <span className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
+                                    {totalItems} item
+                                    {totalItems !== 1 ? "s" : ""}
+                                </span>
+                            )}
                         </div>
-                        <p className="text-sm font-medium text-gray-500 mb-1">
-                            No orders found
-                        </p>
-                        <p className="text-xs text-gray-300">
-                            {activeFilter === "submitted"
-                                ? "No tickets are waiting for your review right now."
-                                : "Try a different filter or search term."}
-                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                            {[
+                                { val: totalItems, label: "Line items" },
+                                { val: totalBoxes, label: "Total boxes" },
+                            ].map(({ val, label }) => (
+                                <div
+                                    key={label}
+                                    className="bg-gray-100 rounded-xl px-4 py-3"
+                                >
+                                    <div className="text-2xl font-bold text-gray-900 tracking-tight">
+                                        {val}
+                                    </div>
+                                    <div className="text-xs text-gray-400 mt-0.5">
+                                        {label}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                ) : (
-                    <>
-                        <div className="rounded-xl border border-gray-200 overflow-hidden">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="bg-gray-50 hover:bg-gray-50 border-b border-gray-200">
-                                        <TableHead className="pl-5 pr-3 w-28 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                                            Ticket ID
-                                        </TableHead>
-                                        <TableHead className="px-3 w-44 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                                            Title
-                                        </TableHead>
-                                        <TableHead className="px-3 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                                            Store
-                                        </TableHead>
-                                        <TableHead className="px-3 w-32 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                                            Submitted by
-                                        </TableHead>
-                                        <TableHead className="px-3 w-24 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                                            Date
-                                        </TableHead>
-                                        <TableHead className="px-3 w-44 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                                            Contents
-                                        </TableHead>
-                                        <TableHead className="px-3 w-40 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                                            Status
-                                        </TableHead>
-                                        <TableHead className="pr-5 pl-2 w-6" />
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filtered.map((ticket) => {
-                                        const dateIso =
-                                            ticket.submitted_at ??
-                                            ticket.created_at;
-                                        const itemCount = getItemCount(ticket);
-                                        const totalBoxes =
-                                            getTotalBoxes(ticket);
-                                        const { dot } =
-                                            STATUS_META[ticket.status] ??
-                                            STATUS_META.draft;
 
-                                        return (
-                                            <TableRow
-                                                key={ticket.id}
-                                                onClick={() =>
-                                                    router.push(
-                                                        `/super-admin/orders/${ticket.id}`,
-                                                    )
-                                                }
-                                                className="group cursor-pointer border-b border-gray-100 hover:bg-gray-50/70 transition-colors"
-                                            >
-                                                {/* Ticket ID */}
-                                                <TableCell className="pl-5 pr-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <div
-                                                            className={`w-2 h-2 rounded-full shrink-0 ${dot}`}
-                                                        />
-                                                        <span
-                                                            style={{
-                                                                fontFamily:
-                                                                    "var(--font-mono, 'JetBrains Mono', monospace)",
-                                                            }}
-                                                            className="text-xs font-medium text-gray-500"
-                                                            title={ticket.id}
-                                                        >
-                                                            {shortId(ticket.id)}
-                                                        </span>
-                                                    </div>
-                                                </TableCell>
+                    {/* Cart items — scrollable middle section */}
+                    <div className="flex-1 overflow-y-auto px-5 py-4">
+                        {!hasItems ? (
+                            <div className="flex flex-col items-center justify-center h-full text-center py-10">
+                                <ShoppingCart
+                                    size={28}
+                                    className="text-gray-200 mb-3"
+                                />
+                                <p className="text-sm font-medium text-gray-400">
+                                    No items added yet
+                                </p>
+                                <p className="text-xs text-gray-300 mt-1">
+                                    Browse the catalog and add box quantities
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-2">
+                                {cartEntries.map((entry) => (
+                                    <CartRow
+                                        key={entry.item.id}
+                                        entry={entry}
+                                        onRemove={() =>
+                                            handleRemove(entry.item.id)
+                                        }
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
-                                                {/* Title */}
-                                                <TableCell className="px-3 max-w-0">
-                                                    <span
-                                                        className="block text-xs font-medium truncate"
-                                                        title={
-                                                            ticket.title ?? ""
-                                                        }
-                                                    >
-                                                        {ticket.title ? (
-                                                            <span className="text-gray-800">
-                                                                {ticket.title}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-gray-300 italic">
-                                                                No title
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                </TableCell>
+                    {/* Delivery + title + notes + actions — fixed bottom */}
+                    <div className="px-5 pb-5 pt-4 border-t border-gray-100 bg-white flex-shrink-0 flex flex-col gap-4">
+                        <DeliveryTypeSelector
+                            value={deliveryType}
+                            onChange={setDeliveryType}
+                        />
 
-                                                {/* Store */}
-                                                <TableCell className="px-3">
-                                                    <div className="flex items-center gap-2 min-w-0">
-                                                        <StoreBadge
-                                                            name={
-                                                                ticket
-                                                                    .requesting_location
-                                                                    ?.name ??
-                                                                "?"
-                                                            }
-                                                        />
-                                                        <span className="text-sm font-semibold text-gray-900 truncate">
-                                                            {ticket
-                                                                .requesting_location
-                                                                ?.name ?? "—"}
-                                                        </span>
-                                                    </div>
-                                                </TableCell>
-
-                                                {/* Submitted by */}
-                                                <TableCell className="px-3">
-                                                    <div className="flex items-center gap-1.5 min-w-0">
-                                                        <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center shrink-0 text-[9px] font-bold text-indigo-700">
-                                                            {(
-                                                                ticket.requested_by ??
-                                                                "?"
-                                                            )
-                                                                .slice(0, 2)
-                                                                .toUpperCase()}
-                                                        </div>
-                                                        <span
-                                                            className="text-xs text-gray-500 truncate"
-                                                            title={
-                                                                ticket.requested_by
-                                                            }
-                                                        >
-                                                            Admin
-                                                        </span>
-                                                    </div>
-                                                </TableCell>
-
-                                                {/* Date */}
-                                                <TableCell className="px-3">
-                                                    <span className="text-xs text-gray-400 whitespace-nowrap">
-                                                        {relativeDate(dateIso)}
-                                                    </span>
-                                                </TableCell>
-
-                                                {/* Contents */}
-                                                <TableCell className="px-3">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <span className="text-xs text-gray-500">
-                                                            <span className="font-semibold text-gray-800">
-                                                                {itemCount}
-                                                            </span>{" "}
-                                                            items
-                                                        </span>
-                                                        <span className="text-xs text-gray-500">
-                                                            <span className="font-semibold text-gray-800">
-                                                                {totalBoxes}
-                                                            </span>{" "}
-                                                            boxes
-                                                        </span>
-                                                        {ticket.notes && (
-                                                            <span className="hidden xl:block text-[11px] text-gray-300 italic truncate max-w-[80px]">
-                                                                {ticket.notes}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-
-                                                {/* Status */}
-                                                <TableCell className="px-3">
-                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <StatusBadge
-                                                            status={
-                                                                ticket.status
-                                                            }
-                                                        />
-                                                        {ticket.is_auto_approved && (
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full">
-                                                                <CheckCircle2
-                                                                    size={8}
-                                                                />{" "}
-                                                                Auto
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-
-                                                {/* Arrow */}
-                                                <TableCell className="pr-5 pl-2">
-                                                    <ChevronRight
-                                                        size={14}
-                                                        className="text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all"
-                                                    />
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                    Order Title{" "}
+                                    <span className="font-normal text-gray-300">
+                                        (optional)
+                                    </span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    placeholder="e.g. Nutella restock…"
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                    Notes{" "}
+                                    <span className="font-normal text-gray-300">
+                                        (optional)
+                                    </span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    placeholder="e.g. Prioritize Nutella…"
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                            </div>
                         </div>
 
-                        <p className="text-center text-[11px] text-gray-300 mt-4">
-                            Showing {filtered.length} of {tickets.length} orders
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleDraft}
+                                disabled={
+                                    !hasItems || isSubmitting || missingContext
+                                }
+                                className="flex-1 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 text-sm font-semibold transition-all"
+                            >
+                                Save Draft
+                            </button>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={
+                                    !hasItems || isSubmitting || missingContext
+                                }
+                                className="flex-[2] py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all hover:enabled:-translate-y-px hover:enabled:shadow-[0_4px_12px_rgba(99,102,241,.3)] flex items-center justify-center gap-2"
+                            >
+                                {isSubmitting && (
+                                    <Loader2
+                                        size={13}
+                                        className="animate-spin"
+                                    />
+                                )}
+                                Submit Order
+                            </button>
+                        </div>
+
+                        <p className="text-[10px] text-gray-300 text-center leading-relaxed">
+                            Submitting sends this order to the warehouse for
+                            fulfillment.
                         </p>
-                    </>
-                )}
+                    </div>
+                </div>
             </div>
         </div>
     );

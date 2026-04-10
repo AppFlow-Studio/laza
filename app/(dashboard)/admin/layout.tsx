@@ -60,7 +60,7 @@ function SidebarLocationBlock() {
         userInfo?.assigned_location_id ?? "",
     );
 
-    console.log(userInfo); 
+    console.log(userInfo);
     
 
     // Don't render anything in collapsed mode — it would overflow
