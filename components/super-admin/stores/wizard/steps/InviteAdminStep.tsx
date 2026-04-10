@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Mail, ShieldCheck, SkipForward } from "lucide-react";
+import { Mail, ShieldCheck, SkipForward, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const inviteSchema = z.object({
@@ -92,6 +92,14 @@ export default function InviteAdminStep({
                     <p>• Location: automatically assigned to the new store</p>
                     <p>• They will receive a Clerk invitation email</p>
                 </div>
+
+                <button
+                    type="submit"
+                    className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
+                >
+                    <Send className="w-4 h-4" />
+                    Invite & Continue
+                </button>
             </form>
 
             {/* Skip option */}

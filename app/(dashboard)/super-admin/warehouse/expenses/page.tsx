@@ -33,6 +33,7 @@ import {
     type ExpenseType,
     type WarehouseExpenseFilters,
 } from "@/lib/supabase/queries/warehouseExpenses";
+import { updateWarehouseExpenseTitleAction } from "@/lib/supabase/actions/warehouseExpenseActions";
 import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { RentHistoryTable } from "@/components/super-admin/warehouse/RentHistoryTable";
@@ -193,16 +194,7 @@ function useUpdateExpenseTitle(organizationId: string) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async ({ id, title }: { id: string; title: string }) => {
-            const { data, error } = await supabase
-                .from("warehouse_expenses")
-                .update({ title: title.trim() || null })
-                .eq("id", id)
-                .select("id, title");
-            if (error) throw error;
-            if (!data || data.length === 0)
-                throw new Error(
-                    "Update blocked — check RLS on warehouse_expenses",
-                );
+            await updateWarehouseExpenseTitleAction(id, title.trim() || null);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({
