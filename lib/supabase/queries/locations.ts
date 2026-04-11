@@ -15,7 +15,7 @@ export async function getAllLocations(organizationId: string) {
     // Get caller role and location assignments
     const { data: caller } = await supabase
         .from('users')
-        .select('role, assigned_location_id')
+        .select('role')
         .eq('id', userId)
         .single();
 
@@ -55,9 +55,16 @@ export async function getAllLocations(organizationId: string) {
         return data.filter((l: any) => assignedIds.includes(l.id)) as Location[];
     }
 
-    // Employee: only their single assigned location
-    if (callerRole === 'employee' && caller?.assigned_location_id) {
-        return data.filter((l: any) => l.id === caller.assigned_location_id) as Location[];
+    // Employee: only their assigned location (from junction table)
+    if (callerRole === 'employee') {
+        const { data: empAssignments } = await supabase
+            .from('user_location_assignments')
+            .select('location_id')
+            .eq('user_id', userId);
+
+        const empLocationId = empAssignments?.[0]?.location_id ?? null;
+        if (!empLocationId) return [];
+        return data.filter((l: any) => l.id === empLocationId) as Location[];
     }
 
     return [];
@@ -111,10 +118,10 @@ export async function getLocationWithDetails(id: string) {
     if (storageError) throw storageError;
 
     const { data: employees, error: employeesError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('assigned_location_id', id)
-        .eq('is_active', true);
+        .from('user_location_assignments')
+        .select('user_id, users!inner(id, is_active)')
+        .eq('location_id', id)
+        .eq('users.is_active', true);
 
     if (employeesError) throw employeesError;
 
@@ -136,7 +143,12 @@ export async function createLocation(location: {
         country?: string;
     };
     is_active?: boolean;
+    latitude?: number | null;
+    longitude?: number | null;
 }) {
+    const { auth } = await import('@clerk/nextjs/server');
+    const { userId } = await auth();
+
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
         .from('locations')
@@ -145,6 +157,29 @@ export async function createLocation(location: {
         .single();
 
     if (error) throw error;
+
+    // Pre-populate location_catalog with all org items so the new location
+    // has access to every item without manual super-admin assignment
+    const { data: items } = await supabase
+        .from('items')
+        .select('id')
+        .eq('organization_id', location.organization_id);
+
+    if (items && items.length > 0 && userId) {
+        const catalogRecords = items.map((item: { id: string | number }) => ({
+            location_id: data.id,
+            item_id: item.id,
+            assigned_by: userId,
+            assigned_at: new Date().toISOString(),
+        }));
+
+        const { error: catalogError } = await supabase
+            .from('location_catalog')
+            .upsert(catalogRecords, { onConflict: 'location_id,item_id' });
+
+        if (catalogError) throw catalogError;
+    }
+
     return data as Location;
 }
 

@@ -15,6 +15,7 @@ import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import toast from "react-hot-toast";
 import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
 
 interface LowStockThresholdManagerProps {
     organizationId: string;
@@ -122,8 +123,8 @@ export default function LowStockThresholdManager({
                 toast.success("Threshold created");
             }
             closeForm();
-        } catch (err: any) {
-            toast.error(err.message || "Failed to save threshold");
+        } catch (err: unknown) {
+            toast.error(getFriendlyErrorMessage(err));
         }
     }
 
@@ -132,8 +133,8 @@ export default function LowStockThresholdManager({
         try {
             await deleteMutation.mutateAsync({ id, organizationId });
             toast.success("Threshold deleted");
-        } catch (err: any) {
-            toast.error(err.message || "Failed to delete threshold");
+        } catch (err: unknown) {
+            toast.error(getFriendlyErrorMessage(err));
         }
     }
 

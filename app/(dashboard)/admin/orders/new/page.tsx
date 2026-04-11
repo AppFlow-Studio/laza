@@ -21,23 +21,28 @@ import {
     Store,
     Warehouse,
     ChevronDown,
+    ChevronUp,
 } from "lucide-react";
+import { Sheet } from "react-modal-sheet";
 import { toast } from "react-hot-toast";
 
-import {
-    useWarehouseCatalog,
-    useWarehouseLocation,
-} from "@/lib/hooks/queries/useWarehouse";
+import { useWarehouseCatalog } from "@/lib/hooks/queries/useWarehouse";
 import { useCategories } from "@/lib/hooks/queries/useCategories";
 import { useCreateTicket } from "@/lib/hooks/queries/useOrderTickets";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { WarehouseCatalogItem } from "@/lib/supabase/queries/warehouse";
 import { CreateTicketInput } from "@/lib/supabase/queries/orderTickets";
 import { useOrganization } from "@clerk/nextjs";
+import { useWarehouses } from "@/lib/hooks/queries/useWarehouse";
 import {
     getItemShipmentHistory,
     type ShipmentBoxConfig,
 } from "@/lib/supabase/queries/itemShipmentHistory";
+import {
+    getFriendlyErrorMessage,
+    isNetworkError,
+} from "@/lib/utils/errorMessages";
+import { useAdminStore } from "@/lib/stores/adminStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -450,12 +455,13 @@ function CatalogItemRow({
                 <div className="flex items-center">
                     <button
                         onClick={() => adjust(-1)}
-                        className="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-l-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
+                        className="w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center border border-gray-200 rounded-l-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
                     >
                         −
                     </button>
                     <input
                         type="number"
+                        inputMode="numeric"
                         min={1}
                         max={999}
                         step={1}
@@ -465,7 +471,7 @@ function CatalogItemRow({
                             if ([".", "e", "E", "-", "+"].includes(e.key))
                                 e.preventDefault();
                         }}
-                        className={`w-10 h-7 border-y text-center text-xs font-semibold text-gray-900 outline-none transition-all ${
+                        className={`w-12 h-10 sm:w-10 sm:h-7 border-y text-center text-sm sm:text-xs font-semibold text-gray-900 outline-none transition-all ${
                             error
                                 ? "border-red-400 bg-red-50"
                                 : "border-gray-200 bg-white focus:border-indigo-400"
@@ -479,7 +485,7 @@ function CatalogItemRow({
                     />
                     <button
                         onClick={() => adjust(1)}
-                        className="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-r-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
+                        className="w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center border border-gray-200 rounded-r-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
                     >
                         +
                     </button>
@@ -559,14 +565,16 @@ export default function NewOrderPage() {
     const router = useRouter();
 
     const { data: userInfo } = useUserInfo();
-    const requestingLocationId = userInfo?.assigned_location_id ?? "";
+    const { selectedLocationId: requestingLocationId } = useAdminStore();
     const requestedBy = userInfo?.id ?? "";
 
     const { organization } = useOrganization();
     const organizationId = organization?.id ?? "";
 
-    const { data: warehouseLocation } = useWarehouseLocation();
-    const warehouseLocationId = warehouseLocation?.id ?? "";
+    // ── Warehouse selector ─────────────────────────────────────────────────────
+    const { data: warehouseLocations } = useWarehouses();
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
+    const warehouseLocationId = selectedWarehouseId;
 
     const { data: rawCatalogItems, isLoading: catalogLoading } =
         useWarehouseCatalog();
@@ -579,7 +587,57 @@ export default function NewOrderPage() {
     const [cart, setCart] = useState<Record<number, CartEntry>>({});
     const [notes, setNotes] = useState("");
     const [deliveryType, setDeliveryType] = useState<DeliveryType>("company");
+    const [reviewSheetOpen, setReviewSheetOpen] = useState(false);
 
+    // ── Restore local draft on mount (network failure recovery) ──────────────
+    // If a previous submit attempt failed due to network issues, the cart was
+    // saved to localStorage. Restore it once the catalog has loaded so we can
+    // re-hydrate items with their full WarehouseCatalogItem data.
+    useEffect(() => {
+        if (!rawCatalogItems || rawCatalogItems.length === 0) return;
+        try {
+            const raw = localStorage.getItem("laza_order_draft");
+            if (!raw) return;
+            const draft = JSON.parse(raw) as {
+                cart: Record<
+                    string,
+                    { boxes: number; configId: string | null }
+                >;
+                notes: string;
+                deliveryType: DeliveryType;
+            };
+            const restored: Record<number, CartEntry> = {};
+            for (const [id, entry] of Object.entries(draft.cart ?? {})) {
+                const item = rawCatalogItems.find((i) => i.id === Number(id));
+                if (
+                    item &&
+                    item.box_quantity != null &&
+                    item.box_quantity > 0
+                ) {
+                    restored[Number(id)] = {
+                        item: item as WarehouseCatalogItem & {
+                            box_quantity: number;
+                        },
+                        boxes: entry.boxes,
+                        selectedConfig: null,
+                    };
+                }
+            }
+            if (Object.keys(restored).length > 0) {
+                setCart(restored);
+                setNotes(draft.notes ?? "");
+                setDeliveryType(draft.deliveryType ?? "company");
+                toast.success("Restored your previously saved draft.", {
+                    duration: 4000,
+                });
+            }
+        } catch {
+            /* ignore corrupt drafts */
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rawCatalogItems]);
+
+    // ── Filter: only items with box_quantity set are orderable ──────────────────
     const orderableItems = useMemo(
         () =>
             (rawCatalogItems ?? []).filter(
@@ -660,7 +718,7 @@ export default function NewOrderPage() {
         status: "draft" | "submitted",
     ): CreateTicketInput => ({
         organizationId,
-        requestingLocationId,
+        requestingLocationId: requestingLocationId || "",
         warehouseLocationId,
         requestedBy,
         initialStatus: status,
@@ -678,31 +736,112 @@ export default function NewOrderPage() {
     const missingContext =
         !organizationId || !requestingLocationId || !warehouseLocationId;
 
+    // ── Local draft save/restore for network failure recovery ──────────────────
+    const DRAFT_KEY = "laza_order_draft";
+
+    const saveDraftLocally = () => {
+        try {
+            const draft = {
+                cart: Object.fromEntries(
+                    cartEntries.map((e) => [
+                        e.item.id,
+                        {
+                            boxes: e.boxes,
+                            configId: e.selectedConfig?.id ?? null,
+                        },
+                    ]),
+                ),
+                notes,
+                deliveryType,
+                savedAt: new Date().toISOString(),
+            };
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        } catch {
+            /* localStorage may be unavailable */
+        }
+    };
+
+    const clearLocalDraft = () => {
+        try {
+            localStorage.removeItem(DRAFT_KEY);
+        } catch {}
+    };
+
+    // ── Validate before submission ───────────────────────────────────────────
+    const validateOrder = (): boolean => {
+        if (!hasItems) {
+            toast.error("Add at least one item to your order.");
+            return false;
+        }
+        // Check for invalid box quantities in cart
+        for (const entry of cartEntries) {
+            const v = validateBoxQty(entry.boxes);
+            if (!v.ok) {
+                toast.error(`${entry.item.name}: ${v.error}`);
+                return false;
+            }
+        }
+        return true;
+    };
+
+    // ── Actions ──────────────────────────────────────────────────────────────────
     const handleDraft = async () => {
         if (missingContext) {
-            toast.error("Missing location context — try refreshing");
+            toast.error(
+                !warehouseLocationId
+                    ? "Select a warehouse first"
+                    : "Missing location context — try refreshing",
+            );
             return;
         }
         try {
             await createTicket(buildPayload("draft"));
+            clearLocalDraft();
             toast.success("Draft saved");
             router.push("/admin/orders");
-        } catch {
-            toast.error("Failed to save draft");
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "";
+            if (isNetworkError(msg)) {
+                saveDraftLocally();
+                toast.error(
+                    "Connection lost. Your draft has been saved locally — it will be restored when you return.",
+                    { duration: 5000 },
+                );
+            } else {
+                toast.error(getFriendlyErrorMessage(err));
+            }
         }
     };
 
     const handleSubmit = async () => {
         if (missingContext) {
-            toast.error("Missing location context — try refreshing");
+            toast.error(
+                !warehouseLocationId
+                    ? "Select a warehouse first"
+                    : "Missing location context — try refreshing",
+            );
             return;
         }
+        if (!validateOrder()) return;
+
+        console.log(buildPayload("submitted"));
+
         try {
             await createTicket(buildPayload("submitted"));
+            clearLocalDraft();
             toast.success("Order submitted to warehouse");
             router.push("/admin/orders");
-        } catch {
-            toast.error("Failed to submit order");
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "";
+            if (isNetworkError(msg)) {
+                saveDraftLocally();
+                toast.error(
+                    "Connection lost. Your order has been saved as a local draft. Please try submitting again when your connection is restored.",
+                    { duration: 6000 },
+                );
+            } else {
+                toast.error(getFriendlyErrorMessage(err));
+            }
         }
     };
 
@@ -726,40 +865,47 @@ export default function NewOrderPage() {
                 </div>
                 {!warehouseLocationId && !catalogLoading && (
                     <div className="ml-auto flex items-center gap-1.5 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg">
-                        <AlertCircle size={11} /> Warehouse not configured
+                        <AlertCircle size={11} /> Select a warehouse to continue
                     </div>
                 )}
             </div>
 
-            {warehouseLocation && (
-                <div className="flex items-center gap-2.5 px-6 py-2.5 mx-6 my-3.5 rounded-xl bg-indigo-50 border-b border-indigo-100">
-                    <Warehouse
-                        size={13}
-                        className="text-indigo-500 flex-shrink-0"
-                    />
-                    <span className="text-sm font-medium text-indigo-700">
-                        Sourcing from <strong>{warehouseLocation.name}:</strong>
-                    </span>
-                    {warehouseLocation.address && (
-                        <span className="text-sm text-indigo-400 ml-1">
-                            {typeof warehouseLocation.address === "object"
-                                ? [
-                                      (warehouseLocation.address as any).street,
-                                      (warehouseLocation.address as any).city,
-                                  ]
-                                      .filter(Boolean)
-                                      .join(", ")
-                                : warehouseLocation.address}
-                        </span>
-                    )}
-                </div>
-            )}
-
             {/* ── Two-column layout ── */}
             <div className="flex flex-1 min-h-0">
-                {/* ── LEFT: Catalog ── */}
-                <div className="flex-1 flex flex-col border-r border-gray-100 overflow-hidden">
-                    <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100 flex-shrink-0">
+                {/* ── LEFT: Catalog (full-width on mobile, 1fr on desktop) ── */}
+                <div className="flex-1 flex flex-col md:border-r border-gray-100 overflow-hidden">
+                    {/* ── Warehouse selector banner ── */}
+                    <div className="flex items-center gap-3 px-5 py-3 mx-5 mt-4 mb-1 rounded-xl bg-indigo-50 border border-indigo-100 flex-shrink-0">
+                        <Warehouse
+                            size={13}
+                            className="text-indigo-500 flex-shrink-0"
+                        />
+                        <span className="text-xs font-medium text-indigo-800 whitespace-nowrap">
+                            Source warehouse:
+                        </span>
+                        <select
+                            value={selectedWarehouseId}
+                            onChange={(e) =>
+                                setSelectedWarehouseId(e.target.value)
+                            }
+                            className="flex-1 max-w-xs border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option value="" disabled hidden>
+                                Select a warehouse
+                            </option>
+                            {warehouseLocations?.map((loc) => (
+                                <option key={loc.id} value={loc.id}>
+                                    {loc.name}
+                                </option>
+                            ))}
+                        </select>
+                        {selectedWarehouseId && (
+                            <span className="text-[10px] text-indigo-600 font-semibold flex items-center gap-1">
+                                <CheckCircle2 size={10} /> Selected
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 px-4 sm:px-5 py-3.5 border-b border-gray-100 flex-shrink-0">
                         <div className="relative flex-1">
                             <Search
                                 size={13}
@@ -769,7 +915,7 @@ export default function NewOrderPage() {
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder="Search by name or SKU…"
-                                className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 sm:py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                             />
                         </div>
                         <select
@@ -781,7 +927,7 @@ export default function NewOrderPage() {
                                         : "",
                                 )
                             }
-                            className="py-2 px-3 text-xs border border-gray-200 rounded-lg outline-none focus:border-indigo-400 bg-white text-gray-600 cursor-pointer transition-all"
+                            className="py-2.5 sm:py-2 px-3 text-xs border border-gray-200 rounded-lg outline-none focus:border-indigo-400 bg-white text-gray-600 cursor-pointer transition-all"
                         >
                             <option value="">All categories</option>
                             {(categories ?? []).map((c) => (
@@ -792,13 +938,14 @@ export default function NewOrderPage() {
                         </select>
                     </div>
 
-                    <div className="px-5 py-2 text-[11px] text-gray-300 flex-shrink-0">
+                    <div className="px-4 sm:px-5 py-2 text-[11px] text-gray-300 flex-shrink-0">
                         {filteredItems.length} item
                         {filteredItems.length !== 1 ? "s" : ""} available to
                         order
                     </div>
 
-                    <div className="flex-1 overflow-y-auto px-5 pb-5">
+                    {/* Extra bottom padding on mobile so last item clears the sticky bar */}
+                    <div className="flex-1 overflow-y-auto px-4 sm:px-5 pb-28 md:pb-5">
                         {catalogLoading ? (
                             <div className="flex items-center justify-center py-16 gap-2 text-gray-400">
                                 <Loader2 size={16} className="animate-spin" />
@@ -857,37 +1004,38 @@ export default function NewOrderPage() {
                     </div>
                 </div>
 
-                {/* ── RIGHT: Order summary ── */}
-                <div className="w-72 flex flex-col flex-shrink-0 bg-gray-50/50">
-                    {/* Stats */}
-                    <div className="px-4 pt-4 pb-3 border-b border-gray-100 bg-white flex-shrink-0">
-                        <div className="flex items-center gap-2 mb-3">
+                {/* ── RIGHT: Order summary — hidden on mobile, visible md+ ── */}
+                <div className="hidden md:flex w-[420px] flex-col flex-shrink-0 bg-gray-50/50 border-l border-gray-100">
+                    {/* Stats header */}
+                    <div className="px-5 pt-5 pb-4 border-b border-gray-100 bg-white flex-shrink-0">
+                        <div className="flex items-center gap-2 mb-4">
                             <ShoppingCart
-                                size={14}
+                                size={15}
                                 className="text-indigo-500"
                             />
-                            <span className="text-sm font-bold text-gray-900">
+                            <span className="text-base font-bold text-gray-900">
                                 Order summary
                             </span>
                             {hasItems && (
                                 <span className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
-                                    {totalItems}
+                                    {totalItems} item
+                                    {totalItems !== 1 ? "s" : ""}
                                 </span>
                             )}
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-3">
                             {[
                                 { val: totalItems, label: "Line items" },
                                 { val: totalBoxes, label: "Total boxes" },
                             ].map(({ val, label }) => (
                                 <div
                                     key={label}
-                                    className="bg-gray-100 rounded-lg px-3 py-2"
+                                    className="bg-gray-100 rounded-xl px-4 py-3"
                                 >
-                                    <div className="text-lg font-bold text-gray-900 tracking-tight">
+                                    <div className="text-2xl font-bold text-gray-900 tracking-tight">
                                         {val}
                                     </div>
-                                    <div className="text-[10px] text-gray-400 mt-0.5">
+                                    <div className="text-xs text-gray-400 mt-0.5">
                                         {label}
                                     </div>
                                 </div>
@@ -895,23 +1043,23 @@ export default function NewOrderPage() {
                         </div>
                     </div>
 
-                    {/* Cart items */}
-                    <div className="flex-1 overflow-y-auto px-3 py-3">
+                    {/* Cart items — scrollable middle section */}
+                    <div className="flex-1 overflow-y-auto px-5 py-4">
                         {!hasItems ? (
-                            <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                            <div className="flex flex-col items-center justify-center h-full text-center py-10">
                                 <ShoppingCart
-                                    size={24}
-                                    className="text-gray-200 mb-2"
+                                    size={28}
+                                    className="text-gray-200 mb-3"
                                 />
-                                <p className="text-xs font-medium text-gray-400">
+                                <p className="text-sm font-medium text-gray-400">
                                     No items added yet
                                 </p>
-                                <p className="text-[11px] text-gray-300 mt-1">
+                                <p className="text-xs text-gray-300 mt-1">
                                     Browse the catalog and add box quantities
                                 </p>
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-1.5">
+                            <div className="flex flex-col gap-2">
                                 {cartEntries.map((entry) => (
                                     <CartRow
                                         key={entry.item.id}
@@ -925,54 +1073,62 @@ export default function NewOrderPage() {
                         )}
                     </div>
 
-                    {/* Delivery + title + notes + actions */}
-                    <div className="px-3 pb-4 pt-3 border-t border-gray-100 bg-white flex-shrink-0 flex flex-col gap-3">
+                    {/* Delivery + title + notes + actions — fixed bottom */}
+                    <div className="px-5 pb-5 pt-4 border-t border-gray-100 bg-white flex-shrink-0 flex flex-col gap-4">
                         <DeliveryTypeSelector
                             value={deliveryType}
                             onChange={setDeliveryType}
                         />
 
-                        {/* Order Title */}
-                        <div>
-                            <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
-                                Order Title{" "}
-                                <span className="font-normal text-gray-300">
-                                    (optional)
-                                </span>
-                            </label>
-                            <input
-                                type="text"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder="e.g. Nutella for Bay Ridge…"
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                            />
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                    Order Title{" "}
+                                    <span className="font-normal text-gray-300">
+                                        (optional)
+                                    </span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    placeholder="e.g. Nutella restock…"
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                    Notes{" "}
+                                    <span className="font-normal text-gray-300">
+                                        (optional)
+                                    </span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    placeholder="e.g. Prioritize Nutella…"
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                            </div>
                         </div>
 
-                        {/* Notes */}
-                        <div>
-                            <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
-                                Notes{" "}
-                                <span className="font-normal text-gray-300">
-                                    (optional)
-                                </span>
-                            </label>
-                            <textarea
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                                rows={2}
-                                placeholder="e.g. Please prioritize Nutella…"
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                            />
-                        </div>
-
-                        <div className="flex flex-col gap-2">
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleDraft}
+                                disabled={
+                                    !hasItems || isSubmitting || missingContext
+                                }
+                                className="flex-1 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 text-sm font-semibold transition-all"
+                            >
+                                Save Draft
+                            </button>
                             <button
                                 onClick={handleSubmit}
                                 disabled={
                                     !hasItems || isSubmitting || missingContext
                                 }
-                                className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all hover:enabled:-translate-y-px hover:enabled:shadow-[0_4px_12px_rgba(99,102,241,.3)] flex items-center justify-center gap-2"
+                                className="flex-[2] py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all hover:enabled:-translate-y-px hover:enabled:shadow-[0_4px_12px_rgba(99,102,241,.3)] flex items-center justify-center gap-2"
                             >
                                 {isSubmitting && (
                                     <Loader2
@@ -982,25 +1138,224 @@ export default function NewOrderPage() {
                                 )}
                                 Submit Order
                             </button>
-                            <button
-                                onClick={handleDraft}
-                                disabled={
-                                    !hasItems || isSubmitting || missingContext
-                                }
-                                className="w-full py-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 text-sm font-semibold transition-all"
-                            >
-                                Save as Draft
-                            </button>
                         </div>
 
                         <p className="text-[10px] text-gray-300 text-center leading-relaxed">
                             Submitting sends this order to the warehouse for
-                            fulfillment. Store admins cannot see warehouse stock
-                            levels.
+                            fulfillment.
                         </p>
                     </div>
                 </div>
             </div>
+
+            {/* ── Mobile sticky cart bar (hidden on md+) ── */}
+            <div className="md:hidden flex-shrink-0 border-t border-gray-200 bg-white px-4 py-3 safe-area-bottom">
+                {hasItems ? (
+                    <div className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-gray-900 truncate">
+                                {totalItems} item{totalItems !== 1 ? "s" : ""} ·{" "}
+                                {totalBoxes} box
+                                {totalBoxes !== 1 ? "es" : ""}
+                            </p>
+                            <p className="text-[11px] text-gray-400">
+                                Tap to review before submitting
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setReviewSheetOpen(true)}
+                            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 text-white text-sm font-semibold shadow-[0_2px_12px_rgba(99,102,241,.35)] active:scale-95 transition-transform"
+                        >
+                            <ShoppingCart size={15} />
+                            Review
+                            <ChevronUp size={14} className="opacity-70" />
+                        </button>
+                    </div>
+                ) : (
+                    <p className="text-xs text-gray-400 text-center py-1">
+                        Add items from the catalog to start your order
+                    </p>
+                )}
+            </div>
+
+            {/* ── Mobile order-review bottom sheet ── */}
+            <Sheet
+                isOpen={reviewSheetOpen}
+                onClose={() => setReviewSheetOpen(false)}
+                snapPoints={[0, 0.92, 1]}
+                initialSnap={1}
+                className="md:hidden"
+            >
+                <Sheet.Container>
+                    <Sheet.Header />
+                    <Sheet.Content>
+                        <div className="overflow-y-auto px-4 pb-10">
+                            <div className="flex items-center gap-2 mb-4">
+                                <ShoppingCart
+                                    size={16}
+                                    className="text-indigo-500"
+                                />
+                                <span className="text-base font-bold text-gray-900">
+                                    Order Summary
+                                </span>
+                                <span className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
+                                    {totalItems} item
+                                    {totalItems !== 1 ? "s" : ""}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mb-4">
+                                {[
+                                    { val: totalItems, label: "Line items" },
+                                    { val: totalBoxes, label: "Total boxes" },
+                                ].map(({ val, label }) => (
+                                    <div
+                                        key={label}
+                                        className="bg-gray-100 rounded-xl px-4 py-3"
+                                    >
+                                        <div className="text-xl font-bold text-gray-900 tracking-tight">
+                                            {val}
+                                        </div>
+                                        <div className="text-[11px] text-gray-400 mt-0.5">
+                                            {label}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="flex flex-col gap-1.5 mb-5">
+                                {cartEntries.map((entry) => (
+                                    <CartRow
+                                        key={entry.item.id}
+                                        entry={entry}
+                                        onRemove={() => {
+                                            handleRemove(entry.item.id);
+                                            if (Object.keys(cart).length <= 1) {
+                                                setReviewSheetOpen(false);
+                                            }
+                                        }}
+                                    />
+                                ))}
+                            </div>
+
+                            <div className="border-t border-gray-100 mb-4" />
+
+                            {/* Warehouse selector in sheet */}
+                            <div className="flex items-center gap-3 px-4 py-2.5 mb-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                                <Warehouse
+                                    size={13}
+                                    className="text-indigo-500 flex-shrink-0"
+                                />
+                                <span className="text-xs font-medium text-indigo-800 whitespace-nowrap">
+                                    Warehouse:
+                                </span>
+                                <select
+                                    value={selectedWarehouseId}
+                                    onChange={(e) =>
+                                        setSelectedWarehouseId(e.target.value)
+                                    }
+                                    className="flex-1 border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="" disabled hidden>
+                                        Select a warehouse
+                                    </option>
+                                    {warehouseLocations?.map((loc) => (
+                                        <option key={loc.id} value={loc.id}>
+                                            {loc.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex flex-col gap-4 mb-5">
+                                <DeliveryTypeSelector
+                                    value={deliveryType}
+                                    onChange={setDeliveryType}
+                                />
+
+                                <div>
+                                    <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                        Order Title{" "}
+                                        <span className="font-normal text-gray-300">
+                                            (optional)
+                                        </span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={title}
+                                        onChange={(e) =>
+                                            setTitle(e.target.value)
+                                        }
+                                        placeholder="e.g. Nutella for Bay Ridge…"
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                        Notes{" "}
+                                        <span className="font-normal text-gray-300">
+                                            (optional)
+                                        </span>
+                                    </label>
+                                    <textarea
+                                        value={notes}
+                                        onChange={(e) =>
+                                            setNotes(e.target.value)
+                                        }
+                                        rows={2}
+                                        placeholder="e.g. Please prioritize Nutella…"
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={() => {
+                                        setReviewSheetOpen(false);
+                                        handleSubmit();
+                                    }}
+                                    disabled={
+                                        !hasItems ||
+                                        isSubmitting ||
+                                        missingContext
+                                    }
+                                    className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-[0_2px_12px_rgba(99,102,241,.3)]"
+                                >
+                                    {isSubmitting && (
+                                        <Loader2
+                                            size={14}
+                                            className="animate-spin"
+                                        />
+                                    )}
+                                    Submit Order
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setReviewSheetOpen(false);
+                                        handleDraft();
+                                    }}
+                                    disabled={
+                                        !hasItems ||
+                                        isSubmitting ||
+                                        missingContext
+                                    }
+                                    className="w-full py-3.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 text-sm font-semibold transition-all"
+                                >
+                                    Save as Draft
+                                </button>
+                            </div>
+
+                            <p className="text-[10px] text-gray-300 text-center mt-3 leading-relaxed">
+                                Submitting sends this order to the warehouse for
+                                fulfillment.
+                            </p>
+                        </div>
+                    </Sheet.Content>
+                </Sheet.Container>
+                <Sheet.Backdrop onTap={() => setReviewSheetOpen(false)} />
+            </Sheet>
         </div>
     );
 }

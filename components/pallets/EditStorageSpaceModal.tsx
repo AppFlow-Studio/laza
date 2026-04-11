@@ -6,6 +6,7 @@ import { PalletWithDetails } from "@/lib/supabase/queries/pallets";
 import { useUpdatePalletStorageSpace } from "@/lib/hooks/queries/usePallets";
 import { useLocationWithDetails } from "@/lib/hooks/queries/useLocations";
 import toast from "react-hot-toast";
+import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
 
 interface EditStorageSpaceModalProps {
   pallet: PalletWithDetails;
@@ -36,8 +37,8 @@ export function EditStorageSpaceModal({
       await updateSpace({ palletId: pallet.id, storageSpaceId: selectedSpaceId });
       toast.success("Storage space updated.");
       onClose();
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to update.");
+    } catch (err: unknown) {
+      toast.error(getFriendlyErrorMessage(err));
     }
   };
 

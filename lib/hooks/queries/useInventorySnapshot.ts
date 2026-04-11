@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createInventorySnapshot, type SnapshotItem } from '@/lib/supabase/queries/inventorySnapshot';
+import { createInventorySnapshot, seedAllItemsToLocation, type SnapshotItem } from '@/lib/supabase/queries/inventorySnapshot';
 
 // /**
 //  * useCreateInventorySnapshot
@@ -28,6 +28,32 @@ export function useCreateInventorySnapshot() {
             userId: string;
             items: SnapshotItem[];
         }) => createInventorySnapshot(locationId, userId, items),
+
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['inventory'] });
+            queryClient.invalidateQueries({ queryKey: ['alerts'] });
+            queryClient.invalidateQueries({ queryKey: ['inventoryLogs'] });
+        },
+    });
+}
+
+export function useSeedAllItemsToLocation() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            locationId,
+            organizationId,
+            storageSpaceId,
+            userId,
+            alreadyAssignedItemIds,
+        }: {
+            locationId: string;
+            organizationId: string;
+            storageSpaceId: string;
+            userId: string;
+            alreadyAssignedItemIds?: string[];
+        }) => seedAllItemsToLocation(locationId, organizationId, storageSpaceId, userId, alreadyAssignedItemIds),
 
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['inventory'] });

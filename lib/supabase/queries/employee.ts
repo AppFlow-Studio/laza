@@ -6,15 +6,15 @@ import { Location, StorageSpace } from '../types';
 export async function getEmployeeLocation(userId: string) {
     const supabase = await createServerSupabaseClient();
 
-    // Get user's assigned location
-    const { data: user, error: userError } = await supabase
-        .from('users')
-        .select('assigned_location_id')
-        .eq('id', userId)
+    // Get user's assigned location from junction table
+    const { data: assignment, error: assignmentError } = await supabase
+        .from('user_location_assignments')
+        .select('location_id')
+        .eq('user_id', userId)
         .single();
 
-    if (userError) throw userError;
-    if (!user?.assigned_location_id) {
+    if (assignmentError) throw assignmentError;
+    if (!assignment?.location_id) {
         throw new Error('No location assigned to employee');
     }
 
@@ -22,7 +22,7 @@ export async function getEmployeeLocation(userId: string) {
     const { data: location, error: locationError } = await supabase
         .from('locations')
         .select('*')
-        .eq('id', user.assigned_location_id)
+        .eq('id', assignment.location_id)
         .single();
 
     if (locationError) {

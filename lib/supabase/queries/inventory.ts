@@ -357,6 +357,7 @@ export async function bulkAssignItemsToStorage(
         current_quantity: quantity,
         min_quantity_override: minQuantityOverride !== undefined ? minQuantityOverride : null,
         last_updated: new Date().toISOString(),
+        organization_id: organizationId,
     }));
 
     // Bulk upsert item_locations

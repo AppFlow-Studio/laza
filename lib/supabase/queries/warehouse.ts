@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerSupabaseClient } from "../server";
+import { createServerSupabaseClient, createServiceRoleClient } from "../server";
 
 // ============================================================
 // Types
@@ -89,7 +89,7 @@ export type WarehouseStats = {
 // ============================================================
 
 export async function getWarehouses(organizationId: string) {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServiceRoleClient();
     const { data, error } = await supabase
         .from("locations")
         .select(
@@ -100,8 +100,8 @@ export async function getWarehouses(organizationId: string) {
         )
         .eq("organization_id", organizationId)
         .eq("location_type", "warehouse")
-        .eq("is_active", true)
         .order("created_at", { ascending: true });
+
 
     if (error) throw error;
     return (data ?? []) as WarehouseLocation[];
@@ -387,7 +387,7 @@ export async function getWarehouseOverview(
     if (mode === "pallet") {
         const { data, error } = await baseQuery
             .order("pallet_label")
-            .order("display_label");
+            .order("item_display_label");
         if (error) throw error;
         return data;
     }

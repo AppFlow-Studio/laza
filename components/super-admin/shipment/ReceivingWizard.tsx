@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { useConfirmPOReceipt, useAssignShipmentToPallets } from "@/lib/hooks/queries/useReceiving";
 import { PhaseAStep, type PhaseAData } from "./PhaseAStep";
 import { PhaseBStep, type PhaseBData } from "./PhaseBStep";
+import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
 
 type POForReceiving = {
     id: string;
@@ -113,8 +114,8 @@ export function ReceivingWizard({
             setPhaseADone(true);
             toast.success("Warehouse stock updated. Now assign items to pallets.");
             goTo(2);
-        } catch (err: any) {
-            toast.error(err.message ?? "Failed to confirm receipt. Please try again.");
+        } catch (err: unknown) {
+            toast.error(getFriendlyErrorMessage(err));
         }
     };
 
@@ -147,8 +148,8 @@ export function ReceivingWizard({
                 `Shipment received. ${data.pallets.length} pallet${data.pallets.length !== 1 ? "s" : ""} created.`
             );
             onComplete();
-        } catch (err: any) {
-            toast.error(err.message ?? "Failed to create pallets. Please try again.");
+        } catch (err: unknown) {
+            toast.error(getFriendlyErrorMessage(err));
         }
     };
 

@@ -20,6 +20,23 @@ export async function createWarehouseExpenseAction(
     return data;
 }
 
+export async function updateWarehouseExpenseTitleAction(
+    id: string,
+    title: string | null,
+): Promise<WarehouseExpense> {
+    const supabase = createServiceRoleClient();
+
+    const { data, error } = await supabase
+        .from("warehouse_expenses")
+        .update({ title })
+        .eq("id", id)
+        .select()
+        .single();
+
+    if (error) throw new Error(error.message);
+    return data;
+}
+
 export async function getWarehouseExpensesAction(
     organizationId: string,
     filters?: WarehouseExpenseFilters,

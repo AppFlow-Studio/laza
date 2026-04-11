@@ -50,7 +50,9 @@ const ROLE_CONFIG: Record<
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type UserWithLocation = UserType & { assigned_location?: { id: string; name: string } | null };
+type UserWithLocation = UserType & {
+    assigned_locations?: { id: string; name: string; location_type?: string }[];
+};
 
 interface UserGroup {
     key: string;
@@ -292,22 +294,22 @@ export default function UserTable({ users, onEdit }: UserTableProps) {
                 continue;
             }
 
-            // 2. Admins with no assigned location → org-wide section
-            if (user.role === "admin" && !user.assigned_location_id) {
+            // 2. Admins with no assigned locations → org-wide section
+            if (user.role === "admin" && (!user.assigned_locations || user.assigned_locations.length === 0)) {
                 orgWideAdmins.push(user);
                 continue;
             }
 
-            // 3. Users with an assigned location → group by location
-            if (user.assigned_location_id && user.assigned_location) {
-                const locId = user.assigned_location_id;
-                if (!locationMap.has(locId)) {
-                    locationMap.set(locId, {
-                        name: user.assigned_location.name,
-                        users: [],
-                    });
+            // 3. Users with assigned location(s) → group by location
+            if (user.assigned_locations && user.assigned_locations.length > 0) {
+                for (const loc of user.assigned_locations) {
+                    if (!locationMap.has(loc.id)) {
+                        locationMap.set(loc.id, { name: loc.name, users: [] });
+                    }
+                    if (!locationMap.get(loc.id)!.users.find((u) => u.id === user.id)) {
+                        locationMap.get(loc.id)!.users.push(user);
+                    }
                 }
-                locationMap.get(locId)!.users.push(user);
                 continue;
             }
 

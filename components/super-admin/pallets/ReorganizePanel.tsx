@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useMoveBoxesBetweenPallets } from "@/lib/hooks/queries/useReorganize";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -265,8 +266,8 @@ export function ReorganizePanel({
             const destLabel = destMode === "new" ? newPalletLabel : destPallet?.pallet_label ?? "pallet";
             toast.success(`${totalMoving} box${totalMoving !== 1 ? "es" : ""} moved from ${sourcePallet.pallet_label} to ${destLabel}.`);
             onComplete();
-        } catch (err: any) {
-            toast.error(err.message ?? "Move failed. Please try again.");
+        } catch (err: unknown) {
+            toast.error(getFriendlyErrorMessage(err));
         }
     }
 

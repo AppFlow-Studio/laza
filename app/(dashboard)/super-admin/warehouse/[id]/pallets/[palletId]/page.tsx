@@ -2,8 +2,8 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, MoveRight } from "lucide-react";
-import { usePallet, usePalletOperationsLog } from "@/lib/hooks/queries/usePallets";
+import { ArrowLeft, MoveRight, Archive } from "lucide-react";
+import { usePallet, usePalletOperationsLog, useRetirePallet } from "@/lib/hooks/queries/usePallets";
 import { PalletStatusBadge } from "@/components/pallets/PalletStatusBadge";
 import { FillLevelBar } from "@/components/pallets/FillLevelBar";
 import { PalletContentsTable } from "@/components/pallets/PalletContentsTable";
@@ -16,6 +16,7 @@ export default function PalletDetailPage() {
 
 	const { data: pallet, isLoading } = usePallet(palletId);
 	const { data: activityLog, isLoading: logLoading } = usePalletOperationsLog(palletId);
+	const { mutate: retirePallet, isPending: isRetiring } = useRetirePallet();
 
 	if (isLoading) {
 		return <PalletDetailSkeleton />;
@@ -55,6 +56,16 @@ export default function PalletDetailPage() {
 					</h1>
 					<PalletStatusBadge status={pallet.status as "active" | "empty" | "retired"} />
 				</div>
+				{pallet.status === "empty" && (
+					<button
+						onClick={() => retirePallet(pallet.id)}
+						disabled={isRetiring}
+						className="flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm transition-colors hover:bg-red-50 disabled:opacity-50"
+					>
+						<Archive className="h-4 w-4" />
+						{isRetiring ? "Retiring…" : "Retire Pallet"}
+					</button>
+				)}
 				<button
 					onClick={() =>
 						router.push(`/super-admin/warehouse/pallets/reorganize?${params.toString()}`)
@@ -67,7 +78,18 @@ export default function PalletDetailPage() {
 			</div>
 
 			{/* ── Info Cards ── */}
-			<div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+			<div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+				<InfoCard label="Location">
+					{pallet.warehouse ? (
+						<div className="flex flex-col gap-1">
+							<span className="text-sm font-medium text-gray-900">
+                {pallet.warehouse.name}
+              </span>
+						</div>
+					) : (
+						<span className="text-sm text-gray-400">Unassigned</span>
+					)}
+				</InfoCard>
 				{/* Source PO */}
 				<InfoCard label="Source Shipment">
 					{pallet.purchase_orders ? (

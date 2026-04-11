@@ -48,3 +48,4 @@ npm run lint         # Run ESLint
 | [Notifications](./notifications.md) | Email system, templates, edge functions |
 | [Public Site](./public-site.md) | Public-facing pages overview |
 | [API Reference](./api-reference.md) | All queries, mutations, and hooks |
+| [Phase 5 E2E Tests](./phase5-e2e-test-scenarios.md) | Backend QA scenarios for the Phase 5 release |

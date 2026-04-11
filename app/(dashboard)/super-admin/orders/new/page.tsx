@@ -11,9 +11,8 @@
  *        shipment's pieces_per_box to use when ordering.
  *      → Falls back to items.box_quantity if no shipment history.
  *
- *   2. "Sourcing from XYZ Warehouse" banner
- *      → useWarehouseLocation() already fetches the single warehouse.
- *        One warehouse per org for now — show it clearly in the UI.
+ *   2. Warehouse picker (replaces static "Sourcing from" banner)
+ *      → Fetches all warehouse-type locations and lets admin select one.
  *
  *   3. Store picker (super admin only — passed via `isSuperAdmin` prop)
  */
@@ -35,14 +34,10 @@ import {
     MapPin,
     Warehouse,
     ChevronDown,
-    History,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useOrganization } from "@clerk/nextjs";
-import {
-    useWarehouseCatalog,
-    useWarehouseLocation,
-} from "@/lib/hooks/queries/useWarehouse";
+import { useWarehouseCatalog } from "@/lib/hooks/queries/useWarehouse";
 import { useCategories } from "@/lib/hooks/queries/useCategories";
 import { useCreateTicket } from "@/lib/hooks/queries/useOrderTickets";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
@@ -62,8 +57,6 @@ type DeliveryType = "company" | "self";
 type CartEntry = {
     item: WarehouseCatalogItem & { box_quantity: number };
     boxes: number;
-    // The selected config for this line item.
-    // null = use items.box_quantity (the static fallback)
     selectedConfig: ShipmentBoxConfig | null;
 };
 
@@ -83,7 +76,6 @@ function validateBoxQty(val: string | number): {
     return { ok: true, value: n };
 }
 
-// Effective pieces per box — from selected shipment config or item default
 function effectivePiecesPerBox(
     item: WarehouseCatalogItem & { box_quantity: number },
     config: ShipmentBoxConfig | null,
@@ -92,9 +84,6 @@ function effectivePiecesPerBox(
 }
 
 // ─── useItemShipmentConfigs ───────────────────────────────────────────────────
-// Fetches available shipment box configs for a given item via RPC.
-// Falls back to empty array if RPC not deployed yet (D8 task).
-// This is a simple inline hook since it's only used in this file.
 
 function useItemShipmentConfigs(
     itemId: number | null,
@@ -106,10 +95,9 @@ function useItemShipmentConfigs(
     useEffect(() => {
         if (!itemId || !organizationId) return;
         setLoading(true);
-
         getItemShipmentHistory(itemId, organizationId)
             .then((result) => {
-                console.log("shipment configs for item", itemId, result); // ← add this
+                console.log("shipment configs for item", itemId, result);
                 setConfigs(result);
             })
             .finally(() => setLoading(false));
@@ -119,8 +107,7 @@ function useItemShipmentConfigs(
 }
 
 // ─── ShipmentConfigPicker ─────────────────────────────────────────────────────
-// Shown inline below an item when it's being added to the cart.
-// Lets the admin select which shipment's pieces_per_box to use.
+
 function ShipmentConfigPicker({
     item,
     organizationId,
@@ -148,7 +135,6 @@ function ShipmentConfigPicker({
         );
     }
 
-    // No shipment history — nothing to pick
     if (configs.length === 0) {
         return (
             <div className="flex items-center gap-1 mt-2 text-[10px] text-gray-400 py-1">
@@ -213,14 +199,12 @@ function ShipmentConfigPicker({
                 })}
             </div>
 
-            {/* Red error message */}
             {hasError && (
                 <p className="mt-1.5 text-[11px] text-red-500 font-medium flex items-center gap-1">
                     <AlertCircle size={10} /> Choose a box config to proceed
                 </p>
             )}
 
-            {/* supplier/date detail unchanged */}
             {selectedConfig &&
                 (selectedConfig.supplierName || selectedConfig.poDate) && (
                     <p className="text-[10px] text-gray-400 mt-1.5">
@@ -390,10 +374,9 @@ function CatalogItemRow({
             setError(v.error ?? null);
             return;
         }
-        // If item has shipment configs, one MUST be selected
         if (requiresConfigSelection && !localConfig) {
             setConfigError(true);
-            setShowConfigPicker(true); // auto-open the picker
+            setShowConfigPicker(true);
             return;
         }
         setError(null);
@@ -433,7 +416,6 @@ function CatalogItemRow({
                         </span>
                     )}
 
-                    {/* Config pill — shows active config or toggle to show picker */}
                     <button
                         onClick={() => setShowConfigPicker((p) => !p)}
                         className={`flex items-center gap-1 mt-1.5 text-[11px] transition-colors group ${
@@ -461,7 +443,6 @@ function CatalogItemRow({
                         />
                     </button>
 
-                    {/* Shipment config picker — expanded inline */}
                     {showConfigPicker && (
                         <ShipmentConfigPicker
                             item={item}
@@ -599,19 +580,24 @@ export default function NewOrderPage() {
     const organizationId = organization?.id ?? "";
     const requestedBy = userInfo?.id ?? "";
 
-    // ── Warehouse (Feature 2 — sourcing banner) ────────────────────────────────
-    // One warehouse per org. useWarehouseLocation() returns the single warehouse.
-    // We show its name in the "Sourcing from" banner.
-    const { data: warehouseLocation } = useWarehouseLocation();
-    const warehouseLocationId = warehouseLocation?.id ?? "";
-
-    // ── Store selector ─────────────────────────────────────────────────────────
+    // ── Locations ─────────────────────────────────────────────────────────────
     const { data: locations } = useLocations();
+
+    const warehouseLocations = useMemo(
+        () => (locations ?? []).filter((l) => l.location_type === "warehouse"),
+        [locations],
+    );
+
     const storeLocations = useMemo(
         () => (locations ?? []).filter((l) => l.location_type === "store"),
         [locations],
     );
+
+    // ── Selected warehouse & store ─────────────────────────────────────────────
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
     const [selectedLocationId, setSelectedLocationId] = useState("");
+
+    const warehouseLocationId = selectedWarehouseId;
     const requestingLocationId = selectedLocationId;
 
     // ── Catalog ────────────────────────────────────────────────────────────────
@@ -690,7 +676,6 @@ export default function NewOrderPage() {
         );
     }, []);
 
-    // Feature 1 — when admin changes shipment config for an item already in cart
     const handleConfigChange = useCallback(
         (itemId: number, config: ShipmentBoxConfig | null) => {
             setCart((prev) =>
@@ -722,7 +707,6 @@ export default function NewOrderPage() {
             return {
                 itemId: e.item.id,
                 quantityBoxes: e.boxes,
-                // Use selected shipment config's pieces_per_box for accurate unit count
                 quantityUnits: e.boxes * ppb,
             };
         }),
@@ -733,7 +717,7 @@ export default function NewOrderPage() {
 
     const handleDraft = async () => {
         if (missingContext) {
-            toast.error("Select a store first");
+            toast.error("Select a store and warehouse first");
             return;
         }
         try {
@@ -747,7 +731,7 @@ export default function NewOrderPage() {
 
     const handleSubmit = async () => {
         if (missingContext) {
-            toast.error("Select a store first");
+            toast.error("Select a store and warehouse first");
             return;
         }
         try {
@@ -778,45 +762,42 @@ export default function NewOrderPage() {
                         Browse the warehouse catalog and build your order
                     </p>
                 </div>
-                {!warehouseLocationId && !catalogLoading && (
-                    <div className="ml-auto flex items-center gap-1.5 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg">
-                        <AlertCircle size={11} /> Warehouse not configured
-                    </div>
-                )}
             </div>
 
-            <div className="flex items-center gap-3">
-                {/* ── Feature 2: Sourcing warehouse banner ── */}
-                {warehouseLocation && (
-                    <div className="w-full h-20 rounded-xl flex flex-col items-start gap-2.5 ml-6 my-2 px-6 py-2.5 bg-indigo-50 border-b border-indigo-100">
-                        <div className="flex items-center gap-3">
-                            <Warehouse
-                                size={13}
-                                className="text-indigo-500 flex-shrink-0"
-                            />
-                            <span className="text-sm font-medium text-indigo-700">
-                                Sourcing from{" "}
-                                <strong>{warehouseLocation.name}:</strong>
-                            </span>
-                        </div>
-                        {warehouseLocation.address && (
-                            <span className="text-[11px] text-indigo-400 ml-1">
-                                {typeof warehouseLocation.address === "object"
-                                    ? [
-                                          (warehouseLocation.address as any)
-                                              .street,
-                                          (warehouseLocation.address as any)
-                                              .city,
-                                      ]
-                                          .filter(Boolean)
-                                          .join(", ")
-                                    : warehouseLocation.address}
-                            </span>
-                        )}
-                    </div>
-                )}
-                {/* ── Store selector ── */}
-                <div className="w-full h-20 flex items-center gap-3 mr-6 my-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+            {/* ── Warehouse + Store selectors ── */}
+            <div className="flex items-center gap-3 px-6 py-3 border-b border-gray-100 flex-shrink-0">
+                {/* Warehouse selector */}
+                <div className="flex-1 flex items-center gap-3 px-4 py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl">
+                    <Warehouse
+                        size={13}
+                        className="text-indigo-500 flex-shrink-0"
+                    />
+                    <span className="text-xs font-medium text-indigo-800 whitespace-nowrap">
+                        Source warehouse:
+                    </span>
+                    <select
+                        value={selectedWarehouseId}
+                        onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                        className="flex-1 max-w-xs border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="" disabled hidden>
+                            Select a warehouse
+                        </option>
+                        {warehouseLocations.map((loc) => (
+                            <option key={loc.id} value={loc.id}>
+                                {loc.name}
+                            </option>
+                        ))}
+                    </select>
+                    {selectedWarehouseId && (
+                        <span className="text-[10px] text-indigo-600 font-semibold flex items-center gap-1">
+                            <CheckCircle2 size={10} /> Selected
+                        </span>
+                    )}
+                </div>
+
+                {/* Store selector */}
+                <div className="flex-1 flex items-center gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
                     <MapPin
                         size={13}
                         className="text-amber-600 flex-shrink-0"
@@ -840,7 +821,7 @@ export default function NewOrderPage() {
                     </select>
                     {selectedLocationId && (
                         <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
-                            <CheckCircle2 size={10} /> Store selected
+                            <CheckCircle2 size={10} /> Selected
                         </span>
                     )}
                 </div>
