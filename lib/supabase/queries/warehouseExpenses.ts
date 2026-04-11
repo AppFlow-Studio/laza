@@ -146,7 +146,10 @@ export async function updateExpenseRate(
 
     const { data, error } = await supabase
         .from("warehouse_expense_rates")
-        .update({ default_rate: newRate })
+        .upsert(
+            { organization_id: organizationId, expense_type: expenseType, default_rate: newRate },
+            { onConflict: "organization_id,expense_type" },
+        )
         .eq("organization_id", organizationId)
         .eq("expense_type", expenseType)
         .select()

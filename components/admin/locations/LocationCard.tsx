@@ -140,7 +140,7 @@ export default function LocationCard({
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {locations.map((location) => (
+                            {locations?.map((location) => (
                                 <TableRow key={location.id}>
                                     <TableCell className="font-medium">
                                         {location.name}
@@ -226,7 +226,7 @@ export default function LocationCard({
     return (
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {locations.map((location) => (
+                {locations?.map((location) => (
                     <motion.div
                         key={location.id}
                         whileHover={{ scale: 1.02 }}
