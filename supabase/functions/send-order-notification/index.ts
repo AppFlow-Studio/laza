@@ -64,7 +64,7 @@ serve(async (req: Request) => {
 
         // Send via Resend
         const { data: sendResult, error: sendError } = await resend.emails.send({
-            from:    "Laza Warehouse <warehouse@lazadessert.com>",
+            from:    "Laza Warehouse <warehouse@lazadessert.cafe>",
             to:      recipients,
             subject,
             html,

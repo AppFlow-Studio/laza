@@ -54,6 +54,7 @@ type QueueTicket = {
     submitted_at: string | null;
     created_at: string;
     is_auto_approved: boolean;
+    has_discrepancy: boolean;
     title: string | null;
     notes: string | null;
     requesting_location: { id: string; name: string } | null;
@@ -156,6 +157,7 @@ const FILTER_CHIPS: { key: TicketStatus | "all"; label: string }[] = [
     { key: "fulfilled", label: "Fulfilled" },
     { key: "confirmed", label: "Confirmed" },
     { key: "rejected", label: "Rejected" },
+    { key: "discrepancy" as any, label: "Discrepancies" },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -255,10 +257,12 @@ export default function SuperAdminOrdersPage() {
     const { organization } = useOrganization();
     const organizationId = organization?.id ?? "";
 
-    const { data: rawTickets, isLoading } = useAllTickets(organizationId);
+    const { data: rawTickets, isLoading } = useAllTickets(organizationId, {
+        excludeCancelled: true,
+    });
     const tickets = (rawTickets ?? []) as QueueTicket[];
 
-    const [activeFilter, setActiveFilter] = useState<TicketStatus | "all">(
+    const [activeFilter, setActiveFilter] = useState<TicketStatus | "all" | "discrepancy">(
         "submitted",
     );
     const [search, setSearch] = useState("");
@@ -282,8 +286,13 @@ export default function SuperAdminOrdersPage() {
     const counts = useMemo(() => {
         const map: Record<string, number> = { all: tickets.length };
         FILTER_CHIPS.forEach(({ key }) => {
-            if (key !== "all")
-                map[key] = tickets.filter((t) => t.status === key).length;
+            if (key !== "all") {
+                if (key === "discrepancy") {
+                    map[key] = tickets.filter((t) => t.has_discrepancy).length;
+                } else {
+                    map[key] = tickets.filter((t) => t.status === key).length;
+                }
+            }
         });
         return map;
     }, [tickets]);
@@ -301,7 +310,11 @@ export default function SuperAdminOrdersPage() {
         const q = search.toLowerCase();
         return tickets.filter((t) => {
             const matchStatus =
-                activeFilter === "all" || t.status === activeFilter;
+                activeFilter === "all"
+                    ? true
+                    : activeFilter === "discrepancy"
+                      ? t.has_discrepancy
+                      : t.status === activeFilter;
             const matchStore =
                 !storeFilter || t.requesting_location?.name === storeFilter;
             const matchDate = isInDateRange(t.submitted_at ?? t.created_at);
@@ -437,7 +450,9 @@ export default function SuperAdminOrdersPage() {
                                         ? tickets.length
                                         : (counts[key] ?? 0)
                                 }
-                                onClick={() => setActiveFilter(key)}
+                                onClick={() =>
+                                    setActiveFilter(key as any)
+                                }
                             />
                         ))}
                     </div>
@@ -501,9 +516,12 @@ export default function SuperAdminOrdersPage() {
                                         const itemCount = getItemCount(ticket);
                                         const totalBoxes =
                                             getTotalBoxes(ticket);
-                                        const { dot } =
+                                        let { dot } =
                                             STATUS_META[ticket.status] ??
                                             STATUS_META.draft;
+                                        if (ticket.has_discrepancy) {
+                                            dot = "bg-orange-500 animate-pulse";
+                                        }
 
                                         return (
                                             <TableRow

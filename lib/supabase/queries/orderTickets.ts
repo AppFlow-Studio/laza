@@ -47,6 +47,7 @@ export interface TicketFilters {
     dateTo?: string;
     isAutoApproved?: boolean;
     hasDiscrepancy?: boolean;
+    excludeCancelled?: boolean;
     limit?: number;
     offset?: number;
 }
@@ -125,8 +126,6 @@ export async function createTicket(input: CreateTicketInput) {
         .from("order_ticket_items")
         .insert(lineItems);
 
-    console.log(lineItems, itemsError);
-
     if (itemsError) throw itemsError;
 
     await insertTicketLog(
@@ -179,6 +178,10 @@ export async function getTicketsByLocation(
             : [filters.status];
         query = query.in("status", statuses);
     }
+
+    if (filters?.excludeCancelled) {
+        query = query.neq("status", "cancelled");
+    }
     if (filters?.hasDiscrepancy !== undefined)
         query = query.eq("has_discrepancy", filters.hasDiscrepancy);
     if (filters?.dateFrom) query = query.gte("created_at", filters.dateFrom);
@@ -223,6 +226,10 @@ export async function getAllTickets(
             ? filters.status
             : [filters.status];
         query = query.in("status", statuses);
+    }
+
+    if (filters?.excludeCancelled) {
+        query = query.neq("status", "cancelled");
     }
     if (filters?.storeLocationId)
         query = query.eq("requesting_location_id", filters.storeLocationId);
@@ -338,7 +345,7 @@ export async function updateTicketStatus(
 
     const { data: current, error: fetchError } = await supabase
         .from("order_tickets")
-        .select("id, status")
+        .select("id, status, organization_id")
         .eq("id", ticketId)
         .single();
 
@@ -395,27 +402,17 @@ export async function updateTicketStatus(
     );
 
     if (newStatus === "fulfilled") {
-        const { data: org } = await supabase
-            .from("order_tickets")
-            .select("organization_id")
-            .eq("id", ticketId)
-            .single();
         await sendOrderNotification(
             "order_fulfilled",
             ticketId,
-            org?.organization_id,
+            current.organization_id,
         );
     }
     if (newStatus === "rejected") {
-        const { data: org } = await supabase
-            .from("order_tickets")
-            .select("organization_id")
-            .eq("id", ticketId)
-            .single();
         await sendOrderNotification(
             "order_rejected",
             ticketId,
-            org?.organization_id,
+            current.organization_id,
         );
     }
 
