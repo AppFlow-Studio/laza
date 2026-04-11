@@ -2,9 +2,8 @@
 
 // app/(dashboard)/super-admin/warehouse/expenses/page.tsx
 // Task 2.22 — Warehouse Expenses page
-// Ledger-style page for tracking warehouse operating costs.
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth } from "date-fns";
@@ -16,11 +15,14 @@ import {
     Warehouse,
     PackageOpen,
     MoreHorizontal,
-    ChevronDown,
     CheckCircle2,
     X,
+    Pencil,
+    Check,
+    Loader2,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { supabase } from "@/lib/supabase/client";
 
 import {
     getWarehouseExpenses,
@@ -31,11 +33,13 @@ import {
     type ExpenseType,
     type WarehouseExpenseFilters,
 } from "@/lib/supabase/queries/warehouseExpenses";
+import { updateWarehouseExpenseTitleAction } from "@/lib/supabase/actions/warehouseExpenseActions";
 import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { RentHistoryTable } from "@/components/super-admin/warehouse/RentHistoryTable";
+import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const EXPENSE_TYPES: {
     value: ExpenseType;
@@ -113,7 +117,7 @@ const TYPE_CARD_STYLES: Record<
     },
 };
 
-// ─── Hooks (inline for single-file delivery) ─────────────────────────────────
+// ─── Inline hooks ─────────────────────────────────────────────────────────────
 
 function useExpenses(
     organizationId: string,
@@ -159,7 +163,7 @@ function useCreateExpense() {
             });
             toast.success("Expense recorded");
         },
-        onError: (err: Error) => toast.error(err.message),
+        onError: (err: unknown) => toast.error(getFriendlyErrorMessage(err)),
     });
 }
 
@@ -181,11 +185,31 @@ function useUpdateRate() {
             });
             toast.success("Rate updated");
         },
-        onError: (err: Error) => toast.error(err.message),
+        onError: (err: unknown) => toast.error(getFriendlyErrorMessage(err)),
     });
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+// Inline expense title update — direct Supabase call (no dedicated query fn exists)
+function useUpdateExpenseTitle(organizationId: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, title }: { id: string; title: string }) => {
+            await updateWarehouseExpenseTitleAction(id, title.trim() || null);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: ["warehouse-expenses", organizationId],
+            });
+            toast.success("Title saved");
+        },
+        onError: (err: any) => {
+            console.error("Expense title update failed:", err?.message);
+            toast.error("Failed to save title");
+        },
+    });
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SummaryCard({
     type,
@@ -198,7 +222,6 @@ function SummaryCard({
 }) {
     const config = EXPENSE_TYPES.find((t) => t.value === type)!;
     const style = TYPE_CARD_STYLES[type];
-
     return (
         <div
             className={`rounded-xl border ${style.border} ${style.bg} p-4 flex flex-col gap-2`}
@@ -235,6 +258,112 @@ function ExpenseTypeBadge({ type }: { type: ExpenseType }) {
     );
 }
 
+// ─── Inline expense title editor ──────────────────────────────────────────────
+function ExpenseTitleEditor({
+    expense,
+    organizationId,
+}: {
+    expense: any;
+    organizationId: string;
+}) {
+    const [editing, setEditing] = useState(false);
+    const [value, setValue] = useState(expense.title ?? "");
+    const inputRef = useRef<HTMLInputElement>(null);
+    const { mutate: updateTitle, isPending } =
+        useUpdateExpenseTitle(organizationId);
+
+    useEffect(() => {
+        if (editing) inputRef.current?.focus();
+    }, [editing]);
+
+    const handleSave = () => {
+        if (value.trim() === (expense.title ?? "")) {
+            setEditing(false);
+            return;
+        }
+        updateTitle(
+            { id: expense.id, title: value },
+            { onSuccess: () => setEditing(false) },
+        );
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") handleSave();
+        if (e.key === "Escape") {
+            setValue(expense.title ?? "");
+            setEditing(false);
+        }
+    };
+
+    if (editing) {
+        return (
+            <div className="flex items-center gap-2 mb-0.5">
+                <input
+                    ref={inputRef}
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Add a title…"
+                    className="text-sm font-semibold text-gray-800 bg-transparent border-b-2 border-indigo-400 outline-none w-full max-w-xs placeholder:text-gray-300 placeholder:font-normal"
+                />
+                <button
+                    onClick={handleSave}
+                    disabled={isPending}
+                    className="w-5 h-5 flex items-center justify-center rounded-full bg-indigo-600 text-white hover:bg-indigo-700 flex-shrink-0 transition-colors"
+                >
+                    {isPending ? (
+                        <Loader2 size={9} className="animate-spin" />
+                    ) : (
+                        <Check size={9} />
+                    )}
+                </button>
+                <button
+                    onClick={() => {
+                        setValue(expense.title ?? "");
+                        setEditing(false);
+                    }}
+                    className="w-5 h-5 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 flex-shrink-0 transition-colors"
+                >
+                    <X size={9} />
+                </button>
+            </div>
+        );
+    }
+
+    if (expense.title) {
+        return (
+            <div className="flex items-center gap-1.5 mb-0.5 group">
+                <p className="text-sm font-semibold text-gray-800">
+                    {expense.title}
+                </p>
+                <button
+                    onClick={() => setEditing(true)}
+                    className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all flex-shrink-0"
+                    title="Edit title"
+                >
+                    <Pencil size={10} />
+                </button>
+            </div>
+        );
+    }
+
+    // No title — clickable placeholder
+    return (
+        <button
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1.5 mb-0.5 group text-left"
+        >
+            <p className="text-sm font-medium text-gray-400 italic group-hover:text-indigo-600 transition-colors">
+                Add a title
+            </p>
+            <Pencil
+                size={10}
+                className="text-gray-300 group-hover:text-indigo-500 transition-colors flex-shrink-0"
+            />
+        </button>
+    );
+}
+
 // ─── Add Expense Form ─────────────────────────────────────────────────────────
 
 interface AddExpenseFormProps {
@@ -253,6 +382,8 @@ function AddExpenseForm({
     const { mutate: createExpense, isPending } = useCreateExpense();
     const { data: userInfo } = useUserInfo();
 
+    const [title, setTitle] = useState("");
+    const [titleError, setTitleError] = useState(false);
     const [expenseType, setExpenseType] =
         useState<ExpenseType>("pallet_delivery");
     const [palletCount, setPalletCount] = useState("");
@@ -279,6 +410,13 @@ function AddExpenseForm({
 
     const handleSubmit = () => {
         if (!userInfo?.id) return;
+
+        // ── Validation ──
+        if (!title.trim()) {
+            setTitleError(true);
+            toast.error("Please add a title for this expense");
+            return;
+        }
         if (finalAmount < 0) {
             toast.error("Amount cannot be negative");
             return;
@@ -289,6 +427,7 @@ function AddExpenseForm({
                 organization_id: organizationId,
                 warehouse_location_id: warehouseLocationId,
                 expense_type: expenseType,
+                title: title.trim(),
                 amount: finalAmount,
                 pallet_count: palletCount ? parseInt(palletCount) : null,
                 rate_per_pallet: useCustomTotal ? null : currentRate,
@@ -325,8 +464,32 @@ function AddExpenseForm({
                         <X className="w-5 h-5 text-gray-500" />
                     </button>
                 </div>
-
                 <div className="p-5 space-y-5">
+                    {/* Title — required */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Title <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => {
+                                setTitle(e.target.value);
+                                if (e.target.value.trim()) setTitleError(false);
+                            }}
+                            placeholder="e.g. April rent, PO-12 delivery…"
+                            className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${titleError ? "border-red-400 bg-red-50 placeholder:text-red-300" : "border-gray-200"}`}
+                        />
+                        {titleError && (
+                            <p className="mt-1.5 text-xs text-red-500 font-medium flex items-center gap-1">
+                                <span className="w-3.5 h-3.5 rounded-full bg-red-500 text-white flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+                                    !
+                                </span>
+                                Title is required
+                            </p>
+                        )}
+                    </div>
+
                     {/* Expense Type */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -342,11 +505,7 @@ function AddExpenseForm({
                                         setUseCustomTotal(false);
                                         setIsSelfDelivered(false);
                                     }}
-                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                                        expenseType === t.value
-                                            ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                            : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
-                                    }`}
+                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${expenseType === t.value ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"}`}
                                 >
                                     {t.icon}
                                     {t.label}
@@ -355,7 +514,7 @@ function AddExpenseForm({
                         </div>
                     </div>
 
-                    {/* Self-delivered toggle for delivery type */}
+                    {/* Self-delivered toggle */}
                     {expenseType === "delivery" && (
                         <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-xl">
                             <div>
@@ -381,7 +540,6 @@ function AddExpenseForm({
                     )}
 
                     <div className="grid grid-cols-2 gap-4">
-                        {/* Pallet count */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">
                                 Pallet Count{" "}
@@ -400,8 +558,6 @@ function AddExpenseForm({
                                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             />
                         </div>
-
-                        {/* Date */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">
                                 Date
@@ -593,7 +749,9 @@ function ManageRatesPanel({
         );
     };
 
-    const editableTypes = EXPENSE_TYPES.filter((t) => t.value === "pallet_rent");
+    const editableTypes = EXPENSE_TYPES.filter(
+        (t) => t.value === "pallet_rent",
+    );
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -614,7 +772,6 @@ function ManageRatesPanel({
                         <X className="w-5 h-5 text-gray-500" />
                     </button>
                 </div>
-
                 <div className="p-5 space-y-4">
                     {editableTypes.map((type) => {
                         const rate = rates.find(
@@ -671,11 +828,7 @@ function ManageRatesPanel({
                                             )
                                         }
                                         disabled={isPending}
-                                        className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                                            isSaved
-                                                ? "bg-green-100 text-green-700"
-                                                : "bg-indigo-600 text-white hover:bg-indigo-700"
-                                        }`}
+                                        className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isSaved ? "bg-green-100 text-green-700" : "bg-indigo-600 text-white hover:bg-indigo-700"}`}
                                     >
                                         {isSaved ? (
                                             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -688,7 +841,6 @@ function ManageRatesPanel({
                         );
                     })}
                 </div>
-
                 <div className="p-5 border-t border-gray-100">
                     <button
                         type="button"
@@ -720,7 +872,6 @@ export default function WarehouseExpensesPage() {
     const [showManageRates, setShowManageRates] = useState(false);
     const [filterType, setFilterType] = useState<ExpenseType | "all">("all");
 
-    // Fill in all expense types for summary cards (show $0 if no data)
     const summaryByType = useMemo(() => {
         return EXPENSE_TYPES.filter((t) => t.value !== "other").map((type) => {
             const found = summary.find(
@@ -766,16 +917,14 @@ export default function WarehouseExpensesPage() {
                             onClick={() => setShowManageRates(true)}
                             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
                         >
-                            <Settings2 className="w-4 h-4" />
-                            Manage Rates
+                            <Settings2 className="w-4 h-4" /> Manage Rates
                         </button>
                         <button
                             type="button"
                             onClick={() => setShowAddForm(true)}
                             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
                         >
-                            <Plus className="w-4 h-4" />
-                            Add Expense
+                            <Plus className="w-4 h-4" /> Add Expense
                         </button>
                     </div>
                 </div>
@@ -788,17 +937,13 @@ export default function WarehouseExpensesPage() {
                 </div>
 
                 {/* Expense List */}
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-10">
                     {/* Filter bar */}
                     <div className="flex items-center gap-2 p-4 border-b border-gray-100 overflow-x-auto">
                         <button
                             type="button"
                             onClick={() => setFilterType("all")}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                                filterType === "all"
-                                    ? "bg-gray-900 text-white"
-                                    : "text-gray-600 hover:bg-gray-100"
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterType === "all" ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"}`}
                         >
                             All
                         </button>
@@ -813,11 +958,7 @@ export default function WarehouseExpensesPage() {
                                             : t.value,
                                     )
                                 }
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                                    filterType === t.value
-                                        ? "bg-gray-900 text-white"
-                                        : "text-gray-600 hover:bg-gray-100"
-                                }`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterType === t.value ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"}`}
                             >
                                 {t.icon}
                                 {t.label}
@@ -825,7 +966,6 @@ export default function WarehouseExpensesPage() {
                         ))}
                     </div>
 
-                    {/* Table */}
                     {expensesLoading ? (
                         <div className="p-8 text-center text-gray-400 text-sm">
                             Loading expenses…
@@ -847,7 +987,7 @@ export default function WarehouseExpensesPage() {
                                     key={expense.id}
                                     className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors"
                                 >
-                                    <div className="shrink-0 w-18 h-18 rounded-xl bg-gray-100 flex items-center justify-center">
+                                    <div className="shrink-0 w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
                                         {EXPENSE_TYPES.find(
                                             (t) =>
                                                 t.value ===
@@ -858,6 +998,12 @@ export default function WarehouseExpensesPage() {
                                     </div>
 
                                     <div className="flex-1 min-w-0">
+                                        {/* Inline title editor */}
+                                        <ExpenseTitleEditor
+                                            expense={expense}
+                                            organizationId={orgId ?? ""}
+                                        />
+
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <ExpenseTypeBadge
                                                 type={
@@ -913,7 +1059,7 @@ export default function WarehouseExpensesPage() {
                                         </div>
                                         {expense.notes && (
                                             <p className="text-xs text-gray-400 mt-0.5 truncate">
-                                               Note: {expense.notes}
+                                                Note: {expense.notes}
                                             </p>
                                         )}
                                     </div>
@@ -934,10 +1080,16 @@ export default function WarehouseExpensesPage() {
                     )}
                 </div>
 
-                <section>
-                    <h2 className="text-lg font-semibold mb-4">
-                        Warehouse Rent History
-                    </h2>
+                {/* ── Warehouse Rent History — proper spacing ── */}
+                <section className="mt-10 pt-8 border-t border-gray-200">
+                    <div className="mb-5">
+                        <h2 className="text-lg font-semibold text-gray-900">
+                            Warehouse Rent History
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-0.5">
+                            Monthly pallet rent snapshots
+                        </p>
+                    </div>
                     <RentHistoryTable />
                 </section>
             </div>

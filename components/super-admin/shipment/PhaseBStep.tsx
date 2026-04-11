@@ -6,7 +6,6 @@ import { z } from "zod";
 import { Plus, Trash2, AlertTriangle, CheckCircle2, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useWarehouseStorageSpaces } from "@/lib/hooks/queries/useReceiving";
 import { cn } from "@/lib/utils";
 import type { PhaseAData } from "./PhaseAStep";
 
@@ -44,7 +43,6 @@ const phaseBSchema = z.object({
         .array(
             z.object({
                 pallet_label: z.string().min(1, "Label required"),
-                storage_space_id: z.string().min(1, "Storage space required"),
                 items: z
                     .array(
                         z.object({
@@ -93,7 +91,6 @@ function buildDefaultPallet(
     const poNumber = po.po_number.replace(/[^A-Z0-9]/gi, "").toUpperCase();
     return {
         pallet_label: `${poNumber}-P${String(palletIndex + 1).padStart(3, "0")}`,
-        storage_space_id: "",
         items: phaseAData.lineItems
             .map((li) => {
                 const poItem = po.purchase_order_items.find(
@@ -231,10 +228,7 @@ function ItemBoxConfigs({
                 const isFirst = cfgIdx === 0;
 
                 return (
-                    <div
-                        key={cfgField.id}
-                        className="flex items-center gap-2"
-                    >
+                    <div key={cfgField.id} className="flex items-center gap-2">
                         {/* Pieces per box */}
                         <div className="flex flex-col">
                             {isFirst && (
@@ -273,13 +267,7 @@ function ItemBoxConfigs({
                             )}
                         </div>
 
-                        {/* × separator */}
-                        <span
-                            className={cn(
-                                "text-xs text-zinc-400 select-none",
-                                isFirst ? "mt-4" : ""
-                            )}
-                        >
+                        <span className={cn("text-xs text-zinc-400 select-none", isFirst ? "mt-4" : "")}>
                             ×
                         </span>
 
@@ -305,9 +293,7 @@ function ItemBoxConfigs({
                                         value={f.value ?? ""}
                                         onChange={(e) =>
                                             f.onChange(
-                                                e.target.value === ""
-                                                    ? 0
-                                                    : Number(e.target.value)
+                                                e.target.value === "" ? 0 : Number(e.target.value)
                                             )
                                         }
                                     />
@@ -320,7 +306,6 @@ function ItemBoxConfigs({
                             )}
                         </div>
 
-                        {/* Remove config button (only when >1 config) */}
                         {fields.length > 1 ? (
                             <button
                                 type="button"
@@ -334,19 +319,12 @@ function ItemBoxConfigs({
                                 <Trash2 className="h-3.5 w-3.5" />
                             </button>
                         ) : (
-                            /* placeholder to keep layout stable */
-                            <div
-                                className={cn(
-                                    "w-[26px]",
-                                    isFirst ? "mt-4" : ""
-                                )}
-                            />
+                            <div className={cn("w-[26px]", isFirst ? "mt-4" : "")} />
                         )}
                     </div>
                 );
             })}
 
-            {/* Add another configuration */}
             <button
                 type="button"
                 onClick={() =>
@@ -368,7 +346,6 @@ function PalletCard({
                         control,
                         register,
                         errors,
-                        storageSpaces,
                         onRemove,
                         canRemove,
                     }: {
@@ -376,7 +353,6 @@ function PalletCard({
     control: any;
     register: any;
     errors: any;
-    storageSpaces: { id: string; name: string; temperature_type: string }[];
     onRemove: () => void;
     canRemove: boolean;
 }) {
@@ -385,7 +361,6 @@ function PalletCard({
         name: `pallets.${palletIndex}.items`,
     });
 
-    // Watch all items to compute totals
     const watchedItems =
         useWatch({ control, name: `pallets.${palletIndex}.items` }) ?? [];
 
@@ -401,11 +376,6 @@ function PalletCard({
     );
 
     const palletError = errors?.pallets?.[palletIndex];
-    const TEMP_ICONS: Record<string, string> = {
-        frozen: "🧊",
-        refrigerated: "❄️",
-        dry: "📦",
-    };
 
     return (
         <div className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
@@ -415,27 +385,15 @@ function PalletCard({
                     <input
                         {...register(`pallets.${palletIndex}.pallet_label`)}
                         className={cn(
-                            "w-36 rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-sm font-mono font-medium text-zinc-900",
+                            "w-48 rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-sm font-mono font-medium text-zinc-900",
                             "focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400",
                             palletError?.pallet_label ? "border-red-400" : ""
                         )}
-                        placeholder="Label"
+                        placeholder="Pallet label"
                     />
-                    <select
-                        {...register(`pallets.${palletIndex}.storage_space_id`)}
-                        className={cn(
-                            "flex-1 min-w-0 rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-sm text-zinc-700",
-                            "focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400",
-                            palletError?.storage_space_id ? "border-red-400" : ""
-                        )}
-                    >
-                        <option value="">— Select storage space —</option>
-                        {storageSpaces.map((s) => (
-                            <option key={s.id} value={s.id}>
-                                {TEMP_ICONS[s.temperature_type] ?? "📦"} {s.name}
-                            </option>
-                        ))}
-                    </select>
+                    {palletError?.pallet_label && (
+                        <p className="text-xs text-red-500">{palletError.pallet_label.message}</p>
+                    )}
                 </div>
                 {canRemove && (
                     <button
@@ -448,12 +406,6 @@ function PalletCard({
                     </button>
                 )}
             </div>
-
-            {palletError?.storage_space_id && (
-                <p className="px-4 pt-1 text-xs text-red-500">
-                    {palletError.storage_space_id.message}
-                </p>
-            )}
 
             {/* Items */}
             <div className="divide-y divide-zinc-50">
@@ -468,12 +420,8 @@ function PalletCard({
                     return (
                         <div
                             key={field.id}
-                            className={cn(
-                                "px-4 py-3",
-                                isOver ? "bg-red-50/40" : ""
-                            )}
+                            className={cn("px-4 py-3", isOver ? "bg-red-50/40" : "")}
                         >
-                            {/* Item name + totals row */}
                             <div className="flex items-start justify-between mb-2">
                                 <div>
                                     <p className="text-sm font-medium text-zinc-900">
@@ -484,39 +432,26 @@ function PalletCard({
                                     </p>
                                 </div>
                                 <div className="text-right text-xs tabular-nums">
-                                    <p
-                                        className={cn(
-                                            "font-semibold",
-                                            isOver
-                                                ? "text-red-600"
-                                                : "text-zinc-900"
-                                        )}
-                                    >
-                                        {totalBoxesThisItem} box
-                                        {totalBoxesThisItem !== 1 ? "es" : ""}
+                                    <p className={cn("font-semibold", isOver ? "text-red-600" : "text-zinc-900")}>
+                                        {totalBoxesThisItem} box{totalBoxesThisItem !== 1 ? "es" : ""}
                                         {isOver && (
                                             <span className="ml-1 text-red-500">
-                                                (over by{" "}
-                                                {totalBoxesThisItem - maxBoxes})
+                                                (over by {totalBoxesThisItem - maxBoxes})
                                             </span>
                                         )}
                                     </p>
                                     <p className="text-zinc-500">
-                                        ≈ {totalUnitsThisItem.toLocaleString()}{" "}
-                                        units
+                                        ≈ {totalUnitsThisItem.toLocaleString()} units
                                     </p>
                                 </div>
                             </div>
 
-                            {/* Box config inputs */}
                             <ItemBoxConfigs
                                 palletIndex={palletIndex}
                                 itemIndex={itemIdx}
                                 control={control}
                                 errors={errors}
-                                defaultPiecesPerBox={
-                                    watchedItem?.default_pieces_per_box ?? 1
-                                }
+                                defaultPiecesPerBox={watchedItem?.default_pieces_per_box ?? 1}
                             />
                         </div>
                     );
@@ -526,16 +461,10 @@ function PalletCard({
             {/* Pallet totals footer */}
             <div className="flex items-center justify-end gap-4 border-t border-zinc-100 bg-zinc-50/60 px-4 py-2.5 text-xs text-zinc-500">
                 <span>
-                    Total:{" "}
-                    <span className="font-semibold text-zinc-900">
-                        {totalBoxes} boxes
-                    </span>
+                    Total: <span className="font-semibold text-zinc-900">{totalBoxes} boxes</span>
                 </span>
                 <span>
-                    ≈{" "}
-                    <span className="font-semibold text-zinc-900">
-                        {totalUnits.toLocaleString()} units
-                    </span>
+                    ≈ <span className="font-semibold text-zinc-900">{totalUnits.toLocaleString()} units</span>
                 </span>
             </div>
         </div>
@@ -554,15 +483,7 @@ interface PhaseBStepProps {
     isLoading: boolean;
 }
 
-export function PhaseBStep({
-                               po,
-                               phaseAData,
-                               warehouseLocationId,
-                               onSubmit,
-                           }: PhaseBStepProps) {
-    const { data: storageSpaces = [] } =
-        useWarehouseStorageSpaces(warehouseLocationId);
-
+export function PhaseBStep({ po, phaseAData, onSubmit }: PhaseBStepProps) {
     const {
         register,
         handleSubmit,
@@ -583,7 +504,6 @@ export function PhaseBStep({
     const watchedPallets = useWatch({ control, name: "pallets" }) ?? [];
 
     const handleFormSubmit = (data: PhaseBData) => {
-        // Check overassignment across all pallets
         const overItems = phaseAData.lineItems.filter((li) => {
             const ppb = li.pieces_per_box;
             const maxBoxes = ppb > 0 ? Math.floor(li.quantity_received / ppb) : 0;
@@ -635,7 +555,6 @@ export function PhaseBStep({
                             control={control}
                             register={register}
                             errors={errors}
-                            storageSpaces={storageSpaces}
                             canRemove={fields.length > 1}
                             onRemove={() => remove(palletIdx)}
                         />

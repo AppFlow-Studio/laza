@@ -13,8 +13,6 @@ export async function getPalletsForReorganizationAction(warehouseLocationId?: st
             id,
             pallet_label,
             status,
-            storage_space_id,
-            storage_spaces ( id, name, temperature_type ),
             warehouse:locations(name),
             pallet_inventory (
                 id,
@@ -48,9 +46,8 @@ export async function getPalletsForReorganizationAction(warehouseLocationId?: st
 // ─── Mutation ─────────────────────────────────────────────────────────────────
 
 export type MoveBoxesPayload = {
-    sourcePalletId:       string;
-    targetPalletId:       string | null;
-    targetStorageSpaceId: string;
+    sourcePalletId: string;
+    targetPalletId: string | null;
     itemsToMove: {
         item_id:             number;
         pallet_inventory_id: string;
@@ -61,8 +58,6 @@ export type MoveBoxesPayload = {
 };
 
 export async function moveBoxesBetweenPalletsAction(payload: MoveBoxesPayload) {
-    // Use service role to bypass RLS — RLS policies cast auth.uid() to uuid
-    // which fails for Clerk text IDs like "user_3ARZei..."
     const supabase = createServiceRoleClient();
 
     if (!payload.userId) {
@@ -90,7 +85,6 @@ export async function moveBoxesBetweenPalletsAction(payload: MoveBoxesPayload) {
             .insert({
                 organization_id:       sourcePallet.organization_id,
                 warehouse_location_id: sourcePallet.warehouse_location_id,
-                storage_space_id:      payload.targetStorageSpaceId,
                 pallet_label:          payload.newPalletLabel,
                 status:                'active',
                 received_at:           new Date().toISOString(),
@@ -100,13 +94,6 @@ export async function moveBoxesBetweenPalletsAction(payload: MoveBoxesPayload) {
 
         if (createErr || !newPallet) throw new Error(createErr?.message ?? 'Failed to create new pallet.');
         targetId = newPallet.id;
-    } else {
-        const { error: moveErr } = await supabase
-            .from('warehouse_pallets')
-            .update({ storage_space_id: payload.targetStorageSpaceId })
-            .eq('id', targetId);
-
-        if (moveErr) throw new Error(moveErr.message);
     }
 
     // ── Get org_id for logging ────────────────────────────────────────────────

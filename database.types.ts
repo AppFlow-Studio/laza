@@ -1200,6 +1200,7 @@ export type Database = {
           requesting_location_id: string
           status: string
           submitted_at: string | null
+          title: string | null
           updated_at: string
           warehouse_location_id: string
         }
@@ -1221,6 +1222,7 @@ export type Database = {
           requesting_location_id: string
           status?: string
           submitted_at?: string | null
+          title?: string | null
           updated_at?: string
           warehouse_location_id: string
         }
@@ -1242,6 +1244,7 @@ export type Database = {
           requesting_location_id?: string
           status?: string
           submitted_at?: string | null
+          title?: string | null
           updated_at?: string
           warehouse_location_id?: string
         }
@@ -2282,6 +2285,7 @@ export type Database = {
           period_start: string | null
           purchase_order_id: string | null
           rate_per_pallet: number | null
+          title: string | null
           updated_at: string
           warehouse_location_id: string
         }
@@ -2300,6 +2304,7 @@ export type Database = {
           period_start?: string | null
           purchase_order_id?: string | null
           rate_per_pallet?: number | null
+          title?: string | null
           updated_at?: string
           warehouse_location_id: string
         }
@@ -2318,6 +2323,7 @@ export type Database = {
           period_start?: string | null
           purchase_order_id?: string | null
           rate_per_pallet?: number | null
+          title?: string | null
           updated_at?: string
           warehouse_location_id?: string
         }
@@ -2827,6 +2833,22 @@ export type Database = {
           urgency_level: string
         }[]
       }
+      get_reorder_alerts: {
+        Args: {
+          p_buffer_days?: number
+          p_lead_time_days?: number
+          p_organization_id: string
+        }
+        Returns: {
+          avg_weekly_units: number
+          current_warehouse_stock: number
+          item_id: number
+          item_name: string
+          item_sku: string
+          urgency: string
+          weeks_remaining: number
+        }[]
+      }
       get_time_window_bounds: {
         Args: {
           p_reference_time?: string
@@ -2850,6 +2872,17 @@ export type Database = {
         Returns: number
       }
       get_user_role: { Args: { user_id: string }; Returns: string }
+      get_warehouse_burn_rates: {
+        Args: { p_days_lookback?: number; p_organization_id: string }
+        Returns: {
+          avg_weekly_units: number
+          current_warehouse_stock: number
+          item_id: number
+          item_name: string
+          item_sku: string
+          weeks_remaining: number
+        }[]
+      }
       is_admin_or_above: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       is_within_time_window: {

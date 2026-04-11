@@ -8,12 +8,9 @@ import {
 	getPalletByIdAction,
 	getPalletOperationsLogAction,
 	getPurchaseOrdersForPalletFilterAction,
+	retirePalletAction,
 } from "@/lib/supabase/actions/palletActions";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
-import {
-	updatePalletStorageSpace,
-	retirePallet,
-} from "@/lib/supabase/queries/pallets";
 import type { PalletFilters } from "@/lib/supabase/queries/pallets";
 
 // ── Query Keys ────────────────────────────────────────────────────────────────
@@ -28,8 +25,6 @@ export const palletKeys = {
 };
 
 // ── usePallets ────────────────────────────────────────────────────────────────
-// Pass a warehouseLocationId to scope to one warehouse (detail page tab).
-// Pass undefined to get ALL pallets across the org (standalone pallets page).
 export function usePallets(
 	warehouseLocationId: string | undefined,
 	filters?: PalletFilters
@@ -39,7 +34,6 @@ export function usePallets(
 		queryFn:  warehouseLocationId
 			? () => getPalletsAction(warehouseLocationId, filters)
 			: () => getAllPalletsAction(filters),
-		// Always enabled — either scoped or org-wide
 		enabled:  true,
 		staleTime: 30_000,
 	});
@@ -56,8 +50,6 @@ export function usePallet(palletId: string | undefined) {
 }
 
 // ── usePalletStats ────────────────────────────────────────────────────────────
-// Pass a warehouseLocationId to scope stats to one warehouse (detail page tab).
-// Pass undefined to get org-wide stats (standalone pallets page).
 export function usePalletStats(warehouseLocationId: string | undefined) {
 	return useQuery({
 		queryKey: palletKeys.stats(warehouseLocationId ?? "all"),
@@ -90,22 +82,6 @@ export function usePurchaseOrdersForFilter() {
 	});
 }
 
-// ── useUpdatePalletStorageSpace ───────────────────────────────────────────────
-export function useUpdatePalletStorageSpace() {
-	const queryClient        = useQueryClient();
-	const { data: userInfo } = useUserInfo();
-
-	return useMutation({
-		mutationFn: ({ palletId, storageSpaceId }: { palletId: string; storageSpaceId: string }) =>
-			updatePalletStorageSpace(palletId, storageSpaceId, userInfo?.id ?? ""),
-		onSuccess: (_, { palletId }) => {
-			queryClient.invalidateQueries({ queryKey: palletKeys.lists() });
-			queryClient.invalidateQueries({ queryKey: palletKeys.detail(palletId) });
-			queryClient.invalidateQueries({ queryKey: palletKeys.all });
-		},
-	});
-}
-
 // ── useRetirePallet ───────────────────────────────────────────────────────────
 export function useRetirePallet() {
 	const queryClient        = useQueryClient();
@@ -113,7 +89,8 @@ export function useRetirePallet() {
 
 	return useMutation({
 		mutationFn: (palletId: string) =>
-			retirePallet(palletId, userInfo?.id ?? ""),
+			retirePalletAction(palletId, userInfo?.id ?? ""),
+
 		onSuccess: (_, palletId) => {
 			queryClient.invalidateQueries({ queryKey: palletKeys.lists() });
 			queryClient.invalidateQueries({ queryKey: palletKeys.detail(palletId) });

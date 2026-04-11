@@ -1,3 +1,5 @@
+//super-admin/purchase-orders/[id]
+
 "use client";
 
 import { use, useState } from "react";

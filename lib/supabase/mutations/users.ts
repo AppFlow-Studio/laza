@@ -95,8 +95,8 @@ export async function createInvitation(input: CreateInvitationInput) {
 interface UpdateUserInput {
     userId: string;
     role?: 'admin' | 'employee' | 'super_admin';
-    assigned_location_id?: string | null;       // employees only
-    assigned_location_ids?: string[];           // admins only
+    assigned_location_id?: string | null;       // employees only (one row in junction table)
+    assigned_location_ids?: string[];           // admins only (multiple rows in junction table)
     is_active?: boolean;
 }
 
@@ -114,18 +114,7 @@ export async function updateUser(input: UpdateUserInput) {
             updates.is_active = input.is_active;
         }
 
-        if (input.role === 'employee') {
-            // Single location on users table, no junction rows needed
-            updates.assigned_location_id = input.assigned_location_id ?? null;
-        } else if (input.role === 'admin' || input.role === 'super_admin') {
-            // Clear the single-location field — admins use junction table, super_admin uses neither
-            updates.assigned_location_id = null;
-        } else if (input.assigned_location_id !== undefined) {
-            // Role unchanged but location updated
-            updates.assigned_location_id = input.assigned_location_id;
-        }
-
-        // Update the users table
+        // Update the users table (location is stored in user_location_assignments, not here)
         const { data, error } = await supabase
             .from('users')
             .update(updates)
@@ -134,17 +123,23 @@ export async function updateUser(input: UpdateUserInput) {
 
         if (error) throw error;
 
-        // Sync user_location_assignments for admin role
-        if (input.role === 'admin') {
-            // Delete all existing assignments for this user
-            const { error: deleteError } = await supabase
+        // Clear all existing location assignments, then re-insert based on role
+        const { error: deleteError } = await supabase
+            .from('user_location_assignments')
+            .delete()
+            .eq('user_id', input.userId);
+
+        if (deleteError) throw deleteError;
+
+        if (input.role === 'employee' && input.assigned_location_id) {
+            // Employee: exactly one row in the junction table
+            const { error: insertError } = await supabase
                 .from('user_location_assignments')
-                .delete()
-                .eq('user_id', input.userId);
+                .insert({ user_id: input.userId, location_id: input.assigned_location_id });
 
-            if (deleteError) throw deleteError;
-
-            // Insert new assignments
+            if (insertError) throw insertError;
+        } else if (input.role === 'admin') {
+            // Admin: one row per assigned location
             const locationIds = input.assigned_location_ids ?? [];
             if (locationIds.length > 0) {
                 const rows = locationIds.map((location_id) => ({
@@ -159,14 +154,7 @@ export async function updateUser(input: UpdateUserInput) {
                 if (insertError) throw insertError;
             }
         }
-
-        // Changing away from admin — clear any leftover junction rows
-        if (input.role === 'employee' || input.role === 'super_admin') {
-            await supabase
-                .from('user_location_assignments')
-                .delete()
-                .eq('user_id', input.userId);
-        }
+        // super_admin: no junction rows (cleared above)
 
         return {
             success: true,

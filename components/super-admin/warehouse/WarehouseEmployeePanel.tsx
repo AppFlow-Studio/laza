@@ -209,7 +209,7 @@ function EmployeePickerStep({
                                         {emp.email}
                                     </p>
                                 </div>
-                                {emp.assigned_location_id && (
+                                {(emp.assigned_locations?.length ?? 0) > 0 && (
                                     <span className="text-xs text-amber-500 whitespace-nowrap">
                                         reassigning
                                     </span>

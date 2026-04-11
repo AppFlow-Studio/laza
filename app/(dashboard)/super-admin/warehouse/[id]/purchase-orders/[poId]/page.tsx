@@ -1,3 +1,4 @@
+// super-admin/warehouse/[id]/purchase-orders/[id]
 "use client";
 
 import { use, useState } from "react";
@@ -134,7 +135,7 @@ export default function PurchaseOrderDetailPage({
         try {
             await deletePO.mutateAsync(poId);
             toast.success("Purchase order deleted");
-            router.push(`/super-admin/warehouse/${warehouseId}`);
+            router.push(`/super-admin/warehouse/${warehouseId}?tab=shipments`);
         } catch {
             toast.error("Failed to delete");
         }
@@ -155,7 +156,7 @@ export default function PurchaseOrderDetailPage({
             <div className="text-center py-16">
                 <Ship className="w-full h-12 text-zinc-300 mx-auto mb-3" />
                 <p className="text-zinc-500 font-medium">Purchase order not found</p>
-                <Link href={`/super-admin/warehouse/${warehouseId}`} className="mt-4 inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                <Link href={`/super-admin/warehouse/${warehouseId}?tab=shipments`} className="mt-4 inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 font-medium">
                     <ArrowLeft className="w-4 h-4" /> Back to Warehouse
                 </Link>
             </div>
@@ -188,7 +189,7 @@ export default function PurchaseOrderDetailPage({
         <div className="space-y-6 max-w-6xl">
             {/* Back */}
             <Link
-                href={`/super-admin/purchase-orders`}
+                href={`/super-admin/warehouse/${warehouseId}?tab=shipments`}
                 className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-700 transition-colors"
             >
                 <ArrowLeft className="w-4 h-4" /> Back to Purchase orders

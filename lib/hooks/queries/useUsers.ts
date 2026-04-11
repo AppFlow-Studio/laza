@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getOrganizationUsers, getPendingInvitations } from '@/lib/supabase/queries/users';
+import { getOrganizationUsers, getPendingInvitations, getUserLocationAssignments } from '@/lib/supabase/queries/users';
 import { createInvitation, updateUser, cancelInvitation, resendInvitation } from '@/lib/supabase/mutations/users';
 
 export function useOrganizationUsers(organizationId: string | null) {
@@ -17,6 +17,14 @@ export function usePendingInvitations(organizationId: string | null) {
         queryKey: ['pending-invitations', organizationId],
         queryFn: () => getPendingInvitations(organizationId!),
         enabled: !!organizationId,
+    });
+}
+
+export function useUserLocationAssignments(userId: string | null) {
+    return useQuery({
+        queryKey: ['user-location-assignments', userId],
+        queryFn: () => getUserLocationAssignments(userId!),
+        enabled: !!userId,
     });
 }
 

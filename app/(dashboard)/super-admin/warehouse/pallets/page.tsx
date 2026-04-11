@@ -1,3 +1,4 @@
+// /super-admin/warehouse/pallets
 "use client";
 
 import { useState, useCallback } from "react";

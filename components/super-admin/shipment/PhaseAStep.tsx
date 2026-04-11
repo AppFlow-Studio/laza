@@ -184,106 +184,106 @@ export function PhaseAStep({ po, onSubmit, isLoading }: PhaseAStepProps) {
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-zinc-50">
                         <thead className="bg-gray-50">
-                            <tr>
-                                {["Item", "Ordered", "Pcs/Box", "Cartons Ordered", "Received (pcs)", "Cartons Rcvd", "Discrepancy"].map((h) => (
-                                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                                        {h}
-                                    </th>
-                                ))}
-                            </tr>
+                        <tr>
+                            {["Item", "Ordered", "Pcs/Box", "Cartons Ordered", "Received (pcs)", "Cartons Rcvd", "Discrepancy"].map((h) => (
+                                <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                                    {h}
+                                </th>
+                            ))}
+                        </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-50 bg-white">
-                            {fields.map((field, idx) => {
-                                const item         = items[idx];
-                                const received     = watchedLines[idx]?.quantity_received ?? 0;
-                                const ordered      = item.quantity_ordered;
-                                const delta        = received - ordered;
-                                const ppb          = item.pieces_per_box;
-                                const cartonsRcvd  = ppb > 0 ? (received / ppb).toFixed(1) : "—";
-                                const cartonsOrd   = item.cartons ?? (ppb > 0 ? (ordered / ppb).toFixed(1) : "—");
-                                const fieldError   = errors.lineItems?.[idx]?.quantity_received;
+                        {fields.map((field, idx) => {
+                            const item         = items[idx];
+                            const received     = watchedLines[idx]?.quantity_received ?? 0;
+                            const ordered      = item.quantity_ordered;
+                            const delta        = received - ordered;
+                            const ppb          = item.pieces_per_box;
+                            const cartonsRcvd  = ppb > 0 ? (received / ppb).toFixed(1) : "—";
+                            const cartonsOrd   = item.cartons ?? (ppb > 0 ? (ordered / ppb).toFixed(1) : "—");
+                            const fieldError   = errors.lineItems?.[idx]?.quantity_received;
 
-                                return (
-                                    <tr key={field.id} className={cn("transition-colors", delta !== 0 ? "bg-amber-50/40" : "hover:bg-zinc-50/50")}>
-                                        {/* Item */}
-                                        <td className="px-4 py-3">
-                                            <p className="text-sm font-medium text-zinc-900">
-                                                {item.items?.short_label ?? item.items?.name ?? "—"}
-                                            </p>
-                                            {item.items?.sku && (
-                                                <p className="text-xs text-zinc-400">{item.items.sku}</p>
-                                            )}
-                                        </td>
-                                        {/* Ordered */}
-                                        <td className="px-4 py-3 text-sm tabular-nums text-zinc-700">
-                                            {ordered.toLocaleString()}
-                                        </td>
-                                        {/* Pcs/Box */}
-                                        <td className="px-4 py-3 text-sm tabular-nums text-zinc-500">
-                                            {ppb}
-                                        </td>
-                                        {/* Cartons ordered */}
-                                        <td className="px-4 py-3 text-sm tabular-nums text-zinc-500">
-                                            {cartonsOrd}
-                                        </td>
-                                        {/* Received (editable) */}
-                                        <td className="px-4 py-3">
-                                            <Controller
-                                                control={control}
-                                                name={`lineItems.${idx}.quantity_received`}
-                                                render={({ field: f }) => (
-                                                    <Input
-                                                        type="number"
-                                                        min="0"
-                                                        step="1"
-                                                        className={cn(
-                                                            "w-28 tabular-nums",
-                                                            fieldError ? "border-red-400" : "",
-                                                            delta !== 0 ? "border-amber-300 bg-amber-50" : ""
-                                                        )}
-                                                        value={f.value ?? ""}
-                                                        onChange={(e) =>
-                                                            f.onChange(e.target.value === "" ? undefined : Number(e.target.value))
+                            return (
+                                <tr key={field.id} className={cn("transition-colors", delta !== 0 ? "bg-amber-50/40" : "hover:bg-zinc-50/50")}>
+                                    {/* Item */}
+                                    <td className="px-4 py-3">
+                                        <p className="text-sm font-medium text-zinc-900">
+                                            {item.items?.short_label ?? item.items?.name ?? "—"}
+                                        </p>
+                                        {item.items?.sku && (
+                                            <p className="text-xs text-zinc-400">{item.items.sku}</p>
+                                        )}
+                                    </td>
+                                    {/* Ordered */}
+                                    <td className="px-4 py-3 text-sm tabular-nums text-zinc-700">
+                                        {ordered.toLocaleString()}
+                                    </td>
+                                    {/* Pcs/Box */}
+                                    <td className="px-4 py-3 text-sm tabular-nums text-zinc-500">
+                                        {ppb}
+                                    </td>
+                                    {/* Cartons ordered */}
+                                    <td className="px-4 py-3 text-sm tabular-nums text-zinc-500">
+                                        {cartonsOrd}
+                                    </td>
+                                    {/* Received (editable) */}
+                                    <td className="px-4 py-3">
+                                        <Controller
+                                            control={control}
+                                            name={`lineItems.${idx}.quantity_received`}
+                                            render={({ field: f }) => (
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="1"
+                                                    className={cn(
+                                                        "w-28 tabular-nums",
+                                                        fieldError ? "border-red-400" : "",
+                                                        delta !== 0 ? "border-amber-300 bg-amber-50" : ""
+                                                    )}
+                                                    value={f.value ?? ""}
+                                                    onChange={(e) =>
+                                                        f.onChange(e.target.value === "" ? undefined : Number(e.target.value))
+                                                    }
+                                                    onKeyDown={(e) => {
+                                                        // Tab to next row's input
+                                                        if (e.key === "Tab" && !e.shiftKey) {
+                                                            e.preventDefault();
+                                                            const next = document.querySelector<HTMLInputElement>(
+                                                                `[name="lineItems.${idx + 1}.quantity_received"]`
+                                                            );
+                                                            next?.focus();
                                                         }
-                                                        onKeyDown={(e) => {
-                                                            // Tab to next row's input
-                                                            if (e.key === "Tab" && !e.shiftKey) {
-                                                                e.preventDefault();
-                                                                const next = document.querySelector<HTMLInputElement>(
-                                                                    `[name="lineItems.${idx + 1}.quantity_received"]`
-                                                                );
-                                                                next?.focus();
-                                                            }
-                                                        }}
-                                                    />
-                                                )}
-                                            />
-                                            {fieldError && (
-                                                <p className="mt-0.5 text-xs text-red-500">{fieldError.message}</p>
+                                                    }}
+                                                />
                                             )}
-                                        </td>
-                                        {/* Cartons received */}
-                                        <td className="px-4 py-3 text-sm tabular-nums text-zinc-500">
-                                            {cartonsRcvd}
-                                        </td>
-                                        {/* Discrepancy */}
-                                        <td className="px-4 py-3">
-                                            {delta === 0 ? (
-                                                <CheckCircle2 className="h-4 w-4 text-green-400" />
-                                            ) : (
-                                                <span className={cn(
-                                                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
-                                                    delta < 0
-                                                        ? "bg-red-100 text-red-700"
-                                                        : "bg-amber-100 text-amber-700"
-                                                )}>
+                                        />
+                                        {fieldError && (
+                                            <p className="mt-0.5 text-xs text-red-500">{fieldError.message}</p>
+                                        )}
+                                    </td>
+                                    {/* Cartons received */}
+                                    <td className="px-4 py-3 text-sm tabular-nums text-zinc-500">
+                                        {cartonsRcvd}
+                                    </td>
+                                    {/* Discrepancy */}
+                                    <td className="px-4 py-3">
+                                        {delta === 0 ? (
+                                            <CheckCircle2 className="h-4 w-4 text-green-400" />
+                                        ) : (
+                                            <span className={cn(
+                                                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
+                                                delta < 0
+                                                    ? "bg-red-100 text-red-700"
+                                                    : "bg-amber-100 text-amber-700"
+                                            )}>
                                                     {delta > 0 ? "+" : ""}{delta.toLocaleString()}
                                                 </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                         </tbody>
                     </table>
                 </div>
@@ -320,7 +320,7 @@ export function PhaseAStep({ po, onSubmit, isLoading }: PhaseAStepProps) {
                             <div key={i} className="flex items-center justify-between text-xs text-amber-800">
                                 <span className="font-medium">{d.name}</span>
                                 <span>
-                                    ordered {d.ordered.toLocaleString()}, received {d.received.toLocaleString()}
+                                    ordered {d.ordered.toLocaleString()}
                                     <span className={cn("ml-1.5 font-semibold", d.delta < 0 ? "text-red-600" : "text-amber-600")}>
                                         ({d.delta > 0 ? "+" : ""}{d.delta})
                                     </span>

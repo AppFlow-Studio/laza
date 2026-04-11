@@ -7,6 +7,9 @@ const config: Config = {
 	setupFiles: ["<rootDir>/jest.env.ts"],  // load env variables before tests run
 	testTimeout: 30000,               // 30 seconds — Supabase network calls need time
 	verbose: true,                    // show each test name as it runs
+	moduleNameMapper: {
+        "^@/(.*)$": "<rootDir>/$1",
+    },
 };
 
 export default config;

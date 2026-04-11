@@ -29,6 +29,7 @@ export interface CreateTicketInput {
     requestingLocationId: string;
     warehouseLocationId: string;
     requestedBy: string;
+    title?: string;
     notes?: string;
     initialStatus: "draft" | "submitted";
     items: Array<{
@@ -46,6 +47,7 @@ export interface TicketFilters {
     dateTo?: string;
     isAutoApproved?: boolean;
     hasDiscrepancy?: boolean;
+    excludeCancelled?: boolean;
     limit?: number;
     offset?: number;
 }
@@ -100,6 +102,7 @@ export async function createTicket(input: CreateTicketInput) {
             warehouse_location_id: input.warehouseLocationId,
             status: input.initialStatus,
             requested_by: input.requestedBy,
+            title: input.title ?? null,
             notes: input.notes ?? null,
             delivery_type: input.deliveryType ?? null,
             submitted_at:
@@ -137,8 +140,12 @@ export async function createTicket(input: CreateTicketInput) {
     );
 
     if (input.initialStatus === "submitted") {
-        await sendOrderNotification("order_submitted", ticket.id, input.organizationId);
-      }
+        await sendOrderNotification(
+            "order_submitted",
+            ticket.id,
+            input.organizationId,
+        );
+    }
 
     return ticket;
 }
@@ -170,6 +177,10 @@ export async function getTicketsByLocation(
             ? filters.status
             : [filters.status];
         query = query.in("status", statuses);
+    }
+
+    if (filters?.excludeCancelled) {
+        query = query.neq("status", "cancelled");
     }
     if (filters?.hasDiscrepancy !== undefined)
         query = query.eq("has_discrepancy", filters.hasDiscrepancy);
@@ -215,6 +226,10 @@ export async function getAllTickets(
             ? filters.status
             : [filters.status];
         query = query.in("status", statuses);
+    }
+
+    if (filters?.excludeCancelled) {
+        query = query.neq("status", "cancelled");
     }
     if (filters?.storeLocationId)
         query = query.eq("requesting_location_id", filters.storeLocationId);
@@ -330,7 +345,7 @@ export async function updateTicketStatus(
 
     const { data: current, error: fetchError } = await supabase
         .from("order_tickets")
-        .select("id, status")
+        .select("id, status, organization_id")
         .eq("id", ticketId)
         .single();
 
@@ -387,21 +402,19 @@ export async function updateTicketStatus(
     );
 
     if (newStatus === "fulfilled") {
-        const { data: org } = await supabase
-          .from("order_tickets")
-          .select("organization_id")
-          .eq("id", ticketId)
-          .single();
-        await sendOrderNotification("order_fulfilled", ticketId, org?.organization_id);
-      }
-      if (newStatus === "rejected") {
-        const { data: org } = await supabase
-          .from("order_tickets")
-          .select("organization_id")
-          .eq("id", ticketId)
-          .single();
-        await sendOrderNotification("order_rejected", ticketId, org?.organization_id);
-      }
+        await sendOrderNotification(
+            "order_fulfilled",
+            ticketId,
+            current.organization_id,
+        );
+    }
+    if (newStatus === "rejected") {
+        await sendOrderNotification(
+            "order_rejected",
+            ticketId,
+            current.organization_id,
+        );
+    }
 
     return updated;
 }
@@ -479,7 +492,7 @@ export async function confirmTicket(
         .from("order_tickets")
         .select(
             `
-      id, status, requesting_location_id,
+      id, status, requesting_location_id, organization_id,
       order_ticket_items (
         id, item_id, fulfilled_boxes, fulfilled_units,
         items ( id, name ),
@@ -502,6 +515,7 @@ export async function confirmTicket(
     }
 
     const storeLocationId = ticket.requesting_location_id;
+    const storeOrgId = ticket.organization_id;
     const discrepancies: ConfirmResult["discrepancies"] = [];
 
     for (const received of receivedItems) {
@@ -513,7 +527,10 @@ export async function confirmTicket(
 
         const expectedBoxes = ticketItem.fulfilled_boxes ?? 0;
         const actualBoxes = received.actualBoxesReceived;
-        const itemName: any = ticketItem.items ?? `Item ${received.itemId}`;
+        const rawItem = Array.isArray(ticketItem.items)
+            ? ticketItem.items[0]
+            : ticketItem.items;
+        const itemName: string = rawItem?.name ?? `Item ${received.itemId}`;
         const fulfillmentLines =
             ticketItem.order_ticket_fulfillment_lines ?? [];
 
@@ -555,6 +572,7 @@ export async function confirmTicket(
             const { error } = await supabase.from("item_locations").insert({
                 item_id: received.itemId,
                 location_id: storeLocationId,
+                organization_id: storeOrgId,
                 current_quantity: totalPiecesToAdd,
             });
             if (error) throw error;
@@ -566,6 +584,7 @@ export async function confirmTicket(
             .insert({
                 item_id: received.itemId,
                 location_id: storeLocationId,
+                organization_id: storeOrgId,
                 user_id: userId,
                 previous_quantity: previousQty,
                 new_quantity: newQty,
@@ -628,6 +647,8 @@ export async function confirmTicket(
 
     // Phase 6: capture payment here.
     // await capturePaymentHold(ticketId, actualReceivedValue);
+
+    await sendOrderNotification("order_confirmed", ticketId, storeOrgId);
 
     return { ticket: confirmed, discrepancies, hasDiscrepancy };
 }

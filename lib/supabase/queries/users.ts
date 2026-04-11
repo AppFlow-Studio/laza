@@ -7,33 +7,34 @@ import { User, OrgInvite } from '../types';
 export async function getOrganizationUsers(organizationId: string) {
     const supabase = createServiceRoleClient();
 
-    // Get the calling user's ID from Clerk — always reliable, no RLS dependency
     const { userId } = await auth();
+    if (!userId) return [];
 
-    if (!userId) {
-        return [];
-    }
-
-    // Look up caller's role and location using service role — bypasses RLS entirely
+    // Look up caller's role — bypasses RLS entirely
     const { data: caller } = await supabase
         .from('users')
-        .select('id, role, assigned_location_id')
+        .select('id, role')
         .eq('id', userId)
         .single();
 
     const callerRole = caller?.role;
-    const callerLocationId = caller?.assigned_location_id;
 
-    // Fetch all org members
+    // Get caller's location from junction table
+    const { data: callerAssignments } = await supabase
+        .from('user_location_assignments')
+        .select('location_id')
+        .eq('user_id', userId);
+
+    const callerLocationId = callerAssignments?.[0]?.location_id ?? null;
+
+    // Fetch all org members, joining junction table for display and filtering
     const { data: members, error: membersError } = await supabase
         .from('members')
         .select(`
             *,
             users (
                 *,
-                assigned_location:locations (*),
                 user_location_assignments (
-                    location_id,
                     locations (id, name, address, location_type)
                 )
             ),
@@ -47,11 +48,6 @@ export async function getOrganizationUsers(organizationId: string) {
         ?.map((member: any) => {
             if (!member.users) return null;
 
-            const assigned_location_ids: string[] =
-                member.users.user_location_assignments?.map(
-                    (a: any) => a.location_id
-                ) ?? [];
-
             const assigned_locations: any[] =
                 member.users.user_location_assignments
                     ?.map((a: any) => a.locations)
@@ -59,8 +55,6 @@ export async function getOrganizationUsers(organizationId: string) {
 
             return {
                 ...member.users,
-                assigned_location: member.users.assigned_location || null,
-                assigned_location_ids,
                 assigned_locations,
             };
         })
@@ -71,36 +65,37 @@ export async function getOrganizationUsers(organizationId: string) {
         return allUsers as UserWithAssignments[];
     }
 
-    console.log(callerRole)
-
-    // Admin — sees users at their location only
+    // Admin — sees users who share their location
     if (callerRole === 'admin' && callerLocationId) {
         const filtered = allUsers.filter((u: any) => {
             if (u.id === caller?.id) return true;
-
-            if (u.role === 'employee') {
-                return u.assigned_location_id === callerLocationId;
+            if (u.role === 'employee' || u.role === 'admin') {
+                return u.assigned_locations?.some((l: any) => l.id === callerLocationId);
             }
-
-            if (u.role === 'admin') {
-                return u.assigned_location_ids?.includes(callerLocationId);
-            }
-
             return false;
         });
-
         return filtered as UserWithAssignments[];
     }
 
-    // Fallback
+    // Fallback — only self
     return allUsers.filter((u: any) => u.id === userId) as UserWithAssignments[];
 }
 
 type UserWithAssignments = User & {
-    assigned_location?: any;
-    assigned_location_ids: string[];
     assigned_locations: any[];
 };
+
+/** Returns the location IDs assigned to a user from the junction table. */
+export async function getUserLocationAssignments(userId: string) {
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+        .from('user_location_assignments')
+        .select('location_id')
+        .eq('user_id', userId);
+
+    if (error) throw error;
+    return (data ?? []).map((row: { location_id: string }) => row.location_id);
+}
 
 export async function getPendingInvitations(organizationId: string) {
     const supabase = createServiceRoleClient();
