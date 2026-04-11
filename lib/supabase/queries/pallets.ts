@@ -206,6 +206,8 @@ export async function retirePallet(
 		.eq("id", palletId)
 		.single();
 
+	console.log(pallet)
+
 	if (pallet?.status !== "empty") {
 		throw new Error("Only empty pallets can be retired.");
 	}
@@ -218,6 +220,8 @@ export async function retirePallet(
 			updated_at: new Date().toISOString(),
 		})
 		.eq("id", palletId);
+
+	console.log("error",error)
 
 	if (error) throw error;
 

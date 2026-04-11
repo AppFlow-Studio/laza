@@ -1,11 +1,11 @@
 'use server';
 
-import { createServerSupabaseClient } from '../server';
+import { createServiceRoleClient } from '../server';
 
 export async function getUserById(id: string | null) {
     if (!id) return null;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = createServiceRoleClient();
     const { data, error } = await supabase
         .from('users')
         .select(`

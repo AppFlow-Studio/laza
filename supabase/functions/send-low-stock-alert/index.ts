@@ -1,8 +1,3 @@
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
-
-// Setup type definitions for built-in Supabase Runtime APIs
 import { createClient } from 'npm:@supabase/supabase-js'
 
 type Payload = {
@@ -55,8 +50,33 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-  // Fetch notification preferences
-  // First try location-specific prefs; if none, fall back to org-wide (location_id IS NULL)
+  // ── Fetch alert first so we can determine isWarehouse before building recipients ──
+  const { data: alert, error: alertError } = await supabase
+    .from('alerts')
+    .select(
+      `
+        id,
+        triggered_at,
+        item_id,
+        location_id,
+        storage_space_id,
+        items (name, sku),
+        locations (name, location_type),
+        storage_spaces (name)
+      `
+    )
+    .eq('id', alert_id)
+    .single()
+
+  if (alertError || !alert) {
+    console.error('Alert fetch error', alertError)
+    return new Response('Alert not found', { status: 404 })
+  }
+
+  const isWarehouse = (alert.locations as any)?.location_type === 'warehouse'
+
+  // ── Fetch notification preferences ──
+  // Try location-specific prefs first; fall back to org-wide (location_id IS NULL)
   const { data: locationPrefs } = await supabase
     .from('notification_preferences')
     .select('*')
@@ -82,8 +102,7 @@ Deno.serve(async (req) => {
     return new Response('Notifications disabled', { status: 200 })
   }
 
-  // Build recipients
-  // For warehouse alerts, always use org-wide prefs (super admin email)
+  // For warehouse alerts always use org-wide prefs (super admin email)
   const effectivePrefs = isWarehouse ? (orgPrefs ?? prefs) : prefs
   const recipients = [
     effectivePrefs.primary_email,
@@ -94,33 +113,9 @@ Deno.serve(async (req) => {
     return new Response('No recipients configured', { status: 200 })
   }
 
-  // Fetch alert context (include location_type to detect warehouse)
-  const { data: alert, error: alertError } = await supabase
-    .from('alerts')
-    .select(
-      `
-        id,
-        triggered_at,
-        item_id,
-        location_id,
-        storage_space_id,
-        items (name, sku),
-        locations (name, location_type),
-        storage_spaces (name)
-      `
-    )
-    .eq('id', alert_id)
-    .single()
-
-  if (alertError || !alert) {
-    console.error('Alert fetch error', alertError)
-    return new Response('Alert not found', { status: 404 })
-  }
-
-  const itemName = alert.items?.name ?? 'Item'
-  const locationName = alert.locations?.name ?? 'Location'
-  const storageName = alert.storage_spaces?.name ?? ''
-  const isWarehouse = (alert.locations as any)?.location_type === 'warehouse'
+  const itemName = (alert.items as any)?.name ?? 'Item'
+  const locationName = (alert.locations as any)?.name ?? 'Location'
+  const storageName = (alert.storage_spaces as any)?.name ?? ''
 
   const urgencyLabel =
     urgency_level === 'critical'
@@ -143,14 +138,6 @@ Deno.serve(async (req) => {
         ? '#7f1d1d'
         : '#f59e0b'
 
-  const urgencyBgColor =
-    urgency_level === 'critical'
-      ? '#fef2f2'
-      : urgency_level === 'out_of_stock'
-        ? '#fef2f2'
-        : '#fffbeb'
-
-  // Calculate quantity change
   const quantityChange = (previous_quantity ?? current_quantity) - current_quantity
   const changeText = quantityChange > 0 ? `-${quantityChange}` : quantityChange < 0 ? `+${Math.abs(quantityChange)}` : '0'
 
@@ -166,7 +153,6 @@ Deno.serve(async (req) => {
     hour12: true,
   })
 
-  // Build URLs with item and location context
   const baseUrl = 'https://lazadessert.cafe'
   const viewItemUrl = isWarehouse
     ? `${baseUrl}/super-admin/warehouse/${location_id}`
@@ -184,11 +170,10 @@ Deno.serve(async (req) => {
   <meta name="x-apple-disable-message-reformatting"/>
 </head>
 <body style="background-color:#f5f7fa">
-  <!-- Preview Text -->
   <div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0">
     ${urgencyLabel}: ${itemName} at ${locationName}${storageName ? ` (${storageName})` : ''} - Current: ${current_quantity}, Threshold: ${min_quantity}
   </div>
-  
+
   <table border="0" width="100%" cellpadding="0" cellspacing="0" role="presentation" align="center">
     <tbody>
       <tr>
@@ -210,7 +195,7 @@ Deno.serve(async (req) => {
                       </tr>
                     </tbody>
                   </table>
-                  
+
                   <!-- Content -->
                   <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="padding:30px 20px">
                     <tbody>
@@ -226,10 +211,9 @@ Deno.serve(async (req) => {
                                     <strong>Location:</strong> ${locationName}<br/>
                                     ${storageName ? `<strong>Storage:</strong> ${storageName}` : ''}
                                   </p>
-                                  
+
                                   <hr style="width:100%;border:none;border-top:1px solid #e5e7eb;margin:15px 0"/>
-                                  
-                                  <!-- Quantity Stats -->
+
                                   <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation">
                                     <tbody style="width:100%">
                                       <tr style="width:100%">
@@ -252,8 +236,8 @@ Deno.serve(async (req) => {
                               </tr>
                             </tbody>
                           </table>
-                          
-                          <!-- Action Buttons -->
+
+                          <!-- Action Button -->
                           <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin:30px 0;text-align:center">
                             <tbody>
                               <tr>
@@ -261,19 +245,18 @@ Deno.serve(async (req) => {
                                   <a href="${viewItemUrl}" style="line-height:100%;text-decoration:none;display:inline-block;background-color:#1e40af;border-radius:6px;color:#ffffff;font-size:16px;font-weight:bold;text-align:center;padding:12px 24px;margin:0 10px 10px 0" target="_blank">
                                     View Item in App
                                   </a>
-                                
                                 </td>
                               </tr>
                             </tbody>
                           </table>
-                          
-                          <!-- Alert Details Footer -->
+
+                          <!-- Alert Details -->
                           <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f9fafb;border-radius:6px;padding:15px;margin-top:20px">
                             <tbody>
                               <tr>
                                 <td>
                                   <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0">
-                                    ${alert.items?.sku ? `<strong>SKU:</strong> ${alert.items.sku}<br/>` : ''}
+                                    ${(alert.items as any)?.sku ? `<strong>SKU:</strong> ${(alert.items as any).sku}<br/>` : ''}
                                     <strong>Previous Qty:</strong> ${previous_quantity ?? 'N/A'}<br/>
                                     <strong>Alert Triggered:</strong> ${triggeredDate}<br/>
                                     <strong>Alert ID:</strong> <span style="font-size:12px;color:#9ca3af">${alert_id}</span>
@@ -286,7 +269,7 @@ Deno.serve(async (req) => {
                       </tr>
                     </tbody>
                   </table>
-                  
+
                   <!-- Footer -->
                   <table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="padding:20px;text-align:center;border-top:1px solid #e5e7eb">
                     <tbody>
@@ -349,12 +332,10 @@ Deno.serve(async (req) => {
       errorMessage = err instanceof Error ? err.message : 'Unknown error'
     }
   } else {
-    // If no Resend key, skip sending but do not fail the trigger
     sendStatus = 'pending'
     errorMessage = 'RESEND_API_KEY not configured'
   }
 
-  // Log delivery status (one log per call; if multiple recipients, we log first)
   const firstRecipient = recipients[0]
   await supabase.from('email_delivery_logs').insert({
     organization_id,
@@ -381,5 +362,3 @@ Deno.serve(async (req) => {
 
   return new Response(JSON.stringify({ status: sendStatus }), { status: 200 })
 })
-
-

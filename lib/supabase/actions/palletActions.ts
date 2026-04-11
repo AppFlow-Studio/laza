@@ -248,6 +248,41 @@ export async function assignShipmentToPalletsAction(
     return data;
 }
 
+export async function retirePalletAction(
+    palletId: string,
+    userId: string,
+): Promise<void> {
+    const supabase = createServiceRoleClient();
+
+    const { data: pallet, error: fetchError } = await supabase
+        .from('warehouse_pallets')
+        .select('status, organization_id')
+        .eq('id', palletId)
+        .single();
+
+    if (fetchError) throw new Error(fetchError.message);
+    if (pallet?.status !== 'empty') throw new Error('Only empty pallets can be retired.');
+
+    const { error } = await supabase
+        .from('warehouse_pallets')
+        .update({
+            status:     'retired',
+            retired_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        })
+        .eq('id', palletId);
+
+    if (error) throw new Error(error.message);
+
+    await supabase.from('pallet_operations_log').insert({
+        organization_id: pallet.organization_id,
+        pallet_id:       palletId,
+        operation_type:  'retired',
+        performed_by:    userId,
+        notes:           'Pallet retired via Pallet Management UI',
+    });
+}
+
 export async function checkPalletLabelUniqueAction(
     organizationId: string,
     label: string,

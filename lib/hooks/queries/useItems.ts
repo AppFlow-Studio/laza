@@ -20,7 +20,8 @@ export function useItems() {
     const organizationId = userInfo?.members?.organization_id;
     return useQuery({
         queryKey: ['items', organizationId],
-        queryFn: () => getAllItems(organizationId),
+        queryFn: () => getAllItems(organizationId!),
+        enabled: !!organizationId,
     });
 }
 

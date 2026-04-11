@@ -8,9 +8,9 @@ import {
 	getPalletByIdAction,
 	getPalletOperationsLogAction,
 	getPurchaseOrdersForPalletFilterAction,
+	retirePalletAction,
 } from "@/lib/supabase/actions/palletActions";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
-import { retirePallet } from "@/lib/supabase/queries/pallets";
 import type { PalletFilters } from "@/lib/supabase/queries/pallets";
 
 // ── Query Keys ────────────────────────────────────────────────────────────────
@@ -89,7 +89,8 @@ export function useRetirePallet() {
 
 	return useMutation({
 		mutationFn: (palletId: string) =>
-			retirePallet(palletId, userInfo?.id ?? ""),
+			retirePalletAction(palletId, userInfo?.id ?? ""),
+
 		onSuccess: (_, palletId) => {
 			queryClient.invalidateQueries({ queryKey: palletKeys.lists() });
 			queryClient.invalidateQueries({ queryKey: palletKeys.detail(palletId) });

@@ -33,7 +33,7 @@ import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { WarehouseCatalogItem } from "@/lib/supabase/queries/warehouse";
 import { CreateTicketInput } from "@/lib/supabase/queries/orderTickets";
 import { useOrganization } from "@clerk/nextjs";
-import { useLocations } from "@/lib/hooks/queries/useLocations";
+import { useWarehouses } from "@/lib/hooks/queries/useWarehouse";
 import {
     getItemShipmentHistory,
     type ShipmentBoxConfig,
@@ -572,11 +572,7 @@ export default function NewOrderPage() {
     const organizationId = organization?.id ?? "";
 
     // ── Warehouse selector ─────────────────────────────────────────────────────
-    const { data: locations } = useLocations();
-    const warehouseLocations = useMemo(
-        () => (locations ?? []).filter((l) => l.location_type === "warehouse"),
-        [locations],
-    );
+    const { data: warehouseLocations } = useWarehouses();
     const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
     const warehouseLocationId = selectedWarehouseId;
 
@@ -897,7 +893,7 @@ export default function NewOrderPage() {
                             <option value="" disabled hidden>
                                 Select a warehouse
                             </option>
-                            {warehouseLocations.map((loc) => (
+                            {warehouseLocations?.map((loc) => (
                                 <option key={loc.id} value={loc.id}>
                                     {loc.name}
                                 </option>
@@ -1263,7 +1259,7 @@ export default function NewOrderPage() {
                                     <option value="" disabled hidden>
                                         Select a warehouse
                                     </option>
-                                    {warehouseLocations.map((loc) => (
+                                    {warehouseLocations?.map((loc) => (
                                         <option key={loc.id} value={loc.id}>
                                             {loc.name}
                                         </option>
