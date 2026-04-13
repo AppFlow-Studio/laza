@@ -56,6 +56,7 @@ export interface ReceivedItem {
     itemId: number;
     /** The count the employee physically counted — may differ from fulfilled_boxes */
     actualBoxesReceived: number;
+    storageSpaceId: string;
 }
 
 export interface ConfirmResult {
@@ -552,6 +553,7 @@ export async function confirmTicket(
             .select("id, current_quantity")
             .eq("item_id", received.itemId)
             .eq("location_id", storeLocationId)
+            .eq("storage_space_id", received.storageSpaceId)
             .maybeSingle();
 
         if (locError) throw locError;
@@ -572,6 +574,7 @@ export async function confirmTicket(
             const { error } = await supabase.from("item_locations").insert({
                 item_id: received.itemId,
                 location_id: storeLocationId,
+                storage_space_id: received.storageSpaceId,
                 organization_id: storeOrgId,
                 current_quantity: totalPiecesToAdd,
             });
@@ -584,6 +587,7 @@ export async function confirmTicket(
             .insert({
                 item_id: received.itemId,
                 location_id: storeLocationId,
+                storage_space_id: received.storageSpaceId,
                 organization_id: storeOrgId,
                 user_id: userId,
                 previous_quantity: previousQty,
