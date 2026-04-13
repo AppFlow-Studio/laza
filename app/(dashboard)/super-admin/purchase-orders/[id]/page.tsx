@@ -10,12 +10,12 @@ import {
     CheckCircle2, XCircle, Clock, Anchor,
     FileText, DollarSign, Calendar, Hash,
     Boxes, AlertCircle, Pencil, PackageCheck, Warehouse,
+    Layers, ChevronRight,
 } from "lucide-react";
 import { usePurchaseOrder, useUpdatePurchaseOrderStatus, useDeletePurchaseOrder } from "@/lib/hooks/queries/usePurchaseOrders";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import toast from "react-hot-toast";
 import { usePallets } from "@/lib/hooks/queries/usePallets";
-import { Layers, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -158,8 +158,6 @@ export default function PurchaseOrderDetailPage({
             </div>
         );
     }
-    console.log(po)
-
     if (!po) {
         return (
             <div className="text-center py-16">
@@ -193,8 +191,6 @@ export default function PurchaseOrderDetailPage({
 
 
     const displayItems = freeTextItems.length > 0 ? freeTextItems : [];
-
-    console.log(displayItems)
 
     return (
         <div className="space-y-6 max-w-6xl">

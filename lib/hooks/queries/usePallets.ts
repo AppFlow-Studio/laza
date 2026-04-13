@@ -34,7 +34,7 @@ export function usePallets(
 		queryFn:  warehouseLocationId
 			? () => getPalletsAction(warehouseLocationId, filters)
 			: () => getAllPalletsAction(filters),
-		enabled:  true,
+		enabled:  !!warehouseLocationId,
 		staleTime: 30_000,
 	});
 }
