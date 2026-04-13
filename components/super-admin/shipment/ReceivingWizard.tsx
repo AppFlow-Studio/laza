@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, ArrowRight, Loader2, X, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 import { useConfirmPOReceipt, useAssignShipmentToPallets } from "@/lib/hooks/queries/useReceiving";
@@ -72,56 +72,52 @@ function reconstructPhaseAData(po: POForReceiving): PhaseAData {
 }
 
 export function ReceivingWizard({
-                                    po,
-                                    warehouseLocationId,
-                                    organizationId,
-                                    initialStep = 1,
-                                    onComplete,
-                                    onCancel,
-                                }: ReceivingWizardProps) {
-    const [currentStep, setCurrentStep]           = useState(initialStep);
-    const [direction, setDirection]               = useState(1);
-    const [phaseAData, setPhaseAData]             = useState<PhaseAData | null>(
-        // If starting at step 2, pre-populate from the PO's received quantities
+    po,
+    warehouseLocationId,
+    organizationId,
+    initialStep = 1,
+    onComplete,
+    onCancel,
+}: ReceivingWizardProps) {
+    const [currentStep, setCurrentStep] = useState<1 | 2>(initialStep);
+    const [direction, setDirection]     = useState(1);
+    const [phaseAData, setPhaseAData]   = useState<PhaseAData | null>(
         initialStep === 2 ? reconstructPhaseAData(po) : null
     );
-    const [phaseADone, setPhaseADone]             = useState(initialStep === 2);
-    const [showCancelDialog, setShowCancelDialog] = useState(false);
+    const [phaseBValid, setPhaseBValid] = useState(false);
 
     const confirmReceipt  = useConfirmPOReceipt();
     const assignToPallets = useAssignShipmentToPallets();
 
     const goTo = useCallback(
-        (step: number) => {
+        (step: 1 | 2) => {
             setDirection(step > currentStep ? 1 : -1);
             setCurrentStep(step);
         },
         [currentStep]
     );
 
-    // ── Phase A submitted ──────────────────────────────────────────────────
-    const handlePhaseASubmit = async (data: PhaseAData) => {
+    // ── Phase A: just save data and advance — no API call ─────────────────
+    const handlePhaseASubmit = (data: PhaseAData) => {
         setPhaseAData(data);
-        try {
-            await confirmReceipt.mutateAsync({
-                purchaseOrderId:   po.id,
-                receivedItems:     data.lineItems.map((li) => ({
-                    item_id:           li.item_id,
-                    quantity_received: li.quantity_received,
-                })),
-                actualArrivalDate: data.actualArrivalDate,
-            });
-            setPhaseADone(true);
-            toast.success("Warehouse stock updated. Now assign items to pallets.");
-            goTo(2);
-        } catch (err: unknown) {
-            toast.error(getFriendlyErrorMessage(err));
-        }
+        goTo(2);
     };
 
-    // ── Phase B submitted ──────────────────────────────────────────────────
+    // ── Phase B: confirm receipt first (if not already received), then assign pallets ──
     const handlePhaseBSubmit = async (data: PhaseBData) => {
         try {
+            // Only call confirmReceipt when PO hasn't been received yet
+            if (initialStep !== 2) {
+                await confirmReceipt.mutateAsync({
+                    purchaseOrderId:   po.id,
+                    receivedItems:     phaseAData!.lineItems.map((li) => ({
+                        item_id:           li.item_id,
+                        quantity_received: li.quantity_received,
+                    })),
+                    actualArrivalDate: phaseAData!.actualArrivalDate,
+                });
+            }
+
             await assignToPallets.mutateAsync({
                 purchaseOrderId:    po.id,
                 organizationId,
@@ -144,6 +140,7 @@ export function ReceivingWizard({
                         })),
                 })),
             });
+
             toast.success(
                 `Shipment received. ${data.pallets.length} pallet${data.pallets.length !== 1 ? "s" : ""} created.`
             );
@@ -153,17 +150,21 @@ export function ReceivingWizard({
         }
     };
 
-    // ── Cancel guard ──────────────────────────────────────────────────────
     const handleCancelClick = () => {
-        if (phaseADone) {
-            setShowCancelDialog(true);
+        if (currentStep > 1 && initialStep === 1) {
+            goTo(1);
         } else {
             onCancel();
         }
     };
 
-    const isPhaseALoading = confirmReceipt.isPending;
-    const isPhaseBLoading = assignToPallets.isPending;
+    const isPhaseALoading = false; // Phase A no longer calls any API
+    const isPhaseBLoading = confirmReceipt.isPending || assignToPallets.isPending;
+
+    // Label for the Phase B loading state
+    const phaseBLoadingLabel = confirmReceipt.isPending
+        ? "Receiving…"
+        : "Creating pallets…";
 
     return (
         <div className="flex flex-col h-full max-h-[90vh]">
@@ -209,9 +210,6 @@ export function ReceivingWizard({
                                     }`}
                                 >
                                     Step {s.num}: {s.label}
-                                    {s.num === 1 && phaseADone && (
-                                        <span className="ml-1 text-green-500">✓</span>
-                                    )}
                                 </p>
                             </div>
                         ))}
@@ -243,7 +241,7 @@ export function ReceivingWizard({
                                 warehouseLocationId={warehouseLocationId}
                                 organizationId={organizationId}
                                 onSubmit={handlePhaseBSubmit}
-                                onSkip={() => {}} // unused — skip is removed
+                                onValidityChange={setPhaseBValid}
                                 isLoading={isPhaseBLoading}
                             />
                         )}
@@ -255,16 +253,8 @@ export function ReceivingWizard({
             <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50/50 px-6 py-4 flex-shrink-0">
                 <Button
                     variant="outline"
-                    onClick={() =>
-                        currentStep > 1 && initialStep === 1
-                            ? goTo(currentStep - 1)
-                            : handleCancelClick()
-                    }
-                    disabled={
-                        isPhaseALoading ||
-                        isPhaseBLoading ||
-                        (phaseADone && currentStep === 1)
-                    }
+                    onClick={handleCancelClick}
+                    disabled={isPhaseBLoading}
                     size="sm"
                 >
                     <ArrowLeft className="mr-1.5 h-4 w-4" />
@@ -280,20 +270,10 @@ export function ReceivingWizard({
                                     new Event("submit", { cancelable: true, bubbles: true })
                                 )
                         }
-                        disabled={isPhaseALoading}
                         size="sm"
                     >
-                        {isPhaseALoading ? (
-                            <>
-                                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                                Confirming…
-                            </>
-                        ) : (
-                            <>
-                                Confirm Receipt
-                                <ArrowRight className="ml-1.5 h-4 w-4" />
-                            </>
-                        )}
+                        Next
+                        <ArrowRight className="ml-1.5 h-4 w-4" />
                     </Button>
                 )}
 
@@ -306,60 +286,20 @@ export function ReceivingWizard({
                                     new Event("submit", { cancelable: true, bubbles: true })
                                 )
                         }
-                        disabled={isPhaseBLoading}
+                        disabled={isPhaseBLoading || !phaseBValid}
                         size="sm"
                     >
                         {isPhaseBLoading ? (
                             <>
                                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                                Creating pallets…
+                                {phaseBLoadingLabel}
                             </>
                         ) : (
-                            "Complete Receiving"
+                            "Receive & Assign to Pallets"
                         )}
                     </Button>
                 )}
             </div>
-
-            {/* ── Cancel dialog (shown when Phase A already committed) ── */}
-            {showCancelDialog && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                    <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-                        <div className="mb-3 flex items-center gap-3">
-                            <div className="rounded-full bg-amber-100 p-2">
-                                <AlertTriangle className="h-5 w-5 text-amber-600" />
-                            </div>
-                            <h2 className="text-base font-semibold text-zinc-900">
-                                Pallets not yet assigned
-                            </h2>
-                        </div>
-                        <p className="text-sm text-zinc-600">
-                            Warehouse stock has already been updated. If you leave now, this
-                            shipment will have no pallets. You can return to this page at any
-                            time to complete pallet assignment.
-                        </p>
-                        <div className="mt-5 flex gap-2">
-                            <Button
-                                variant="outline"
-                                className="flex-1"
-                                onClick={() => setShowCancelDialog(false)}
-                            >
-                                Stay &amp; assign pallets
-                            </Button>
-                            <Button
-                                variant="destructive"
-                                className="flex-1"
-                                onClick={() => {
-                                    setShowCancelDialog(false);
-                                    onComplete();
-                                }}
-                            >
-                                Leave anyway
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
