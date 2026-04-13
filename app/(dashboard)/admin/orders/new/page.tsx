@@ -579,7 +579,7 @@ export default function NewOrderPage() {
     const { data: rawCatalogItems, isLoading: catalogLoading } =
         useWarehouseCatalog();
     const { data: categories } = useCategories();
-    const { mutate: createTicket, isPending: isSubmitting } = useCreateTicket();
+    const { mutateAsync: createTicket, isPending: isSubmitting } = useCreateTicket();
 
     const [title, setTitle] = useState("");
     const [search, setSearch] = useState("");
