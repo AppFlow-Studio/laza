@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -479,11 +480,11 @@ interface PhaseBStepProps {
     warehouseLocationId: string;
     organizationId: string;
     onSubmit: (data: PhaseBData) => void;
-    onSkip: () => void;
+    onValidityChange: (valid: boolean) => void;
     isLoading: boolean;
 }
 
-export function PhaseBStep({ po, phaseAData, onSubmit }: PhaseBStepProps) {
+export function PhaseBStep({ po, phaseAData, onSubmit, onValidityChange }: PhaseBStepProps) {
     const {
         register,
         handleSubmit,
@@ -502,6 +503,15 @@ export function PhaseBStep({ po, phaseAData, onSubmit }: PhaseBStepProps) {
     });
 
     const watchedPallets = useWatch({ control, name: "pallets" }) ?? [];
+
+    useEffect(() => {
+        const valid = watchedPallets.some((p: PhaseBData["pallets"][number]) =>
+            p.items.some((it) =>
+                it.box_configs.some((c) => (c.box_count ?? 0) > 0)
+            )
+        );
+        onValidityChange(valid);
+    }, [watchedPallets, onValidityChange]);
 
     const handleFormSubmit = (data: PhaseBData) => {
         const overItems = phaseAData.lineItems.filter((li) => {
