@@ -25,6 +25,9 @@ import {
     X,
     Pencil,
     Check,
+    Snowflake,
+    Thermometer,
+    Wind,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -37,6 +40,9 @@ import {
 } from "@/lib/hooks/queries/useOrderTickets";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
+import { useLocationWithDetails } from "@/lib/hooks/queries/useLocations";
+import { Tables } from "@/lib/supabase/types";
+type StorageSpace = Tables<"storage_spaces">;
 import { CancelOrderDialog } from "@/components/orders/CancelOrderDialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -620,8 +626,10 @@ function ConfirmReceiptModal({
     onClose: () => void;
 }) {
     const { mutate: confirmTicket, isPending } = useConfirmTicket();
+    const { data: location } = useLocationWithDetails(ticket.requesting_location_id);
+    const storageSpaces: StorageSpace[] = location?.storage_spaces ?? [];
 
-    // Pre-fill with fulfilled_boxes; admin can correct if actual differs
+    // quantities: ticketItemId → actual boxes received
     const [quantities, setQuantities] = useState<Record<string, number>>(
         Object.fromEntries(
             ticket.order_ticket_items.map((item) => [
@@ -631,10 +639,45 @@ function ConfirmReceiptModal({
         ),
     );
 
+    // which storage space tab is active
+    const [activeSpaceId, setActiveSpaceId] = useState<string | null>(
+        storageSpaces[0]?.id ?? null,
+    );
+
+    // item_id (number) → storageSpaceId (string)
+    const [itemAssignments, setItemAssignments] = useState<Record<number, string>>({});
+
+    // When storage spaces load, auto-select first if none selected
+    useEffect(() => {
+        if (storageSpaces.length > 0 && !activeSpaceId) {
+            setActiveSpaceId(storageSpaces[0].id);
+        }
+    }, [storageSpaces, activeSpaceId]);
+
+    const allAssigned =
+        storageSpaces.length === 0 ||
+        ticket.order_ticket_items.every((item) => itemAssignments[item.item_id]);
+
+    const handleItemClick = (itemId: number) => {
+        if (!activeSpaceId) return;
+        setItemAssignments((prev) => {
+            // clicking same space again unassigns
+            if (prev[itemId] === activeSpaceId) {
+                const next = { ...prev };
+                delete next[itemId];
+                return next;
+            }
+            return { ...prev, [itemId]: activeSpaceId };
+        });
+    };
+
     const handleConfirm = () => {
         const receivedItems = ticket.order_ticket_items.map((item) => ({
             itemId: item.item_id,
             actualBoxesReceived: quantities[item.id] ?? 0,
+            ...(itemAssignments[item.item_id]
+                ? { storageSpaceId: itemAssignments[item.item_id] }
+                : {}),
         }));
         confirmTicket(
             { ticketId: ticket.id, receivedItems },
@@ -650,6 +693,29 @@ function ConfirmReceiptModal({
         );
     };
 
+    // Helper: get space meta for a spaceId
+    const getSpace = (spaceId: string) =>
+        storageSpaces.find((s) => s.id === spaceId);
+
+    // Temperature type → colors
+    const tempColors: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
+        frozen: {
+            bg: "bg-blue-50",
+            text: "text-blue-700",
+            icon: <Snowflake size={11} />,
+        },
+        refrigerated: {
+            bg: "bg-sky-50",
+            text: "text-sky-700",
+            icon: <Thermometer size={11} />,
+        },
+        dry: {
+            bg: "bg-amber-50",
+            text: "text-amber-700",
+            icon: <Wind size={11} />,
+        },
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -660,7 +726,7 @@ function ConfirmReceiptModal({
                             Confirm Receipt
                         </h2>
                         <p className="text-[11px] text-gray-400 mt-0.5">
-                            Enter the actual boxes received for each item.
+                            Assign each item to a storage space, then confirm quantities.
                         </p>
                     </div>
                     <button
@@ -671,8 +737,39 @@ function ConfirmReceiptModal({
                     </button>
                 </div>
 
+                {/* Storage space tabs — only shown when spaces exist */}
+                {storageSpaces.length > 0 && (
+                    <div className="px-5 pt-3 pb-1">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+                            Storage Space
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            {storageSpaces.map((space) => {
+                                const isActive = space.id === activeSpaceId;
+                                const colors = tempColors[space.temperature_type ?? "dry"];
+                                return (
+                                    <button
+                                        key={space.id}
+                                        onClick={() => setActiveSpaceId(space.id)}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                                            isActive
+                                                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                                                : `${colors.bg} ${colors.text} border-transparent hover:border-current`
+                                        }`}
+                                    >
+                                        <span className={isActive ? "text-white" : ""}>
+                                            {colors.icon}
+                                        </span>
+                                        {space.name}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 {/* Items */}
-                <div className="px-5 py-3 max-h-72 overflow-y-auto divide-y divide-gray-50">
+                <div className="px-5 py-3 max-h-64 overflow-y-auto divide-y divide-gray-50">
                     {ticket.order_ticket_items.map((item) => {
                         const name =
                             item.items?.short_label ??
@@ -682,14 +779,49 @@ function ConfirmReceiptModal({
                             item.fulfilled_boxes ?? item.quantity_boxes;
                         const actual = quantities[item.id] ?? fulfilled;
                         const hasDiscrepancy = actual !== fulfilled;
+                        const assignedSpaceId = itemAssignments[item.item_id];
+                        const assignedSpace = assignedSpaceId ? getSpace(assignedSpaceId) : null;
+                        const assignedColors = assignedSpace
+                            ? tempColors[assignedSpace.temperature_type ?? "dry"]
+                            : null;
+
                         return (
                             <div
                                 key={item.id}
-                                className="py-3 flex items-center gap-3"
+                                onClick={() => handleItemClick(item.item_id)}
+                                className={`py-3 flex items-center gap-3 rounded-lg cursor-pointer transition-all select-none ${
+                                    assignedSpaceId
+                                        ? "opacity-100"
+                                        : "opacity-80 hover:opacity-100"
+                                }`}
                             >
+                                {/* Assignment indicator dot */}
+                                <div
+                                    className={`w-2 h-2 rounded-full flex-shrink-0 transition-all ${
+                                        assignedSpaceId
+                                            ? "bg-indigo-500"
+                                            : "bg-gray-200"
+                                    }`}
+                                />
+
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-semibold text-gray-800 truncate">
-                                        {name}
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-xs font-semibold text-gray-800 truncate">
+                                            {name}
+                                        </div>
+                                        {/* Storage space badge */}
+                                        {assignedSpace && assignedColors ? (
+                                            <span
+                                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${assignedColors.bg} ${assignedColors.text}`}
+                                            >
+                                                {assignedColors.icon}
+                                                {assignedSpace.name}
+                                            </span>
+                                        ) : storageSpaces.length > 0 ? (
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-400">
+                                                Unassigned
+                                            </span>
+                                        ) : null}
                                     </div>
                                     <div className="text-[11px] text-gray-400 mt-0.5">
                                         Fulfilled:{" "}
@@ -698,7 +830,11 @@ function ConfirmReceiptModal({
                                         </span>
                                     </div>
                                 </div>
-                                <div className="flex flex-col items-end gap-1">
+
+                                <div
+                                    className="flex flex-col items-end gap-1"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-[11px] text-gray-400">
                                             Received:
@@ -718,13 +854,7 @@ function ConfirmReceiptModal({
                                                 }))
                                             }
                                             onKeyDown={(e) =>
-                                                [
-                                                    ".",
-                                                    "e",
-                                                    "E",
-                                                    "-",
-                                                    "+",
-                                                ].includes(e.key) &&
+                                                [".", "e", "E", "-", "+"].includes(e.key) &&
                                                 e.preventDefault()
                                             }
                                             className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"
@@ -742,26 +872,35 @@ function ConfirmReceiptModal({
                 </div>
 
                 {/* Footer */}
-                <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
-                    <button
-                        onClick={onClose}
-                        disabled={isPending}
-                        className="px-4 py-2 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleConfirm}
-                        disabled={isPending}
-                        className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all disabled:opacity-50 shadow-[0_2px_8px_rgba(22,163,74,.25)]"
-                    >
-                        {isPending ? (
-                            <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                            <CheckCircle2 size={12} />
-                        )}
-                        Confirm Receipt
-                    </button>
+                <div className="px-5 py-4 border-t border-gray-100">
+                    {!allAssigned && (
+                        <p className="text-[11px] text-amber-600 font-medium mb-2 flex items-center gap-1">
+                            <AlertTriangle size={11} />
+                            Select a storage space tab and tap each item to assign it.
+                        </p>
+                    )}
+                    <div className="flex items-center justify-end gap-2">
+                        <button
+                            onClick={onClose}
+                            disabled={isPending}
+                            className="px-4 py-2 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleConfirm}
+                            disabled={isPending || !allAssigned}
+                            title={!allAssigned ? "Assign all items to a storage space first" : undefined}
+                            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_2px_8px_rgba(22,163,74,.25)]"
+                        >
+                            {isPending ? (
+                                <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                                <CheckCircle2 size={12} />
+                            )}
+                            Confirm Receipt
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
