@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { format } from "date-fns";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, ArrowRight, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,6 @@ const STEPS = [
 
 /** Rebuild PhaseA data from an already-received PO so Phase B can run standalone. */
 function reconstructPhaseAData(po: POForReceiving): PhaseAData {
-    const { format } = require("date-fns");
     return {
         actualArrivalDate: po.actual_arrival ?? format(new Date(), "yyyy-MM-dd"),
         notes: "",
@@ -84,7 +84,8 @@ export function ReceivingWizard({
     const [phaseAData, setPhaseAData]   = useState<PhaseAData | null>(
         initialStep === 2 ? reconstructPhaseAData(po) : null
     );
-    const [phaseBValid, setPhaseBValid] = useState(false);
+    const [phaseBValid, setPhaseBValid]         = useState(false);
+    const [receiptConfirmed, setReceiptConfirmed] = useState(initialStep === 2);
 
     const confirmReceipt  = useConfirmPOReceipt();
     const assignToPallets = useAssignShipmentToPallets();
@@ -107,7 +108,7 @@ export function ReceivingWizard({
     const handlePhaseBSubmit = async (data: PhaseBData) => {
         try {
             // Only call confirmReceipt when PO hasn't been received yet
-            if (initialStep !== 2) {
+            if (!receiptConfirmed) {
                 await confirmReceipt.mutateAsync({
                     purchaseOrderId:   po.id,
                     receivedItems:     phaseAData!.lineItems.map((li) => ({
@@ -116,6 +117,7 @@ export function ReceivingWizard({
                     })),
                     actualArrivalDate: phaseAData!.actualArrivalDate,
                 });
+                setReceiptConfirmed(true);
             }
 
             await assignToPallets.mutateAsync({
