@@ -56,7 +56,7 @@ export interface ReceivedItem {
     itemId: number;
     /** The count the employee physically counted — may differ from fulfilled_boxes */
     actualBoxesReceived: number;
-    storageSpaceId: string;
+    storageSpaceId?: string;
 }
 
 export interface ConfirmResult {
@@ -548,13 +548,17 @@ export async function confirmTicket(
         }
 
         // Update store item_locations with ACTUAL pieces received
-        const { data: itemLoc, error: locError } = await supabase
+        let itemLocQuery = supabase
             .from("item_locations")
             .select("id, current_quantity")
             .eq("item_id", received.itemId)
-            .eq("location_id", storeLocationId)
-            .eq("storage_space_id", received.storageSpaceId)
-            .maybeSingle();
+            .eq("location_id", storeLocationId);
+
+        if (received.storageSpaceId) {
+            itemLocQuery = itemLocQuery.eq("storage_space_id", received.storageSpaceId);
+        }
+
+        const { data: itemLoc, error: locError } = await itemLocQuery.maybeSingle();
 
         if (locError) throw locError;
 
@@ -571,13 +575,16 @@ export async function confirmTicket(
                 .eq("id", itemLoc.id);
             if (error) throw error;
         } else {
-            const { error } = await supabase.from("item_locations").insert({
+            const insertData: Record<string, unknown> = {
                 item_id: received.itemId,
                 location_id: storeLocationId,
-                storage_space_id: received.storageSpaceId,
                 organization_id: storeOrgId,
                 current_quantity: totalPiecesToAdd,
-            });
+            };
+            if (received.storageSpaceId) {
+                insertData.storage_space_id = received.storageSpaceId;
+            }
+            const { error } = await supabase.from("item_locations").insert(insertData);
             if (error) throw error;
         }
 
@@ -587,7 +594,7 @@ export async function confirmTicket(
             .insert({
                 item_id: received.itemId,
                 location_id: storeLocationId,
-                storage_space_id: received.storageSpaceId,
+                ...(received.storageSpaceId ? { storage_space_id: received.storageSpaceId } : {}),
                 organization_id: storeOrgId,
                 user_id: userId,
                 previous_quantity: previousQty,
