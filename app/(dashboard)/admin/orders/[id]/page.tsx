@@ -5,7 +5,7 @@
  * File: app/(dashboard)/admin/orders/[id]/page.tsx
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -42,8 +42,9 @@ import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
 import { useLocationWithDetails } from "@/lib/hooks/queries/useLocations";
 import { Tables } from "@/lib/supabase/types";
-type StorageSpace = Tables<"storage_spaces">;
 import { CancelOrderDialog } from "@/components/orders/CancelOrderDialog";
+
+type StorageSpace = Tables<"storage_spaces">;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TicketStatus =
@@ -626,7 +627,7 @@ function ConfirmReceiptModal({
     onClose: () => void;
 }) {
     const { mutate: confirmTicket, isPending } = useConfirmTicket();
-    const { data: location } = useLocationWithDetails(ticket.requesting_location_id);
+    const { data: location, isLoading: locationLoading } = useLocationWithDetails(ticket.requesting_location_id);
     const storageSpaces: StorageSpace[] = location?.storage_spaces ?? [];
 
     // quantities: ticketItemId → actual boxes received
@@ -649,10 +650,11 @@ function ConfirmReceiptModal({
 
     // When storage spaces load, auto-select first if none selected
     useEffect(() => {
-        if (storageSpaces.length > 0 && !activeSpaceId) {
+        if (storageSpaces.length > 0 && activeSpaceId === null) {
             setActiveSpaceId(storageSpaces[0].id);
         }
-    }, [storageSpaces, activeSpaceId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [storageSpaces]);
 
     const allAssigned =
         storageSpaces.length === 0 ||
@@ -698,7 +700,7 @@ function ConfirmReceiptModal({
         storageSpaces.find((s) => s.id === spaceId);
 
     // Temperature type → colors
-    const tempColors: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
+    const tempColors = useMemo<Record<string, { bg: string; text: string; icon: React.ReactNode }>>(() => ({
         frozen: {
             bg: "bg-blue-50",
             text: "text-blue-700",
@@ -714,7 +716,7 @@ function ConfirmReceiptModal({
             text: "text-amber-700",
             icon: <Wind size={11} />,
         },
-    };
+    }), []);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
@@ -738,7 +740,17 @@ function ConfirmReceiptModal({
                 </div>
 
                 {/* Storage space tabs — only shown when spaces exist */}
-                {storageSpaces.length > 0 && (
+                {locationLoading ? (
+                    <div className="px-5 pt-3 pb-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+                            Storage Space
+                        </p>
+                        <div className="flex gap-2">
+                            <div className="h-7 w-20 rounded-full bg-gray-100 animate-pulse" />
+                            <div className="h-7 w-16 rounded-full bg-gray-100 animate-pulse" />
+                        </div>
+                    </div>
+                ) : storageSpaces.length > 0 ? (
                     <div className="px-5 pt-3 pb-1">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
                             Storage Space
@@ -766,7 +778,7 @@ function ConfirmReceiptModal({
                             })}
                         </div>
                     </div>
-                )}
+                ) : null}
 
                 {/* Items */}
                 <div className="px-5 py-3 max-h-64 overflow-y-auto divide-y divide-gray-50">
@@ -889,7 +901,7 @@ function ConfirmReceiptModal({
                         </button>
                         <button
                             onClick={handleConfirm}
-                            disabled={isPending || !allAssigned}
+                            disabled={isPending || !allAssigned || locationLoading}
                             title={!allAssigned ? "Assign all items to a storage space first" : undefined}
                             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_2px_8px_rgba(22,163,74,.25)]"
                         >
