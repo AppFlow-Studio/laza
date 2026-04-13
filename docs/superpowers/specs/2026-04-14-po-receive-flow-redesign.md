@@ -1,7 +1,7 @@
 # PO Receiving Flow Redesign
 
 **Date:** 2026-04-14  
-**Scope:** `ReceivingWizard`, both receive pages, PO detail page
+**Scope:** `ReceivingWizard`, both receive pages, both PO detail pages
 
 ---
 
@@ -61,12 +61,17 @@ No other changes needed in the receive pages.
 
 ---
 
-### 3. PO Detail Page (`app/(dashboard)/super-admin/purchase-orders/[id]/page.tsx`)
+### 3. PO Detail Pages (both)
+
+Applies to:
+- `app/(dashboard)/super-admin/purchase-orders/[id]/page.tsx`
+- `app/(dashboard)/super-admin/warehouse/[id]/purchase-orders/[poId]/page.tsx`
 
 **New pallets section:**
-- Add `usePallets(po.warehouse.id, { purchaseOrderId: id })` query.
+- Add `usePallets(po.warehouse.id, { purchaseOrderId: id })` query (both pages have `po.warehouse.id` available via the existing `getPurchaseOrderByIdAction` select).
 - Render a "Pallets" card below the line items table **only when** `po.status === "received"` AND `pallets.length > 0`.
 - Each pallet row: pallet label (monospace), box count, received date, linking to `/super-admin/warehouse/${po.warehouse.id}/pallets/${pallet.id}`.
+- The warehouse-context page already has the `warehouseId` route param — both link targets are identical since `po.warehouse.id` is the same value.
 - Use the same `ExistingPalletsList` visual style already used in the receive pages.
 
 **Status restriction:**
@@ -95,5 +100,6 @@ Phase B (on submit)
 | `components/super-admin/shipment/ReceivingWizard.tsx` | Remove Phase A API call, combine in Phase B, remove cancel dialog, update button labels |
 | `components/super-admin/shipment/PhaseBStep.tsx` | Add `onValidityChange` prop to signal whether any boxes are assigned |
 | `app/(dashboard)/super-admin/purchase-orders/[id]/page.tsx` | Add pallets section for received POs |
+| `app/(dashboard)/super-admin/warehouse/[id]/purchase-orders/[poId]/page.tsx` | Add pallets section for received POs |
 
 The two receive pages require no changes.
