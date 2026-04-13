@@ -649,11 +649,12 @@ function ConfirmReceiptModal({
     const [itemAssignments, setItemAssignments] = useState<Record<number, string>>({});
 
     // When storage spaces load, auto-select first if none selected
+    const didAutoSelect = useRef(false);
     useEffect(() => {
-        if (storageSpaces.length > 0 && activeSpaceId === null) {
+        if (!didAutoSelect.current && storageSpaces.length > 0) {
             setActiveSpaceId(storageSpaces[0].id);
+            didAutoSelect.current = true;
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [storageSpaces]);
 
     const allAssigned =
@@ -677,9 +678,7 @@ function ConfirmReceiptModal({
         const receivedItems = ticket.order_ticket_items.map((item) => ({
             itemId: item.item_id,
             actualBoxesReceived: quantities[item.id] ?? 0,
-            ...(itemAssignments[item.item_id]
-                ? { storageSpaceId: itemAssignments[item.item_id] }
-                : {}),
+            storageSpaceId: itemAssignments[item.item_id] ?? undefined,
         }));
         confirmTicket(
             { ticketId: ticket.id, receivedItems },
@@ -758,7 +757,7 @@ function ConfirmReceiptModal({
                         <div className="flex flex-wrap gap-2">
                             {storageSpaces.map((space) => {
                                 const isActive = space.id === activeSpaceId;
-                                const colors = tempColors[space.temperature_type ?? "dry"];
+                                const colors = tempColors[space.temperature_type ?? "dry"] ?? tempColors["dry"];
                                 return (
                                     <button
                                         key={space.id}
@@ -794,7 +793,7 @@ function ConfirmReceiptModal({
                         const assignedSpaceId = itemAssignments[item.item_id];
                         const assignedSpace = assignedSpaceId ? getSpace(assignedSpaceId) : null;
                         const assignedColors = assignedSpace
-                            ? tempColors[assignedSpace.temperature_type ?? "dry"]
+                            ? (tempColors[assignedSpace.temperature_type ?? "dry"] ?? tempColors["dry"])
                             : null;
 
                         return (
