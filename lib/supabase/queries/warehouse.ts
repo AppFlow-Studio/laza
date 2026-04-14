@@ -380,7 +380,7 @@ export async function getWarehouseOverview(
     const supabase = await createServerSupabaseClient();
 
     const baseQuery = supabase
-        .from("warehouse_inventory_overview")
+        .from("item_locations")
         .select("*")
         .eq("warehouse_location_id", warehouseLocationId);
 

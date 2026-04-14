@@ -171,7 +171,7 @@ function StockTab({ itemId }: { itemId: number }) {
 	// Group by storage space
 	const grouped = pallets.reduce<Record<string, typeof pallets>>(
 		(acc, p) => {
-			const key = p.storage_space_name ?? "Unassigned";
+			const key = p.storage_space_name ?? "";
 			if (!acc[key]) acc[key] = [];
 			acc[key].push(p);
 			return acc;

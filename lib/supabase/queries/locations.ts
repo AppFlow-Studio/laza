@@ -70,8 +70,41 @@ export async function getAllLocations(organizationId: string) {
     return [];
 }
 
+async function assertLocationAccess(supabase: any, userId: string, locationId: string) {
+    const { data: caller } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+    if (caller?.role === 'super_admin') return; // full access
+
+    if (caller?.role === 'admin') {
+        const { data: assignments } = await supabase
+            .from('user_location_assignments')
+            .select('location_id')
+            .eq('user_id', userId);
+
+        const assignedIds = assignments?.map((a: any) => a.location_id) ?? [];
+        if (assignedIds.length > 0 && !assignedIds.includes(locationId)) {
+            throw new Error('Unauthorized: location not assigned to this admin');
+        }
+        return;
+    }
+
+    throw new Error('Unauthorized');
+}
+
 export async function getLocationById(id: string) {
-    const supabase = await createServerSupabaseClient();
+    const { auth } = await import('@clerk/nextjs/server');
+    const { createServiceRoleClient } = await import('../server');
+
+    const { userId } = await auth();
+    if (!userId) throw new Error('Unauthorized');
+
+    const supabase = createServiceRoleClient();
+    await assertLocationAccess(supabase, userId, id);
+
     const { data, error } = await supabase
         .from('locations')
         .select(
@@ -92,7 +125,15 @@ export async function getLocationById(id: string) {
 }
 
 export async function getLocationWithDetails(id: string) {
-    const supabase = await createServerSupabaseClient();
+    const { auth } = await import('@clerk/nextjs/server');
+    const { createServiceRoleClient } = await import('../server');
+
+    const { userId } = await auth();
+    if (!userId) throw new Error('Unauthorized');
+
+    const supabase = createServiceRoleClient();
+    await assertLocationAccess(supabase, userId, id);
+
     const { data: location, error: locationError } = await supabase
         .from('locations')
         .select(

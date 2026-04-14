@@ -5,9 +5,11 @@ import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import { format } from 'date-fns';
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAdminStore } from '@/lib/stores/adminStore';
 
 export default function ActivityFeed() {
-    const { data: logs, isLoading } = useInventoryLogs({ limit: 10 });
+    const { selectedLocationId } = useAdminStore();
+    const { data: logs, isLoading } = useInventoryLogs({ limit: 10, locationId: selectedLocationId ?? undefined });
 
     const getActionTypeColor = (actionType: string) => {
         switch (actionType) {

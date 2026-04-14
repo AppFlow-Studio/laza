@@ -13,14 +13,16 @@ import toast from 'react-hot-toast';
 import ImmediateActions from '@/components/admin/dashboard/ImmediateActions';
 import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 import { useOrganizationUsers } from '@/lib/hooks/queries/useUsers';
+import { useAdminStore } from '@/lib/stores/adminStore';
 // import { useInventoryLogsSubscription, useAlertsSubscription, useEmployeesSubscription } from '@/lib/supabase/subscriptions';
 
 export default function AdminDashboard() {
+    const { selectedLocationId } = useAdminStore();
     const { data: userInfo } = useUserInfo();
     const { data: locations, isLoading: locationsLoading } = useLocations();
     const { data: employees, isLoading: employeesLoading } = useOrganizationUsers(userInfo?.members?.organization_id);
     const { data: items, isLoading: itemsLoading } = useItems();
-    const { data: alerts, isLoading: alertsLoading } = useAlerts({ resolved: false });
+    const { data: alerts, isLoading: alertsLoading } = useAlerts({ resolved: false, locationId: selectedLocationId ?? undefined });
 
     const [showAddLocation, setShowAddLocation] = useState(false);
     const [showAddEmployee, setShowAddEmployee] = useState(false);

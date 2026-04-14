@@ -1,6 +1,7 @@
 "use server";
 
-import { createServerSupabaseClient } from '../server';
+import { auth } from '@clerk/nextjs/server';
+import { createServiceRoleClient } from '../server';
 
 // Types
 export interface EmailDeliveryLog {
@@ -31,7 +32,7 @@ export interface EmailDeliveryLogFilters {
 export async function logEmailDelivery(
     data: Omit<EmailDeliveryLog, 'id' | 'created_at'>
 ): Promise<EmailDeliveryLog> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServiceRoleClient();
     const { data: log, error } = await supabase
         .from('email_delivery_logs')
         .insert({
@@ -57,11 +58,26 @@ export async function getEmailDeliveryLogs(
     organizationId: string,
     filters?: EmailDeliveryLogFilters
 ): Promise<{ logs: EmailDeliveryLog[]; total: number }> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServiceRoleClient();
+
+    const { userId } = await auth();
+    if (!userId) return { logs: [], total: 0 };
+
+    const { data: caller } = await supabase
+        .from('users')
+        .select('role, email')
+        .eq('id', userId)
+        .single();
+
     let query = supabase
         .from('email_delivery_logs')
         .select('*', { count: 'exact' })
         .eq('organization_id', organizationId);
+
+    // Admin: scope to emails sent to their own address only
+    if (caller?.role === 'admin' && caller?.email) {
+        query = query.eq('recipient_email', caller.email);
+    }
 
     if (filters?.emailType) {
         query = query.eq('email_type', filters.emailType);
@@ -104,7 +120,7 @@ export async function updateEmailDeliveryStatus(
     error?: string | null,
     resendEmailId?: string | null
 ): Promise<EmailDeliveryLog> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServiceRoleClient();
     const updateData: any = {
         status,
         sent_at: status === 'sent' ? new Date().toISOString() : null,
@@ -130,7 +146,7 @@ export async function updateEmailDeliveryStatus(
 
 // Get failed emails for retry
 export async function getFailedEmails(organizationId: string, limit = 50): Promise<EmailDeliveryLog[]> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServiceRoleClient();
     const { data, error } = await supabase
         .from('email_delivery_logs')
         .select('*')
