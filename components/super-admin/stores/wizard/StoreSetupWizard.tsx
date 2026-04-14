@@ -34,7 +34,8 @@ export default function StoreSetupWizard() {
     const createStorageSpaceMutation  = useCreateStorageSpace();
     const bulkAssignMutation          = useBulkAssignItems();
     const createInvitationMutation    = useCreateInvitation();
-    const { data: items }             = useItems();
+    // Fetch org-wide catalog items to seed the Default Storage space
+    const { data: items, isLoading: itemsLoading } = useItems();
 
     // ── Wizard state ─────────────────────────────────────────────────────────
     const [currentStep, setCurrentStep]       = useState(1);
@@ -197,25 +198,30 @@ export default function StoreSetupWizard() {
             if (assignPromises.length > 0) await Promise.all(assignPromises);
 
             // 4. Always create a Default Storage space; assign all catalog items if available (qty 0).
-            // The space is created unconditionally so it always exists even if items haven't loaded yet.
-            const defaultSpace = await createStorageSpaceMutation.mutateAsync({
-                location_id:      location.id,
-                name:             'Default Storage',
-                temperature_type: 'refrigerated',
-            });
+            const defaultNameTaken = storageSpaces.some(
+                s => s.name.trim().toLowerCase() === 'default storage'
+            );
 
-            const allItems = (items ?? []).map(item => ({
-                itemId:              String(item.id),
-                quantity:            0,
-                minQuantityOverride: null,
-            }));
-
-            if (allItems.length > 0) {
-                await bulkAssignMutation.mutateAsync({
-                    locationId:     location.id,
-                    storageSpaceId: defaultSpace.id,
-                    items:          allItems,
+            if (!defaultNameTaken) {
+                const defaultSpace = await createStorageSpaceMutation.mutateAsync({
+                    location_id:      location.id,
+                    name:             'Default Storage',
+                    temperature_type: 'refrigerated',
                 });
+
+                const allItems = (items ?? []).map(item => ({
+                    itemId:              String(item.id),
+                    quantity:            0,
+                    minQuantityOverride: null,
+                }));
+
+                if (allItems.length > 0) {
+                    await bulkAssignMutation.mutateAsync({
+                        locationId:     location.id,
+                        storageSpaceId: defaultSpace.id,
+                        items:          allItems,
+                    });
+                }
             }
 
             // 5. Send admin invitation if not skipped
@@ -400,7 +406,7 @@ export default function StoreSetupWizard() {
                                 )}
 
                                 {showFooterSubmit && (
-                                    <Button onClick={handleSubmit} disabled={isSubmitting || !storeData}>
+                                    <Button onClick={handleSubmit} disabled={isSubmitting || !storeData || itemsLoading}>
                                         {isSubmitting ? (
                                             <>
                                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
