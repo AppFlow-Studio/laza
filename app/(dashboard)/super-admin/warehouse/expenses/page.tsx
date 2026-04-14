@@ -944,22 +944,22 @@ export default function WarehouseExpensesPage() {
                                 })}
                             </span>
                         </p>
+                        {/* Warehouse selector */}
+                        {warehouses.length > 1 && (
+                            <select
+                                value={selectedWarehouseId}
+                                onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                                disabled={warehousesLoading}
+                                className="mt-2 px-3 py-2 w-64 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            >
+                                {warehouses.map((wh) => (
+                                    <option key={wh.id} value={wh.id}>
+                                        {wh.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
-                    {/* Warehouse selector */}
-                    {warehouses.length > 1 && (
-                        <select
-                            value={selectedWarehouseId}
-                            onChange={(e) => setSelectedWarehouseId(e.target.value)}
-                            disabled={warehousesLoading}
-                            className="px-3 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                        >
-                            {warehouses.map((wh) => (
-                                <option key={wh.id} value={wh.id}>
-                                    {wh.name}
-                                </option>
-                            ))}
-                        </select>
-                    )}
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
