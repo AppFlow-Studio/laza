@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import { useAllTickets } from "@/lib/hooks/queries/useOrderTickets";
 import { useOrganization } from "@clerk/nextjs";
+import { useAdminStore } from "@/lib/stores/adminStore";
 
 type TicketStatus =
     | "draft"
@@ -339,7 +340,10 @@ export default function AdminOrdersPage() {
     const router = useRouter();
     const { organization } = useOrganization();
     const organizationId = organization?.id ?? "";
-    const { data: tickets, isLoading } = useAllTickets(organizationId, {});
+    const { selectedLocationId } = useAdminStore();
+    const { data: tickets, isLoading } = useAllTickets(organizationId, {
+        storeLocationId: selectedLocationId ?? undefined,
+    });
     const [activeFilter, setActiveFilter] = useState<TicketStatus | "all">(
         "all",
     );

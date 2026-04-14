@@ -77,6 +77,7 @@ export default function ImmediateActions() {
                     const locationAlerts = groupedAlerts[locationId];
                     const location = locationAlerts[0]?.locations;
                     const locationName = location?.name || 'Unknown Location';
+                    console.log(locationAlerts)
 
                     return (
                         <motion.div

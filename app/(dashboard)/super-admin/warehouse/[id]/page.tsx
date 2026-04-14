@@ -1,11 +1,11 @@
-//super-admin/warehouse/purchase-orders
+//super-admin/warehouse/
 "use client";
 
 import { useWarehouseById } from "@/lib/hooks/queries/useWarehouse";
 import { useLocationWithDetails } from "@/lib/hooks/queries/useLocations";
 import { usePurchaseOrders } from "@/lib/hooks/queries/usePurchaseOrders";
 import { usePallets, usePalletStats, usePurchaseOrdersForFilter } from "@/lib/hooks/queries/usePallets";
-import { useWarehouseInventory } from "@/lib/hooks/queries/useWarehouse";
+import { useWarehouseOverview } from "@/lib/hooks/queries/useWarehouse";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import {
     Package, Thermometer, Snowflake, Wind,
@@ -468,13 +468,15 @@ function PalletsTab({ warehouseId }: { warehouseId: string }) {
 
 function InventoryTab({ warehouseId }: { warehouseId: string }) {
     const [search, setSearch] = useState("");
-    const { data: inventory, isLoading } = useWarehouseInventory(warehouseId);
+    const { data: overview, isLoading } = useWarehouseOverview(warehouseId);
 
-    const filtered = (inventory ?? []).filter((row: any) =>
+    const filtered = (overview ?? []).filter((row: any) =>
         !search ||
-        row.items?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        row.items?.sku?.toLowerCase().includes(search.toLowerCase())
+        row.item_display_label?.toLowerCase().includes(search.toLowerCase()) ||
+        row.sku?.toLowerCase().includes(search.toLowerCase())
     );
+
+    console.log(overview)
 
     if (isLoading) {
         return (
@@ -528,67 +530,51 @@ function InventoryTab({ warehouseId }: { warehouseId: string }) {
                         <tr className="border-b border-zinc-100 bg-zinc-50/50 text-left">
                             <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">Item</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">SKU</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">Storage Space</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Quantity</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Min Qty</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">Status</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">Unit</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Total Boxes</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">Availability</th>
                         </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-100">
                         {filtered.map((row: any) => {
-                            const qty    = row.current_quantity ?? 0;
-                            const minQty = row.min_quantity_override ?? row.items?.min_quantity ?? 0;
-                            const isLow  = minQty > 0 && qty <= minQty;
-                            const isOut  = qty === 0;
+                            const boxes  = row.box_count ?? 0;
+                            const isOut  = boxes === 0;
+                            console.log(row)
 
                             return (
-                                <tr key={row.id} className="hover:bg-zinc-50 transition-colors">
+                                <tr key={row.item_id} className="hover:bg-zinc-50 transition-colors">
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0">
                                                 <Package className="w-4 h-4 text-zinc-400" />
                                             </div>
                                             <span className="font-medium text-zinc-900">
-                                                    {row.items?.name ?? "Unknown"}
-                                                </span>
+                                                {row.item_display_label ?? "Unknown"}
+                                            </span>
                                         </div>
                                     </td>
                                     <td className="px-4 py-3">
-                                            <span className="font-mono text-xs text-zinc-500">
-                                                {row.items?.sku ?? "—"}
-                                            </span>
+                                        <span className="font-mono text-xs text-zinc-500">
+                                            {row.sku ?? "—"}
+                                        </span>
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-zinc-600">
-                                        {row.storage_spaces?.name ?? "—"}
+                                    <td className="px-4 py-3 text-sm text-zinc-600 capitalize">
+                                        {row.total_pieces ?? "—"}
                                     </td>
                                     <td className="px-4 py-3 text-right">
-                                            <span className={`text-sm font-semibold ${
-                                                isOut  ? "text-red-600"    :
-                                                    isLow  ? "text-amber-600"  :
-                                                        "text-zinc-900"
-                                            }`}>
-                                                {qty}
-                                            </span>
-                                        <span className="text-xs text-zinc-400 ml-1">
-                                                {row.items?.unit_of_measure ?? ""}
-                                            </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-right text-sm text-zinc-500">
-                                        {minQty > 0 ? minQty : "—"}
+                                        <span className={`text-sm font-semibold ${isOut ? "text-red-600" : "text-zinc-900"}`}>
+                                            {boxes}
+                                        </span>
                                     </td>
                                     <td className="px-4 py-3">
                                         {isOut ? (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                                                    Out of stock
-                                                </span>
-                                        ) : isLow ? (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                                                    Low stock
-                                                </span>
+                                                Out of stock
+                                            </span>
                                         ) : (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                                                    In stock
-                                                </span>
+                                                In stock
+                                            </span>
                                         )}
                                     </td>
                                 </tr>

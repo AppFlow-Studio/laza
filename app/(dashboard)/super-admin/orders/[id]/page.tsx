@@ -34,10 +34,7 @@ import {
     useFulfillTicket,
     usePartialFulfillTicket,
 } from "@/lib/hooks/queries/useOrderTickets";
-import {
-    useWarehouseInventory,
-    useWarehouseLocation,
-} from "@/lib/hooks/queries/useWarehouse";
+import { useWarehouseOverview } from "@/lib/hooks/queries/useWarehouse";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { RejectTicketDialog } from "@/components/orders/RejectTicketDialog";
 import {
@@ -113,8 +110,9 @@ type Ticket = {
 
 type WarehouseStockRow = {
     item_id: number;
-    current_quantity: number;
-    items: { id: number; name: string; unit_of_measure: string } | null;
+    total_boxes: number;
+    display_label: string;
+    unit_of_measure: string;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -607,7 +605,6 @@ export default function SuperAdminTicketDetailPage() {
     const ticketId = params.id as string;
 
     const { data: userInfo } = useUserInfo();
-    const { data: warehouseLocation } = useWarehouseLocation();
 
     const {
         data: rawTicket,
@@ -616,13 +613,12 @@ export default function SuperAdminTicketDetailPage() {
     } = useTicket(ticketId);
     const ticket = rawTicket as Ticket | undefined;
 
-    const warehouseLocationId =
-        warehouseLocation?.id ?? ticket?.warehouse_location_id ?? "";
+    const warehouseLocationId = ticket?.warehouse_location_id ?? "";
     const {
         data: warehouseStock,
         isLoading: stockLoading,
         refetch: refetchStock,
-    } = useWarehouseInventory(warehouseLocationId);
+    } = useWarehouseOverview(warehouseLocationId, "box");
 
     const { mutate: fulfillAll, isPending: isFulfillingAll } =
         useFulfillTicket();
@@ -635,7 +631,7 @@ export default function SuperAdminTicketDetailPage() {
     const stockMap = useMemo(() => {
         const map = new Map<number, number>();
         (warehouseStock as WarehouseStockRow[] | undefined)?.forEach((row) => {
-            map.set(row.item_id, row.current_quantity);
+            map.set(row.item_id, row.total_boxes);
         });
         return map;
     }, [warehouseStock]);

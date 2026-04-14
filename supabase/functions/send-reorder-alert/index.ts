@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
   const items = (alerts ?? []) as ReorderRow[]
 
   if (items.length === 0) {
-    return new Response('No reorder alerts', { status: 200 })
+    return new Response(JSON.stringify({ skipped: true }), { status: 200 })
   }
 
   // Get organization name
@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
   })
 
   const baseUrl = 'https://lazadessert.cafe'
-  const analyticsUrl = `${baseUrl}/super-admin/analytics`
+  const analyticsUrl = `${baseUrl}/super-admin/warehouse/analytics`
   const notificationSettingsUrl = `${baseUrl}/super-admin/settings/notifications`
 
   // Build urgency helpers

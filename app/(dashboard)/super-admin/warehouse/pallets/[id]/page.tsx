@@ -2,8 +2,8 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, MoveRight, Pencil } from "lucide-react";
-import { usePallet, usePalletOperationsLog } from "@/lib/hooks/queries/usePallets";
+import { ArrowLeft, MoveRight, Pencil, Archive } from "lucide-react";
+import { usePallet, usePalletOperationsLog, useRetirePallet } from "@/lib/hooks/queries/usePallets";
 import { PalletStatusBadge } from "@/components/pallets/PalletStatusBadge";
 import { TemperatureBadge } from "@/components/pallets/TemperatureBadge";
 import { FillLevelBar } from "@/components/pallets/FillLevelBar";
@@ -15,11 +15,11 @@ import { useState } from "react";
 export default function PalletDetailPage() {
 	const { id } = useParams<{ id: string }>();
 	const router = useRouter();
-	const [editModalOpen, setEditModalOpen] = useState(false);
 
 	const { data: pallet, isLoading } = usePallet(id);
 	const { data: activityLog, isLoading: logLoading } =
 		usePalletOperationsLog(id);
+	const { mutate: retirePallet, isPending: isRetiring } = useRetirePallet();
 
 	if (isLoading) {
 		return <PalletDetailSkeleton />;
@@ -43,7 +43,6 @@ export default function PalletDetailPage() {
 		warehouse: pallet.warehouse_location_id,
 	});
 
-	console.log(pallet)
 
 	return (
 		<div className="flex flex-col gap-6 p-6">
@@ -62,6 +61,16 @@ export default function PalletDetailPage() {
 					<PalletStatusBadge status={pallet.status as "active" | "empty" | "retired"} />
 				</div>
 				<div className="flex gap-2">
+					{pallet.status === "empty" && (
+						<button
+							onClick={() => retirePallet(pallet.id)}
+							disabled={isRetiring}
+							className="flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm transition-colors hover:bg-red-50 disabled:opacity-50"
+						>
+							<Archive className="h-4 w-4" />
+							{isRetiring ? "Retiring…" : "Retire Pallet"}
+						</button>
+					)}
 					<button
 						onClick={() =>
 							router.push(`/super-admin/warehouse/pallets/reorganize?${params.toString()}`)
@@ -70,13 +79,6 @@ export default function PalletDetailPage() {
 					>
 						<MoveRight className="h-4 w-4" />
 						Move Items
-					</button>
-					<button
-						onClick={() => setEditModalOpen(true)}
-						className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-					>
-						<Pencil className="h-4 w-4" />
-						Edit
 					</button>
 				</div>
 			</div>
