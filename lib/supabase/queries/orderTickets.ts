@@ -123,10 +123,15 @@ export async function createTicket(input: CreateTicketInput) {
         quantity_units: item.quantityUnits,
     }));
 
-    const { error: itemsError } = await supabase
+    console.log(lineItems);
+    
+
+    const { error: itemsError, status, data } = await supabase
         .from("order_ticket_items")
         .insert(lineItems);
 
+    console.log(itemsError, status, data);
+    
     if (itemsError) throw itemsError;
 
     await insertTicketLog(
@@ -487,6 +492,8 @@ export async function confirmTicket(
     userId: string,
     receivedItems: ReceivedItem[],
 ): Promise<ConfirmResult> {
+    console.log("[confirmTicket] Starting:", { ticketId, userId, receivedItems });
+
     const supabase = createServerSupabaseClient();
 
     const { data: ticket, error: ticketError } = await supabase
@@ -506,7 +513,17 @@ export async function confirmTicket(
         .eq("id", ticketId)
         .single();
 
-    if (ticketError) throw ticketError;
+    if (ticketError) {
+        console.error("[confirmTicket] Failed to fetch ticket:", ticketError);
+        throw ticketError;
+    }
+
+    console.log("[confirmTicket] Ticket fetched:", {
+        id: ticket.id,
+        status: ticket.status,
+        requesting_location_id: ticket.requesting_location_id,
+        itemCount: ticket.order_ticket_items?.length,
+    });
 
     const confirmableStatuses: TicketStatus[] = ["delivered", "fulfilled"];
     if (!confirmableStatuses.includes(ticket.status as TicketStatus)) {
@@ -518,6 +535,24 @@ export async function confirmTicket(
     const storeLocationId = ticket.requesting_location_id;
     const storeOrgId = ticket.organization_id;
     const discrepancies: ConfirmResult["discrepancies"] = [];
+
+    // Pre-fetch storage space names for all assigned space IDs (single query)
+    const assignedSpaceIds = [
+        ...new Set(receivedItems.map((r) => r.storageSpaceId).filter(Boolean)),
+    ] as string[];
+    const spaceNameMap: Record<string, string> = {};
+    if (assignedSpaceIds.length > 0) {
+        const { data: spaces } = await supabase
+            .from("storage_spaces")
+            .select("id, name")
+            .in("id", assignedSpaceIds);
+        for (const s of spaces ?? []) {
+            spaceNameMap[s.id] = s.name;
+        }
+    }
+
+    // item assignments for the log note: "Item name → Space name"
+    const itemSpaceLines: string[] = [];
 
     for (const received of receivedItems) {
         const ticketItem = ticket.order_ticket_items?.find(
@@ -535,6 +570,12 @@ export async function confirmTicket(
         const fulfillmentLines =
             ticketItem.order_ticket_fulfillment_lines ?? [];
 
+        // Record storage space assignment for the log note
+        if (received.storageSpaceId) {
+            const spaceName = spaceNameMap[received.storageSpaceId] ?? received.storageSpaceId;
+            itemSpaceLines.push(`${itemName} → ${spaceName}`);
+        }
+
         // Calculate pieces to add using ACTUAL count with per-source pieces_per_box_at_time
         let totalPiecesToAdd = 0;
         if (fulfillmentLines.length > 0 && expectedBoxes > 0) {
@@ -547,7 +588,9 @@ export async function confirmTicket(
             totalPiecesToAdd = actualBoxes;
         }
 
-        // Update store item_locations with ACTUAL pieces received
+        // Update store item_locations with ACTUAL pieces received.
+        // When a storageSpaceId is provided, target that specific storage-space row.
+        // Without one, target any row for this item+location (no storage space filter).
         let itemLocQuery = supabase
             .from("item_locations")
             .select("id, current_quantity")
@@ -556,11 +599,28 @@ export async function confirmTicket(
 
         if (received.storageSpaceId) {
             itemLocQuery = itemLocQuery.eq("storage_space_id", received.storageSpaceId);
+        } else {
+            itemLocQuery = itemLocQuery.is("storage_space_id", null);
         }
 
         const { data: itemLoc, error: locError } = await itemLocQuery.maybeSingle();
 
-        if (locError) throw locError;
+        if (locError) {
+            console.error("[confirmTicket] item_locations query error:", locError, {
+                itemId: received.itemId,
+                locationId: storeLocationId,
+                storageSpaceId: received.storageSpaceId,
+            });
+            throw locError;
+        }
+
+        console.log("[confirmTicket] item_locations lookup:", {
+            itemId: received.itemId,
+            storageSpaceId: received.storageSpaceId ?? null,
+            found: !!itemLoc,
+            currentQty: itemLoc?.current_quantity,
+            piecesToAdd: totalPiecesToAdd,
+        });
 
         const previousQty = itemLoc?.current_quantity ?? 0;
         const newQty = previousQty + totalPiecesToAdd;
@@ -573,7 +633,11 @@ export async function confirmTicket(
                     last_updated: new Date().toISOString(),
                 })
                 .eq("id", itemLoc.id);
-            if (error) throw error;
+            if (error) {
+                console.error("[confirmTicket] item_locations update error:", error);
+                throw error;
+            }
+            console.log("[confirmTicket] item_locations updated:", { id: itemLoc.id, newQty });
         } else {
             const insertData: Record<string, unknown> = {
                 item_id: received.itemId,
@@ -585,7 +649,11 @@ export async function confirmTicket(
                 insertData.storage_space_id = received.storageSpaceId;
             }
             const { error } = await supabase.from("item_locations").insert(insertData);
-            if (error) throw error;
+            if (error) {
+                console.error("[confirmTicket] item_locations insert error:", error, insertData);
+                throw error;
+            }
+            console.log("[confirmTicket] item_locations inserted:", insertData);
         }
 
         // Inventory log — note includes discrepancy detail when counts differ
@@ -607,7 +675,10 @@ export async function confirmTicket(
                         : ""
                 }`,
             });
-        if (logError) throw logError;
+        if (logError) {
+            console.error("[confirmTicket] inventory_logs insert error:", logError);
+            throw logError;
+        }
 
         // Track discrepancy
         if (actualBoxes !== expectedBoxes) {
@@ -623,14 +694,19 @@ export async function confirmTicket(
     const hasDiscrepancy = discrepancies.length > 0;
 
     // Build human-readable note for the ticket log
+    const storageSuffix =
+        itemSpaceLines.length > 0
+            ? ` Storage: ${itemSpaceLines.join(", ")}.`
+            : "";
+
     const logNote = hasDiscrepancy
         ? `Confirmed with discrepancies — ${discrepancies
               .map(
                   (d) =>
                       `${d.itemName}: expected ${d.expectedBoxes} boxes, received ${d.actualBoxes} boxes`,
               )
-              .join(" | ")}`
-        : "Order confirmed — all quantities match.";
+              .join(" | ")}${storageSuffix}`
+        : `Order confirmed — all quantities match.${storageSuffix}`;
 
     // Mark ticket confirmed + write has_discrepancy flag for super admin filtering
     const { data: confirmed, error: confirmError } = await supabase
@@ -645,7 +721,12 @@ export async function confirmTicket(
         .select("id, status")
         .single();
 
-    if (confirmError) throw confirmError;
+    if (confirmError) {
+        console.error("[confirmTicket] order_tickets update error:", confirmError);
+        throw confirmError;
+    }
+
+    console.log("[confirmTicket] Ticket status updated to confirmed:", confirmed);
 
     await insertTicketLog(
         supabase,

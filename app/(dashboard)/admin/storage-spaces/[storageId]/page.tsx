@@ -1,24 +1,21 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { useParams, usePathname } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Plus, Package, Edit, History, AlertTriangle, Settings, Trash2, Check } from 'lucide-react';
+import { Package, Edit, History, AlertTriangle, Settings, Trash2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import { useStorageSpace, useInventoryByStorageSpace, useInventoryLogsByStorageSpace, useUpdateStorageSpace, useDeleteStorageSpace } from '@/lib/hooks/queries/useStorageSpace';
-import { useBulkAssignItems } from '@/lib/hooks/queries/useStorageSetup';
 import { useBulkUpdateInventory, useBulkRemoveItems } from '@/lib/hooks/queries/useInventory';
 import { useAdminStore } from '@/lib/stores/adminStore';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
 import QuantityUpdateModal from '@/components/admin/inventory/QuantityUpdateModal';
-import AddItemsToStorageSpace from '@/components/admin/locations/AddItemsToStorageSpace';
 import InventoryLogsList from '@/components/admin/locations/InventoryLogsList';
 import SearchBar from '@/components/admin/shared/SearchBar';
 import FilterDropdown from '@/components/admin/shared/FilterDropdown';
 import { useCategories } from '@/lib/hooks/queries/useCategories';
-import { useUser } from '@clerk/nextjs';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Grid, List } from 'lucide-react';
@@ -40,33 +37,19 @@ import {
 
 export default function StorageSpaceDetailPage() {
     const params = useParams();
-    const pathname = usePathname();
+    const storageSpaceId = params.storageId as string;
 
-    // Extract IDs from nested route: /admin/locations/[locationId]/storage-spaces/[storageSpaceId]
-    // Use pathname to reliably extract both IDs
-    const [actualLocationId, actualStorageSpaceId] = useMemo(() => {
-        const segments = pathname.split('/');
-        const locIndex = segments.indexOf('locations');
-        const storageIndex = segments.indexOf('storage-spaces');
-        return [
-            locIndex >= 0 ? segments[locIndex + 1] : '',
-            storageIndex >= 0 ? segments[storageIndex + 1] : ''
-        ];
-    }, [pathname]);
-
-    const { user } = useUser();
     const { viewMode, setViewMode } = useAdminStore();
 
-    const { data: storageSpace, isLoading: storageSpaceLoading } = useStorageSpace(actualStorageSpaceId);
-    const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } = useInventoryByStorageSpace(actualStorageSpaceId);
-    const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useInventoryLogsByStorageSpace(actualStorageSpaceId, 50);
+    const { data: storageSpace, isLoading: storageSpaceLoading } = useStorageSpace(storageSpaceId);
+    const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } = useInventoryByStorageSpace(storageSpaceId);
+    const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useInventoryLogsByStorageSpace(storageSpaceId, 50);
     const { data: categories } = useCategories();
     const updateStorageSpaceMutation = useUpdateStorageSpace();
     const deleteStorageSpaceMutation = useDeleteStorageSpace();
     const router = useRouter();
 
     const [activeTab, setActiveTab] = useState('items');
-    const [showAddItems, setShowAddItems] = useState(false);
     const [editingItem, setEditingItem] = useState<{
         itemId: string;
         quantity: number;
@@ -74,10 +57,7 @@ export default function StorageSpaceDetailPage() {
         minQuantityOverride?: number | null;
         itemMinQuantity?: number;
     } | null>(null);
-    const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [selectedInventoryItems, setSelectedInventoryItems] = useState<Set<string>>(new Set());
-    const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
-    const [itemMinQuantityOverrides, setItemMinQuantityOverrides] = useState<Record<string, number | null>>({});
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -87,79 +67,8 @@ export default function StorageSpaceDetailPage() {
     const [showBulkRemoveDialog, setShowBulkRemoveDialog] = useState(false);
     const debouncedSearch = useDebounce(searchQuery, 300);
 
-    const bulkAssignMutation = useBulkAssignItems();
     const bulkUpdateInventoryMutation = useBulkUpdateInventory();
     const bulkRemoveItemsMutation = useBulkRemoveItems();
-
-    // Get existing item IDs in this storage space
-    const existingItemIds = new Set(inventory?.map((inv: any) => inv.item_id) || []);
-
-    const handleItemToggle = (itemId: string) => {
-        const newSelected = new Set(selectedItems);
-        if (newSelected.has(itemId)) {
-            newSelected.delete(itemId);
-            const newQuantities = { ...itemQuantities };
-            const newOverrides = { ...itemMinQuantityOverrides };
-            delete newQuantities[itemId];
-            delete newOverrides[itemId];
-            setItemQuantities(newQuantities);
-            setItemMinQuantityOverrides(newOverrides);
-        } else {
-            newSelected.add(itemId);
-            setItemQuantities({ ...itemQuantities, [itemId]: 0 });
-            setItemMinQuantityOverrides({ ...itemMinQuantityOverrides, [itemId]: null });
-        }
-        setSelectedItems(newSelected);
-    };
-
-    const handleQuantityChange = (itemId: string, quantity: number) => {
-        setItemQuantities({ ...itemQuantities, [itemId]: quantity });
-    };
-
-    const handleMinQuantityOverrideChange = (itemId: string, override: number | null) => {
-        setItemMinQuantityOverrides({ ...itemMinQuantityOverrides, [itemId]: override });
-    };
-
-    const handleAddItems = async () => {
-        if (selectedItems.size === 0) {
-            toast.error('Please select at least one item');
-            return;
-        }
-
-        if (!storageSpace) {
-            toast.error('Storage space not found');
-            return;
-        }
-
-        const itemsToAssign = Array.from(selectedItems).map(itemId => ({
-            itemId,
-            quantity: itemQuantities[itemId] || 0,
-            minQuantityOverride: itemMinQuantityOverrides[itemId] ?? null,
-        }));
-
-        const invalidItems = itemsToAssign.filter(item => item.quantity < 0);
-        if (invalidItems.length > 0) {
-            toast.error('Please enter valid quantities (0 or greater)');
-            return;
-        }
-
-        try {
-            await bulkAssignMutation.mutateAsync({
-                locationId: storageSpace.location.id,
-                storageSpaceId: actualStorageSpaceId,
-                items: itemsToAssign,
-            });
-            toast.success(`Successfully added ${selectedItems.size} item(s) to storage space`);
-            setSelectedItems(new Set());
-            setItemQuantities({});
-            setItemMinQuantityOverrides({});
-            setShowAddItems(false);
-            refetchInventory();
-            refetchLogs();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to add items');
-        }
-    };
 
     const handleQuantityUpdate = () => {
         setEditingItem(null);
@@ -191,7 +100,7 @@ export default function StorageSpaceDetailPage() {
             await bulkRemoveItemsMutation.mutateAsync({
                 itemIds: Array.from(selectedInventoryItems),
                 locationId: storageSpace.location.id,
-                storageSpaceId: actualStorageSpaceId,
+                storageSpaceId,
             });
             toast.success(`Successfully removed ${selectedInventoryItems.size} item${selectedInventoryItems.size !== 1 ? 's' : ''} from storage space`);
             setSelectedInventoryItems(new Set());
@@ -210,13 +119,11 @@ export default function StorageSpaceDetailPage() {
         refetchLogs();
     };
 
-
     // Filter inventory items
     const filteredInventory = inventory?.filter((inv: any) => {
         const item = inv.items;
         if (!item) return false;
 
-        // Search filter
         if (debouncedSearch) {
             const searchLower = debouncedSearch.toLowerCase();
             const matchesSearch =
@@ -225,7 +132,6 @@ export default function StorageSpaceDetailPage() {
             if (!matchesSearch) return false;
         }
 
-        // Category filter
         if (categoryFilter) {
             const itemCategoryId = typeof item.category === 'object' && item.category !== null && 'id' in item.category
                 ? (item.category as any).id
@@ -269,8 +175,8 @@ export default function StorageSpaceDetailPage() {
         return (
             <div className="text-center py-12">
                 <p className="text-zinc-500">Storage space not found</p>
-                <Link href={`/admin/locations/${actualLocationId}`}>
-                    <Button className="mt-4">Back to Location</Button>
+                <Link href="/admin">
+                    <Button className="mt-4">Back to Dashboard</Button>
                 </Link>
             </div>
         );
@@ -283,32 +189,6 @@ export default function StorageSpaceDetailPage() {
 
     return (
         <div className="space-y-6">
-            {/* Breadcrumb Navigation */}
-            <nav className="mb-6" aria-label="Breadcrumb">
-                <ol className="flex items-center text-sm text-zinc-600 space-x-2">
-                    <li>
-                        <Link href="/admin/locations" className="flex items-center hover:underline">
-                            <ArrowLeft className="w-4 h-4 mr-1" />
-                            Locations
-                        </Link>
-                    </li>
-                    <li>
-                        <span className="mx-2 text-zinc-400">/</span>
-                    </li>
-                    <li>
-                        <Link href={`/admin/locations/${actualLocationId}`} className="hover:underline">
-                            {location.name}
-                        </Link>
-                    </li>
-                    <li>
-                        <span className="mx-2 text-zinc-400">/</span>
-                    </li>
-                    <li className="truncate font-semibold text-zinc-900">
-                        {storageSpace.name}
-                    </li>
-                </ol>
-            </nav>
-
             {/* Storage Space Header */}
             <div className="bg-white rounded-xl shadow-sm p-6 border border-zinc-200">
                 <div className="flex items-start justify-between">
@@ -383,30 +263,11 @@ export default function StorageSpaceDetailPage() {
                                         <List className="w-4 h-4" />
                                     </button>
                                 </div>
-                                <Button
-                                    onClick={() => setShowAddItems(true)}
-                                    size="sm"
-                                    className=" items-center gap-2 sm:flex hidden"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Add Items
-                                </Button>
                             </div>
                         )}
                     </div>
 
-                    <Button
-                        onClick={() => setShowAddItems(true)}
-                        size="sm"
-                        className=" items-center gap-2 mb-2 flex sm:hidden"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add Items
-                    </Button>
-
                     <TabsContent value="items" className="mt-0">
-
-
                         {/* Search and Filters */}
                         <div className="flex flex-col sm:flex-row gap-4 mb-4">
                             <div className="flex-1">
@@ -442,6 +303,7 @@ export default function StorageSpaceDetailPage() {
                             onClearSelection={() => setSelectedInventoryItems(new Set())}
                             isLoading={bulkUpdateInventoryMutation.isPending || bulkRemoveItemsMutation.isPending}
                         />
+
                         {/* Items List/Grid */}
                         {inventoryLoading ? (
                             <div className="flex items-center justify-center py-12">
@@ -450,15 +312,7 @@ export default function StorageSpaceDetailPage() {
                         ) : filteredInventory.length === 0 ? (
                             <div className="text-center py-12">
                                 <Package className="w-12 h-12 text-zinc-300 mx-auto mb-3" />
-                                <p className="text-zinc-500 mb-4">No items in this storage space</p>
-                                <Button
-                                    onClick={() => setShowAddItems(true)}
-                                    variant="outline"
-                                    size="sm"
-                                >
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Items
-                                </Button>
+                                <p className="text-zinc-500">No items in this storage space</p>
                             </div>
                         ) : viewMode === 'list' ? (
                             <div className="space-y-2">
@@ -554,7 +408,7 @@ export default function StorageSpaceDetailPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {filteredInventory.map((inv: any) => {
                                     const item = inv.items;
-                                    const isLowStock = item && inv.current_quantity <= (inv.min_quantity_override || item.min_quantity || 0);
+                                    const isLowStock = item && inv.current_quantity <= (inv.min_quantity_override || item.min_quantity_override || item.min_quantity || 0);
                                     const isSelected = selectedInventoryItems.has(inv.item_id);
                                     return (
                                         <div
@@ -641,54 +495,6 @@ export default function StorageSpaceDetailPage() {
                 </Tabs>
             </div>
 
-            {/* Add Items Bottom Sheet */}
-            <MobileSheet
-                isOpen={showAddItems}
-                onClose={() => {
-                    setShowAddItems(false);
-                    setSelectedItems(new Set());
-                    setItemQuantities({});
-                }}
-                title="Add Items to Storage Space"
-                snapPoints={[0, 0.7, 0.95, 1]}
-                footer={
-                    selectedItems.size > 0 ? (
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                    setShowAddItems(false);
-                                    setSelectedItems(new Set());
-                                    setItemQuantities({});
-                                }}
-                                className="flex-1"
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                onClick={handleAddItems}
-                                className="flex-1"
-                                disabled={bulkAssignMutation.isPending}
-                            >
-                                {bulkAssignMutation.isPending ? 'Adding...' : `Add ${selectedItems.size} Item${selectedItems.size !== 1 ? 's' : ''}`}
-                            </Button>
-                        </div>
-                    ) : undefined
-                }
-            >
-                <AddItemsToStorageSpace
-                    locationId={storageSpace.location.id}
-                    existingItemIds={existingItemIds}
-                    selectedItems={selectedItems}
-                    itemQuantities={itemQuantities}
-                    itemMinQuantityOverrides={itemMinQuantityOverrides}
-                    onItemToggle={handleItemToggle}
-                    onQuantityChange={handleQuantityChange}
-                    onMinQuantityOverrideChange={handleMinQuantityOverrideChange}
-                    isLoading={bulkAssignMutation.isPending}
-                />
-            </MobileSheet>
-
             {/* Edit Quantity Modal */}
             {editingItem && (
                 <MobileSheet
@@ -700,7 +506,7 @@ export default function StorageSpaceDetailPage() {
                     <QuantityUpdateModal
                         itemId={editingItem.itemId}
                         locationId={storageSpace.location.id}
-                        storageSpaceId={actualStorageSpaceId}
+                        storageSpaceId={storageSpaceId}
                         currentQuantity={editingItem.quantity}
                         currentMinQuantityOverride={editingItem.minQuantityOverride || null}
                         itemMinQuantity={editingItem.itemMinQuantity}
@@ -719,10 +525,7 @@ export default function StorageSpaceDetailPage() {
                 >
                     <EditStorageSpaceModal
                         storageSpace={storageSpace}
-                        onSuccess={() => {
-                            setShowEditModal(false);
-                            // Refetch will happen automatically via query invalidation
-                        }}
+                        onSuccess={() => setShowEditModal(false)}
                         onCancel={() => setShowEditModal(false)}
                     />
                 </MobileSheet>
@@ -750,9 +553,9 @@ export default function StorageSpaceDetailPage() {
                         <AlertDialogAction
                             onClick={async () => {
                                 try {
-                                    await deleteStorageSpaceMutation.mutateAsync(actualStorageSpaceId);
+                                    await deleteStorageSpaceMutation.mutateAsync(storageSpaceId);
                                     toast.success('Storage space deleted successfully');
-                                    router.push(`/admin/locations/${actualLocationId}`);
+                                    router.push('/admin/storage-spaces');
                                 } catch (error: any) {
                                     toast.error(error.message || 'Failed to delete storage space');
                                 }
@@ -780,7 +583,7 @@ export default function StorageSpaceDetailPage() {
                             .map((inv: any) => ({
                                 itemId: inv.item_id,
                                 locationId: storageSpace.location.id,
-                                storageSpaceId: actualStorageSpaceId,
+                                storageSpaceId,
                                 currentQuantity: inv.current_quantity,
                                 itemName: inv.items?.name || 'Unknown',
                             }))}

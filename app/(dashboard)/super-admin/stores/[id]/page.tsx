@@ -17,12 +17,15 @@ import {
     Snowflake,
     ArrowDownRight,
     ArrowUpRight,
+    Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import SearchBar from "@/components/admin/shared/SearchBar";
 import { Tables } from "@/lib/supabase/types";
+import MobileSheet from "@/components/admin/shared/MobileSheet";
+import StorageSetupWizard from "@/components/admin/locations/StorageSetupWizard";
 
 type StorageSpace = Tables<"storage_spaces">;
 
@@ -45,6 +48,7 @@ export default function SuperAdminStoreDetailPage() {
     const { data: logs } = useInventoryLogs({ locationId, limit: 100 });
 
     const [activeTab, setActiveTab] = useState<TabKey>("stock");
+    const [showStorageSetup, setShowStorageSetup] = useState(false);
 
     const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
 
@@ -191,6 +195,17 @@ export default function SuperAdminStoreDetailPage() {
 
                 {/* ── Stock tab ── */}
                 {activeTab === "stock" && (
+                    <div className="space-y-4">
+                    <div className="flex justify-end">
+                        <Button
+                            size="sm"
+                            onClick={() => setShowStorageSetup(true)}
+                            className="flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Add Storage
+                        </Button>
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                         {!location.storage_spaces?.length ? (
                             <div className="col-span-2 flex flex-col items-center justify-center py-16 text-center">
@@ -267,6 +282,7 @@ export default function SuperAdminStoreDetailPage() {
                                 </div>
                             ))
                         )}
+                    </div>
                     </div>
                 )}
 
@@ -403,6 +419,22 @@ export default function SuperAdminStoreDetailPage() {
                     </div>
                 )}
             </div>
+
+            {/* Storage Setup Wizard */}
+            <MobileSheet
+                isOpen={showStorageSetup}
+                onClose={() => setShowStorageSetup(false)}
+                title="Setup Storage Space"
+                snapPoints={[0.7, 0.95]}
+            >
+                <StorageSetupWizard
+                    locationId={locationId}
+                    onComplete={() => {
+                        setShowStorageSetup(false);
+                    }}
+                    onClose={() => setShowStorageSetup(false)}
+                />
+            </MobileSheet>
         </div>
     );
 }

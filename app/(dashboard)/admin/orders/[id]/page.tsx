@@ -627,7 +627,7 @@ function ConfirmReceiptModal({
     onClose: () => void;
 }) {
     const { mutate: confirmTicket, isPending } = useConfirmTicket();
-    const { data: location, isLoading: locationLoading } = useLocationWithDetails(ticket.requesting_location_id);
+    const { data: location, isLoading: locationLoading, error: locationError } = useLocationWithDetails(ticket.requesting_location_id);
     const storageSpaces: StorageSpace[] = location?.storage_spaces ?? [];
 
     // quantities: ticketItemId → actual boxes received
@@ -641,53 +641,79 @@ function ConfirmReceiptModal({
     );
 
     // which storage space tab is active
-    const [activeSpaceId, setActiveSpaceId] = useState<string | null>(
-        storageSpaces[0]?.id ?? null,
-    );
+    const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
 
     // item_id (number) → storageSpaceId (string)
     const [itemAssignments, setItemAssignments] = useState<Record<number, string>>({});
 
-    // When storage spaces load, auto-select first if none selected
+    // Auto-select first storage space once data loads
     const didAutoSelect = useRef(false);
     useEffect(() => {
         if (!didAutoSelect.current && storageSpaces.length > 0) {
+            console.log("[ConfirmReceiptModal] Storage spaces loaded:", storageSpaces);
             setActiveSpaceId(storageSpaces[0].id);
             didAutoSelect.current = true;
         }
     }, [storageSpaces]);
 
+    // Log location fetch errors
+    useEffect(() => {
+        if (locationError) {
+            console.error("[ConfirmReceiptModal] Failed to load location/storage spaces:", locationError);
+        }
+    }, [locationError]);
+
+    // Items with a valid item_id that need assignment
+    const assignableItems = ticket.order_ticket_items.filter((item) => item.item_id != null);
+
     const allAssigned =
         storageSpaces.length === 0 ||
-        ticket.order_ticket_items.every((item) => itemAssignments[item.item_id]);
+        assignableItems.every((item) => !!itemAssignments[item.item_id!]);
 
     const handleItemClick = (itemId: number) => {
-        if (!activeSpaceId) return;
+        if (!activeSpaceId) {
+            console.warn("[ConfirmReceiptModal] handleItemClick called but no active space selected");
+            return;
+        }
         setItemAssignments((prev) => {
             // clicking same space again unassigns
             if (prev[itemId] === activeSpaceId) {
                 const next = { ...prev };
                 delete next[itemId];
+                console.log(`[ConfirmReceiptModal] Unassigned item ${itemId} from space ${activeSpaceId}`);
                 return next;
             }
+            console.log(`[ConfirmReceiptModal] Assigned item ${itemId} → space ${activeSpaceId}`);
             return { ...prev, [itemId]: activeSpaceId };
         });
     };
 
     const handleConfirm = () => {
-        const receivedItems = ticket.order_ticket_items.map((item) => ({
-            itemId: item.item_id,
-            actualBoxesReceived: quantities[item.id] ?? 0,
-            storageSpaceId: itemAssignments[item.item_id] ?? undefined,
-        }));
+        const receivedItems = ticket.order_ticket_items
+            .filter((item) => item.item_id != null)
+            .map((item) => ({
+                itemId: item.item_id!,
+                actualBoxesReceived: quantities[item.id] ?? 0,
+                storageSpaceId: itemAssignments[item.item_id!] ?? undefined,
+            }));
+
+        console.log("[ConfirmReceiptModal] Submitting confirm:", {
+            ticketId: ticket.id,
+            receivedItems,
+            itemAssignments,
+            storageSpaces: storageSpaces.map((s) => ({ id: s.id, name: s.name })),
+        });
+
         confirmTicket(
             { ticketId: ticket.id, receivedItems },
             {
-                onSuccess: () => {
+                onSuccess: (result) => {
+                    console.log("[ConfirmReceiptModal] Confirm success:", result);
                     toast.success("Order confirmed — inventory updated!");
                     onClose();
                 },
                 onError: (err: any) => {
+                    console.error("[ConfirmReceiptModal] Confirm error:", err);
                     toast.error(err?.message ?? "Failed to confirm order");
                 },
             },

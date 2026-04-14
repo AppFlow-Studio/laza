@@ -192,10 +192,11 @@ export default function AddItemsToStorageSpace({
             <div className="flex-1 overflow-y-auto min-h-0 -mx-4 px-4">
                 {filteredItems.length === 0 ? (
                     <div className="text-center py-12 bg-white rounded-xl border border-zinc-200">
+                        <Package className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
                         <p className="text-zinc-500">
-                            {existingItemIds.size > 0 &&
-                            items &&
-                            items.length === existingItemIds.size
+                            {!isSuperAdmin && (!items || items.length === 0)
+                                ? "No items have been assigned to this location by a super admin yet."
+                                : existingItemIds.size > 0 && items && items.length === existingItemIds.size
                                 ? "All items are already assigned to this storage space"
                                 : "No items found"}
                         </p>
@@ -338,7 +339,7 @@ export default function AddItemsToStorageSpace({
                         })}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 py-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                         {filteredItems.map((item) => {
                             const isSelected = selectedItems.has(item.id);
                             const quantity = itemQuantities[item.id] || 0;
