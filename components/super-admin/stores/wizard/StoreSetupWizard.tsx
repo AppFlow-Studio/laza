@@ -180,7 +180,7 @@ export default function StoreSetupWizard() {
                 const realId = idMap.get(tempId);
                 if (!realId) continue;
 
-                const items = Array.from(assignment.selectedItems).map(itemId => ({
+                const spaceItems = Array.from(assignment.selectedItems).map(itemId => ({
                     itemId,
                     quantity:            assignment.itemQuantities[itemId] || 0,
                     minQuantityOverride: assignment.itemMinQuantityOverrides[itemId] ?? null,
@@ -190,13 +190,14 @@ export default function StoreSetupWizard() {
                     bulkAssignMutation.mutateAsync({
                         locationId:     location.id,
                         storageSpaceId: realId,
-                        items,
+                        items:          spaceItems,
                     })
                 );
             }
             if (assignPromises.length > 0) await Promise.all(assignPromises);
 
-            // 4. Create Default Storage space and assign all catalog items to it
+            // 5. Always create a Default Storage space; assign all catalog items if available (qty 0).
+            // The space is created unconditionally so it always exists even if items haven't loaded yet.
             const defaultSpace = await createStorageSpaceMutation.mutateAsync({
                 location_id:      location.id,
                 name:             'Default Storage',
@@ -206,7 +207,7 @@ export default function StoreSetupWizard() {
             const allItems = (items ?? []).map(item => ({
                 itemId:              String(item.id),
                 quantity:            0,
-                minQuantityOverride: null as null,
+                minQuantityOverride: null,
             }));
 
             if (allItems.length > 0) {
