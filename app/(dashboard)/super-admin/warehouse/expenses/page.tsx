@@ -866,7 +866,8 @@ export default function WarehouseExpensesPage() {
         if (warehouses.length > 0 && !selectedWarehouseId) {
             setSelectedWarehouseId(warehouses[0].id);
         }
-    }, [warehouses, selectedWarehouseId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [warehouses]);
 
     const { data: expenses = [], isLoading: expensesLoading } = useExpenses(
         orgId ?? "",
