@@ -453,7 +453,7 @@ function AddExpenseForm({
                 title: title.trim(),
                 amount: finalAmount,
                 pallet_count: palletCount ? parseInt(palletCount) : null,
-                rate_per_pallet: useCustomTotal ? null : currentRate,
+                rate_per_pallet: palletCount ? currentRate : null,
                 expense_date: date,
                 is_self_delivered:
                     expenseType === "delivery" ? isSelfDelivered : null,
