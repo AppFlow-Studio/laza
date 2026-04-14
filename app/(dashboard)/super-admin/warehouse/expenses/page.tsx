@@ -164,7 +164,11 @@ function useCreateExpense() {
             });
             toast.success("Expense recorded");
         },
-        onError: (err: unknown) => toast.error(getFriendlyErrorMessage(err)),
+        onError: (err: unknown) => {
+            const raw = err instanceof Error ? err.message : String(err);
+            console.error('[createExpense] raw error:', raw);
+            toast.error(getFriendlyErrorMessage(err));
+        },
     });
 }
 
