@@ -34,7 +34,7 @@ import {
     type WarehouseExpenseFilters,
 } from "@/lib/supabase/queries/warehouseExpenses";
 import { updateWarehouseExpenseTitleAction } from "@/lib/supabase/actions/warehouseExpenseActions";
-import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
+import { useWarehouses, usePallets } from "@/lib/hooks/queries/useWarehouse";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { RentHistoryTable } from "@/components/super-admin/warehouse/RentHistoryTable";
 import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
@@ -126,19 +126,19 @@ function useExpenses(
     return useQuery({
         queryKey: ["warehouse-expenses", organizationId, filters],
         queryFn: () => getWarehouseExpenses(organizationId, filters),
-        enabled: !!organizationId,
+        enabled: !!organizationId && !!(filters?.warehouseLocationId),
         staleTime: 60 * 1000,
     });
 }
 
-function useExpenseSummary(organizationId: string) {
+function useExpenseSummary(organizationId: string, warehouseLocationId: string) {
     const now = new Date();
     const from = format(startOfMonth(now), "yyyy-MM-dd");
     const to = format(endOfMonth(now), "yyyy-MM-dd");
     return useQuery({
-        queryKey: ["warehouse-expense-summary", organizationId, from, to],
-        queryFn: () => getExpenseSummary(organizationId, { from, to }),
-        enabled: !!organizationId,
+        queryKey: ["warehouse-expense-summary", organizationId, warehouseLocationId, from, to],
+        queryFn: () => getExpenseSummary(organizationId, { from, to }, warehouseLocationId),
+        enabled: !!organizationId && !!warehouseLocationId,
         staleTime: 60 * 1000,
     });
 }
@@ -859,13 +859,20 @@ function ManageRatesPanel({
 
 export default function WarehouseExpensesPage() {
     const { orgId } = useAuth();
-    const { data: warehouseLocation } = useWarehouseLocation();
-    const warehouseLocationId = warehouseLocation?.id;
+    const { data: warehouses = [], isLoading: warehousesLoading } = useWarehouses();
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
+
+    useEffect(() => {
+        if (warehouses.length > 0 && !selectedWarehouseId) {
+            setSelectedWarehouseId(warehouses[0].id);
+        }
+    }, [warehouses, selectedWarehouseId]);
 
     const { data: expenses = [], isLoading: expensesLoading } = useExpenses(
         orgId ?? "",
+        { warehouseLocationId: selectedWarehouseId },
     );
-    const { data: summary = [] } = useExpenseSummary(orgId ?? "");
+    const { data: summary = [] } = useExpenseSummary(orgId ?? "", selectedWarehouseId);
     const { data: rates = [] } = useExpenseRates(orgId ?? "");
 
     const [showAddForm, setShowAddForm] = useState(false);
@@ -911,6 +918,21 @@ export default function WarehouseExpensesPage() {
                             </span>
                         </p>
                     </div>
+                    {/* Warehouse selector */}
+                    {warehouses.length > 1 && (
+                        <select
+                            value={selectedWarehouseId}
+                            onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                            disabled={warehousesLoading}
+                            className="px-3 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                        >
+                            {warehouses.map((wh) => (
+                                <option key={wh.id} value={wh.id}>
+                                    {wh.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
@@ -1095,10 +1117,10 @@ export default function WarehouseExpensesPage() {
             </div>
 
             {/* Modals */}
-            {showAddForm && orgId && warehouseLocationId && (
+            {showAddForm && orgId && selectedWarehouseId && (
                 <AddExpenseForm
                     organizationId={orgId}
-                    warehouseLocationId={warehouseLocationId}
+                    warehouseLocationId={selectedWarehouseId}
                     rates={rates}
                     onClose={() => setShowAddForm(false)}
                 />
