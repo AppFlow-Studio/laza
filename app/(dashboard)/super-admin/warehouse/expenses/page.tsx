@@ -34,7 +34,8 @@ import {
     type WarehouseExpenseFilters,
 } from "@/lib/supabase/queries/warehouseExpenses";
 import { updateWarehouseExpenseTitleAction } from "@/lib/supabase/actions/warehouseExpenseActions";
-import { useWarehouses, usePallets } from "@/lib/hooks/queries/useWarehouse";
+import { useWarehouses } from "@/lib/hooks/queries/useWarehouse";
+import { usePallets } from "@/lib/hooks/queries/usePallets";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { RentHistoryTable } from "@/components/super-admin/warehouse/RentHistoryTable";
 import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
