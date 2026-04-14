@@ -69,3 +69,27 @@ export async function getWarehouseExpensesAction(
     if (error) throw new Error(error.message);
     return data ?? [];
 }
+
+export async function getExpenseSummaryAction(
+    organizationId: string,
+    from: string,
+    to: string,
+    warehouseLocationId?: string,
+): Promise<Array<{ expense_type: string; amount: number }>> {
+    const supabase = createServiceRoleClient();
+
+    let query = supabase
+        .from("warehouse_expenses")
+        .select("expense_type, amount")
+        .eq("organization_id", organizationId)
+        .gte("expense_date", from)
+        .lte("expense_date", to);
+
+    if (warehouseLocationId) {
+        query = query.eq("warehouse_location_id", warehouseLocationId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return data ?? [];
+}
