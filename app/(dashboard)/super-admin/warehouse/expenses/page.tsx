@@ -395,6 +395,21 @@ function AddExpenseForm({
     const [periodStart, setPeriodStart] = useState("");
     const [periodEnd, setPeriodEnd] = useState("");
 
+    const { data: activePallets } = usePallets(
+        warehouseLocationId,
+        { status: 'active' },
+    );
+    const activePalletCount = activePallets?.length ?? 0;
+
+    useEffect(() => {
+        if (expenseType === 'pallet_rent' && activePalletCount > 0) {
+            setPalletCount(String(activePalletCount));
+        }
+        if (expenseType !== 'pallet_rent') {
+            setPalletCount('');
+        }
+    }, [expenseType, activePalletCount]);
+
     const currentRate =
         rates.find((r) => r.expense_type === expenseType)?.default_rate ?? 0;
 
@@ -557,6 +572,11 @@ function AddExpenseForm({
                                 placeholder="0"
                                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             />
+                            {expenseType === 'pallet_rent' && activePalletCount > 0 && (
+                                <p className="mt-1 text-xs text-green-600">
+                                    {activePalletCount} active pallets in this warehouse
+                                </p>
+                            )}
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">
