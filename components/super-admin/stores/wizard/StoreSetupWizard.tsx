@@ -196,7 +196,7 @@ export default function StoreSetupWizard() {
             }
             if (assignPromises.length > 0) await Promise.all(assignPromises);
 
-            // 5. Always create a Default Storage space; assign all catalog items if available (qty 0).
+            // 4. Always create a Default Storage space; assign all catalog items if available (qty 0).
             // The space is created unconditionally so it always exists even if items haven't loaded yet.
             const defaultSpace = await createStorageSpaceMutation.mutateAsync({
                 location_id:      location.id,
