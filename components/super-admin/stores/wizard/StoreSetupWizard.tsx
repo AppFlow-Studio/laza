@@ -10,6 +10,7 @@ import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 import { useCreateLocation, useLocationWithDetails } from '@/lib/hooks/queries/useLocations';
 import { useCreateStorageSpace, useBulkAssignItems } from '@/lib/hooks/queries/useStorageSetup';
 import { useCreateInvitation } from '@/lib/hooks/queries/useUsers';
+import { useItems } from '@/lib/hooks/queries/useItems';
 import StoreWizardSidebar from './StoreWizardSidebar';
 import StoreDetailsStep from './steps/StoreDetailsStep';
 import type { StoreFormData } from './steps/StoreDetailsStep';
@@ -33,6 +34,7 @@ export default function StoreSetupWizard() {
     const createStorageSpaceMutation  = useCreateStorageSpace();
     const bulkAssignMutation          = useBulkAssignItems();
     const createInvitationMutation    = useCreateInvitation();
+    const { data: items }             = useItems();
 
     // ── Wizard state ─────────────────────────────────────────────────────────
     const [currentStep, setCurrentStep]       = useState(1);
@@ -194,7 +196,28 @@ export default function StoreSetupWizard() {
             }
             if (assignPromises.length > 0) await Promise.all(assignPromises);
 
-            // 4. Send admin invitation if not skipped
+            // 4. Create Default Storage space and assign all catalog items to it
+            const defaultSpace = await createStorageSpaceMutation.mutateAsync({
+                location_id:      location.id,
+                name:             'Default Storage',
+                temperature_type: 'refrigerated',
+            });
+
+            const allItems = (items ?? []).map(item => ({
+                itemId:              String(item.id),
+                quantity:            0,
+                minQuantityOverride: null as null,
+            }));
+
+            if (allItems.length > 0) {
+                await bulkAssignMutation.mutateAsync({
+                    locationId:     location.id,
+                    storageSpaceId: defaultSpace.id,
+                    items:          allItems,
+                });
+            }
+
+            // 5. Send admin invitation if not skipped
             if (inviteData?.email) {
                 await createInvitationMutation.mutateAsync({
                     email:              inviteData.email,
