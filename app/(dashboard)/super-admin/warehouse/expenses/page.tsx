@@ -400,12 +400,15 @@ function AddExpenseForm({
         { status: 'active' },
     );
     const activePalletCount = activePallets?.length ?? 0;
+    const hasUserEditedPalletCount = useRef(false);
 
     useEffect(() => {
-        if (expenseType === 'pallet_rent' && activePalletCount > 0) {
-            setPalletCount(String(activePalletCount));
-        }
-        if (expenseType !== 'pallet_rent') {
+        if (expenseType === 'pallet_rent') {
+            if (!hasUserEditedPalletCount.current && activePalletCount > 0) {
+                setPalletCount(String(activePalletCount));
+            }
+        } else {
+            hasUserEditedPalletCount.current = false;
             setPalletCount('');
         }
     }, [expenseType, activePalletCount]);
@@ -568,7 +571,10 @@ function AddExpenseForm({
                                 type="number"
                                 min="0"
                                 value={palletCount}
-                                onChange={(e) => setPalletCount(e.target.value)}
+                                onChange={(e) => {
+                                    hasUserEditedPalletCount.current = true;
+                                    setPalletCount(e.target.value);
+                                }}
                                 placeholder="0"
                                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             />
