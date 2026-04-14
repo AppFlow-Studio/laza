@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Settings, Trash2, X } from 'lucide-react';
+import { Settings, Trash2, X, Percent } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BulkActionsToolbarProps {
@@ -9,6 +9,7 @@ interface BulkActionsToolbarProps {
     onUpdateMinQuantity: () => void;
     onUpdateCategory: () => void;
     onUpdateUnit: () => void;
+    onUpdatePrice?: () => void;
     onBulkUpdate: () => void;
     onDelete: () => void;
     onClearSelection: () => void;
@@ -20,6 +21,7 @@ export default function BulkActionsToolbar({
     onUpdateMinQuantity,
     onUpdateCategory,
     onUpdateUnit,
+    onUpdatePrice = undefined,
     onBulkUpdate,
     onDelete,
     onClearSelection,
@@ -80,6 +82,18 @@ export default function BulkActionsToolbar({
                     >
                         Update Unit
                     </Button>
+                    {onUpdatePrice && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onUpdatePrice}
+                            disabled={isLoading}
+                            className="text-xs"
+                        >
+                            <Percent className="w-4 h-4 mr-1" />
+                            Update Price
+                        </Button>
+                    )}
                     <Button
                         variant="outline"
                         size="sm"

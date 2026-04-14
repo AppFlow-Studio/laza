@@ -11,6 +11,7 @@ import {
     deleteItem,
     bulkUpdateItems,
     bulkDeleteItems,
+    bulkUpdateItemPrices,
 } from '@/lib/supabase/queries/items';
 import { Item } from '@/lib/supabase/types';
 import { useUserInfo } from './useUserInfo';
@@ -104,6 +105,17 @@ export function useBulkDeleteItems() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (itemIds: string[]) => bulkDeleteItems(itemIds),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['items'] });
+        },
+    });
+}
+
+export function useBulkUpdateItemPrices() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (items: Array<{ id: number; cost_per_unit: number }>) =>
+            bulkUpdateItemPrices(items),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['items'] });
         },

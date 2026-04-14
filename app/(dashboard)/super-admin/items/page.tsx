@@ -37,7 +37,7 @@ export default function ItemsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
-    const [bulkUpdateField, setBulkUpdateField] = useState<'min_quantity' | 'category' | 'unit' | 'all'>('all');
+    const [bulkUpdateField, setBulkUpdateField] = useState<'min_quantity' | 'category' | 'unit' | 'price' | 'all'>('all');
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
     const debouncedSearch = useDebounce(searchQuery, 300);
     const { viewMode, setViewMode } = useAdminStore();
@@ -179,6 +179,10 @@ export default function ItemsPage() {
                 }}
                 onUpdateUnit={() => {
                     setBulkUpdateField('unit');
+                    setShowBulkUpdateModal(true);
+                }}
+                onUpdatePrice={() => {
+                    setBulkUpdateField('price');
                     setShowBulkUpdateModal(true);
                 }}
                 onBulkUpdate={() => {

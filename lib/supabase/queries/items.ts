@@ -131,6 +131,21 @@ export async function bulkUpdateItems(itemIds: string[], updates: Partial<Item>)
     return data as Item[];
 }
 
+export async function bulkUpdateItemPrices(items: Array<{ id: number; cost_per_unit: number }>) {
+    const supabase = await createServerSupabaseClient();
+
+    const results = await Promise.all(
+        items.map(({ id, cost_per_unit }) =>
+            supabase.from('items').update({ cost_per_unit }).eq('id', id).select().single()
+        )
+    );
+
+    const failed = results.find(r => r.error);
+    if (failed?.error) throw failed.error;
+
+    return results.map(r => r.data);
+}
+
 export async function bulkDeleteItems(itemIds: string[]) {
     const supabase = await createServerSupabaseClient();
     const { error } = await supabase
