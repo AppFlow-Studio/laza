@@ -21,6 +21,7 @@ export interface WarehouseExpenseFilters {
     purchaseOrderId?: string;
     dateFrom?: string;
     dateTo?: string;
+    warehouseLocationId?: string;   // ← ADD THIS
 }
 
 export interface ExpenseSummary {
@@ -59,6 +60,7 @@ export async function createWarehouseExpense(
 export async function getExpenseSummary(
     organizationId: string,
     dateRange?: { from: string; to: string },
+    warehouseLocationId?: string,
 ): Promise<ExpenseSummary[]> {
     const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -77,16 +79,20 @@ export async function getExpenseSummary(
             .toISOString()
             .split("T")[0];
 
-    const { data, error } = await supabase
+    let query = supabase
         .from("warehouse_expenses")
         .select("expense_type, amount")
         .eq("organization_id", organizationId)
         .gte("expense_date", from)
         .lte("expense_date", to);
 
+    if (warehouseLocationId) {
+        query = query.eq("warehouse_location_id", warehouseLocationId);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
 
-    // Aggregate client-side — avoids needing a view or RPC for a simple sum
     const summaryMap = new Map<ExpenseType, ExpenseSummary>();
     for (const row of data ?? []) {
         const type = row.expense_type as ExpenseType;

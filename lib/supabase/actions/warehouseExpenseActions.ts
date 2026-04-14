@@ -55,6 +55,9 @@ export async function getWarehouseExpensesAction(
     if (filters?.purchaseOrderId) {
         query = query.eq("purchase_order_id", filters.purchaseOrderId);
     }
+    if (filters?.warehouseLocationId) {
+        query = query.eq("warehouse_location_id", filters.warehouseLocationId);
+    }
     if (filters?.dateFrom) {
         query = query.gte("expense_date", filters.dateFrom);
     }
