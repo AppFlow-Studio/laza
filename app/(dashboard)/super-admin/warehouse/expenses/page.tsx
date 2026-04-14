@@ -781,7 +781,7 @@ function ManageRatesPanel({
     };
 
     const editableTypes = EXPENSE_TYPES.filter(
-        (t) => t.value === "pallet_rent",
+        (t) => t.value !== "other",
     );
 
     return (
