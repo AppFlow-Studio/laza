@@ -51,7 +51,6 @@ export default function PalletsPage() {
 			<PalletFiltersBar
 				filters={filters}
 				onFilterChange={handleFilterChange}
-				storageSpaces={storageSpaces?.storage_spaces ?? []}
 				purchaseOrders={purchaseOrders ?? []}
 			/>
 

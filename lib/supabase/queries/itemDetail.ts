@@ -1,6 +1,6 @@
 'use server';
 
-import { createServerSupabaseClient } from '../server';
+import { createServiceRoleClient } from '../server';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,7 +93,7 @@ export async function getItemOverview(
 	itemId: number,
 	warehouseLocationId: string
 ): Promise<ItemOverview | null> {
-	const supabase = createServerSupabaseClient();
+	const supabase = createServiceRoleClient();
 
 	// Fetch item details
 	const { data: item, error: itemError } = await supabase
@@ -122,21 +122,27 @@ export async function getItemOverview(
 
 	if (itemError || !item) return null;
 
-	// Fetch warehouse pallet inventory totals
+	// Fetch warehouse pallet inventory totals (scoped to this warehouse)
 	const { data: palletRows, error: palletError } = await supabase
-		.from("warehouse_inventory_overview")
-		.select("box_count, effective_ppb, total_pieces, pallet_status")
+		.from("pallet_inventory")
+		.select("box_count, pieces_per_box_override, warehouse_pallets!inner(id, status, warehouse_location_id)")
 		.eq("item_id", itemId)
-		.in("pallet_status", ["active", "empty"]);
+		.eq("warehouse_pallets.warehouse_location_id", warehouseLocationId)
+		.in("warehouse_pallets.status", ["active", "empty"])
+		.gt("box_count", 0);
 
+	const defaultPpb = item.box_quantity ?? 0;
 	const warehouseBoxes =
 		palletRows?.reduce((sum, r) => sum + (r.box_count ?? 0), 0) ?? 0;
 	const warehousePieces =
-		palletRows?.reduce((sum, r) => sum + (r.total_pieces ?? 0), 0) ?? 0;
+		palletRows?.reduce((sum: number, r: any) => {
+			const ppb = r.pieces_per_box_override ?? defaultPpb;
+			return sum + (r.box_count ?? 0) * ppb;
+		}, 0) ?? 0;
 	const activePalletCount =
-		palletRows?.filter((r) => r.pallet_status === "active").length ?? 0;
+		palletRows?.filter((r: any) => (r.warehouse_pallets as any)?.status === "active").length ?? 0;
 
-	console.log("palletRows" ,palletRows, palletError)
+	console.log("palletRows", palletRows, palletError)
 
 
 
@@ -165,24 +171,22 @@ export async function getItemOverview(
 // ─── Query: Pallet-level stock breakdown ──────────────────────────────────────
 
 export async function getItemPalletStock(itemId: number): Promise<PalletStock[]> {
-	const supabase = createServerSupabaseClient();
+	const supabase = createServiceRoleClient();
 
 	const { data, error } = await supabase
-		.from("warehouse_inventory_overview")
+		.from("pallet_inventory")
 		.select(
 			`
-      pallet_id,
-      pallet_label,
-      storage_space_id,
+      id,
       box_count,
-      effective_ppb,
-      total_pieces,
-      pallet_status
+      pieces_per_box_override,
+      warehouse_pallets!inner(id, pallet_label, status, storage_space_id),
+      items!inner(box_quantity)
     `
 		)
 		.eq("item_id", itemId)
-		.neq("pallet_status", "retired")
-		.order("pallet_label");
+		.neq("warehouse_pallets.status", "retired")
+		.gt("box_count", 0);
 
 	console.log("palletStock", data, error)
 
@@ -190,7 +194,11 @@ export async function getItemPalletStock(itemId: number): Promise<PalletStock[]>
 
 	// Fetch storage space names separately
 	const storageSpaceIds = [
-		...new Set(data.map((r) => r.storage_space_id).filter(Boolean)),
+		...new Set(
+			data
+				.map((r: any) => (r.warehouse_pallets as any)?.storage_space_id)
+				.filter(Boolean)
+		),
 	] as string[];
 
 	let storageNames: Record<string, string> = {};
@@ -204,24 +212,28 @@ export async function getItemPalletStock(itemId: number): Promise<PalletStock[]>
 		);
 	}
 
-	return data.map((r) => ({
-		pallet_id: r.pallet_id,
-		pallet_label: r.pallet_label,
-		storage_space_id: r.storage_space_id ?? null,
-		storage_space_name: r.storage_space_id
-			? (storageNames[r.storage_space_id] ?? null)
-			: null,
-		box_count: r.box_count,
-		effective_pieces_per_box: r.effective_ppb,
-		total_pieces: r.total_pieces,
-		status: r.pallet_status as PalletStock["status"],
-	}));
+	return (data as any[]).map((r) => {
+		const pallet = r.warehouse_pallets as any;
+		const ppb = r.pieces_per_box_override ?? (r.items as any)?.box_quantity ?? 0;
+		return {
+			pallet_id: pallet.id,
+			pallet_label: pallet.pallet_label,
+			storage_space_id: pallet.storage_space_id ?? null,
+			storage_space_name: pallet.storage_space_id
+				? (storageNames[pallet.storage_space_id] ?? null)
+				: null,
+			box_count: r.box_count,
+			effective_pieces_per_box: ppb,
+			total_pieces: r.box_count * ppb,
+			status: pallet.status as PalletStock["status"],
+		};
+	});
 }
 
 // ─── Query: Item Box Totals (D6 view) ─────────────────────────────────────────
 
 export async function getItemBoxTotals(itemId: number): Promise<ItemBoxTotals | null> {
-	const supabase = createServerSupabaseClient();
+	const supabase = createServiceRoleClient();
 
 	const { data, error } = await supabase
 		.from("item_box_totals")
@@ -239,7 +251,7 @@ export async function getItemBoxTotals(itemId: number): Promise<ItemBoxTotals | 
 export async function getItemShipmentBreakdown(
 	itemId: number
 ): Promise<ItemShipmentRecord[]> {
-	const supabase = createServerSupabaseClient();
+	const supabase = createServiceRoleClient();
 
 	const { data, error } = await supabase
 		.from("item_shipment_breakdown")
@@ -259,7 +271,7 @@ export async function getItemShipmentHistory(
 	itemId: number,
 	organizationId: string
 ): Promise<ItemShipmentRecord[]> {
-	const supabase = createServerSupabaseClient();
+	const supabase = createServiceRoleClient();
 
 	const { data, error } = await supabase.rpc("get_item_shipment_history", {
 		p_item_id: itemId,
@@ -280,7 +292,7 @@ export async function getItemShipmentHistory(
 export async function getItemCostHistory(
 	itemId: number
 ): Promise<ItemCostHistoryRecord[]> {
-	const supabase = createServerSupabaseClient();
+	const supabase = createServiceRoleClient();
 
 	const { data, error } = await supabase
 		.from("item_cost_history")

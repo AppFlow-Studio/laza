@@ -34,7 +34,10 @@ import {
     useFulfillTicket,
     usePartialFulfillTicket,
 } from "@/lib/hooks/queries/useOrderTickets";
-import { useWarehouseOverview } from "@/lib/hooks/queries/useWarehouse";
+import {
+    useWarehouseInventory,
+    useWarehouseLocation,
+} from "@/lib/hooks/queries/useWarehouse";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { RejectTicketDialog } from "@/components/orders/RejectTicketDialog";
 import {
@@ -110,9 +113,8 @@ type Ticket = {
 
 type WarehouseStockRow = {
     item_id: number;
-    total_boxes: number;
-    display_label: string;
-    unit_of_measure: string;
+    current_quantity: number;
+    items: { id: number; name: string; unit_of_measure: string } | null;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -155,8 +157,9 @@ function getStockStatus(
     stockMap: Map<number, number>,
 ): "ok" | "partial" | "none" {
     const stock = stockMap.get(line.item_id) ?? 0;
+    console.log(stock, line)
     if (stock === 0) return "none";
-    if (stock < line.quantity_boxes) return "partial";
+    if (stock < line.quantity_units) return "partial";
     return "ok";
 }
 
@@ -489,17 +492,17 @@ function ItemsTable({
                     stockStatus === "ok" ? (
                         <div className="flex items-center gap-1.5 text-green-700 font-semibold text-sm">
                             <CheckCircle2 size={13} className="flex-shrink-0" />
-                            {stock} boxes
+                            {stock} units
                         </div>
                     ) : stockStatus === "partial" ? (
                         <div className="flex items-center gap-1.5 text-amber-700 font-semibold text-sm">
                             <AlertCircle size={13} className="flex-shrink-0" />
-                            {stock} boxes
+                            {stock} units
                         </div>
                     ) : (
                         <div className="flex items-center gap-1.5 text-red-600 font-semibold text-sm">
                             <XCircle size={13} className="flex-shrink-0" />0
-                            boxes
+                            units
                         </div>
                     );
                 const pill =
@@ -605,6 +608,7 @@ export default function SuperAdminTicketDetailPage() {
     const ticketId = params.id as string;
 
     const { data: userInfo } = useUserInfo();
+    const { data: warehouseLocation } = useWarehouseLocation();
 
     const {
         data: rawTicket,
@@ -613,12 +617,15 @@ export default function SuperAdminTicketDetailPage() {
     } = useTicket(ticketId);
     const ticket = rawTicket as Ticket | undefined;
 
-    const warehouseLocationId = ticket?.warehouse_location_id ?? "";
+    const warehouseLocationId =
+        warehouseLocation?.id ?? ticket?.warehouse_location_id ?? "";
     const {
         data: warehouseStock,
         isLoading: stockLoading,
         refetch: refetchStock,
-    } = useWarehouseOverview(warehouseLocationId, "box");
+    } = useWarehouseInventory(warehouseLocationId);
+
+    console.log("stock" , warehouseStock)
 
     const { mutate: fulfillAll, isPending: isFulfillingAll } =
         useFulfillTicket();
@@ -631,7 +638,7 @@ export default function SuperAdminTicketDetailPage() {
     const stockMap = useMemo(() => {
         const map = new Map<number, number>();
         (warehouseStock as WarehouseStockRow[] | undefined)?.forEach((row) => {
-            map.set(row.item_id, row.total_boxes);
+            map.set(row.item_id, row.current_quantity);
         });
         return map;
     }, [warehouseStock]);
