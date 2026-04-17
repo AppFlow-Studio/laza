@@ -193,7 +193,7 @@ export function useFulfillTicket() {
 				}>;
 			};
 		},
-		onSuccess: (_data, variables) => {
+		onSuccess: (data, variables) => {
 			queryClient.invalidateQueries({ queryKey: ticketKeys.detail(variables.ticketId) });
 			queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
 			queryClient.invalidateQueries({ queryKey: ticketKeys.all });
@@ -203,9 +203,7 @@ export function useFulfillTicket() {
 
 			// Fire-and-forget: check warehouse low stock for each fulfilled item.
 			// Errors are logged inside the action and never surface to the user.
-			const fulfilledItemIds = (_data as {
-				items_fulfilled: Array<{ item_id: number }>;
-			}).items_fulfilled.map((i) => i.item_id);
+			const fulfilledItemIds = data.items_fulfilled.map((i) => i.item_id);
 
 			checkWarehouseLowStockAfterFulfillment(variables.ticketId, fulfilledItemIds).catch(
 				(err) => console.error("[warehouseLowStock] Unexpected error:", err),
