@@ -30,6 +30,7 @@ import {
 	type ReceivedItem,
 } from "@/lib/supabase/queries/orderTickets";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
+import { checkWarehouseLowStockAfterFulfillment } from "@/lib/supabase/actions/warehouseLowStockActions";
 
 // ─── Query Key Factory ────────────────────────────────────────────────────────
 
@@ -199,6 +200,16 @@ export function useFulfillTicket() {
 			queryClient.invalidateQueries({ queryKey: ["pallets"] });
 			queryClient.invalidateQueries({ queryKey: ["warehouse", "inventory"] });
 			queryClient.invalidateQueries({ queryKey: ["alerts"] });
+
+			// Fire-and-forget: check warehouse low stock for each fulfilled item.
+			// Errors are logged inside the action and never surface to the user.
+			const fulfilledItemIds = (_data as {
+				items_fulfilled: Array<{ item_id: number }>;
+			}).items_fulfilled.map((i) => i.item_id);
+
+			checkWarehouseLowStockAfterFulfillment(variables.ticketId, fulfilledItemIds).catch(
+				(err) => console.error("[warehouseLowStock] Unexpected error:", err),
+			);
 		},
 	});
 }
