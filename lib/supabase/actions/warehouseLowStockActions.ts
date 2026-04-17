@@ -86,6 +86,8 @@ export async function checkWarehouseLowStockAfterFulfillment(
     for (const loc of itemLocations) {
         const itemId = loc.item_id;
         const currentQty = loc.current_quantity;
+
+        if (itemId === null || currentQty === null) continue;
         const threshold = thresholdMap.get(itemId);
 
         if (!threshold) continue; // no threshold configured — skip
@@ -112,6 +114,7 @@ export async function checkWarehouseLowStockAfterFulfillment(
             .select("id")
             .eq("item_id", itemId)
             .eq("location_id", warehouseLocationId)
+            .eq("alert_type", "low_stock")
             .is("resolved_at", null)
             .maybeSingle();
 
