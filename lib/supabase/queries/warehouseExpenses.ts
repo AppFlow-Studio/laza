@@ -1,6 +1,8 @@
+"use server"
+
 import type { Database } from "@/lib/supabase/types";
-import { createClient } from "@supabase/supabase-js";
 import { createWarehouseExpenseAction, getWarehouseExpensesAction, getExpenseSummaryAction } from "../actions/warehouseExpenseActions";
+import { createServiceRoleClient } from "../server";
 
 type WarehouseExpense =
     Database["public"]["Tables"]["warehouse_expenses"]["Row"];
@@ -103,10 +105,7 @@ export async function getExpenseSummary(
 export async function getExpenseRates(
     organizationId: string,
 ): Promise<ExpenseRate[]> {
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    );
+    const supabase = createServiceRoleClient()
 
     const { data, error } = await supabase
         .from("warehouse_expense_rates")
@@ -128,10 +127,7 @@ export async function updateExpenseRate(
     expenseType: ExpenseType,
     newRate: number,
 ): Promise<ExpenseRate> {
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    );
+    const supabase = createServiceRoleClient()
 
     const { data, error } = await supabase
         .from("warehouse_expense_rates")
