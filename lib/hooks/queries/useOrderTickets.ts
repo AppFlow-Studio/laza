@@ -174,6 +174,9 @@ export function useFulfillTicket() {
 				process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
 			);
 
+			// 4-param overload: fulfill_order_ticket(uuid, text, boolean, text)
+			// The old 3-param overload (uuid, text, text DEFAULT 'company') was dropped in
+			// migration 20260419_drop_fulfill_order_ticket_3param.sql (FIX-A3).
 			const { data, error } = await supabase.rpc("fulfill_order_ticket", {
 				p_ticket_id:     ticketId,
 				p_admin_user_id: adminUserId,

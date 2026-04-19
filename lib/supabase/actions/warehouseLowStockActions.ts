@@ -34,6 +34,7 @@ export async function checkWarehouseLowStockAfterFulfillment(
 
     const warehouseLocationId = ticket.warehouse_location_id;
     const organizationId = ticket.organization_id;
+    console.log('2')
 
     // ── 2. Current warehouse quantities for fulfilled items ──────────────────
     const { data: itemLocations, error: itemLocError } = await supabase
@@ -41,6 +42,7 @@ export async function checkWarehouseLowStockAfterFulfillment(
         .select("item_id, current_quantity")
         .eq("location_id", warehouseLocationId)
         .in("item_id", fulfilledItemIds);
+    console.log(itemLocations, fulfilledItemIds)
 
     if (itemLocError) {
         console.error("[warehouseLowStock] Failed to fetch item_locations:", itemLocError);
@@ -48,6 +50,7 @@ export async function checkWarehouseLowStockAfterFulfillment(
     }
 
     if (!itemLocations?.length) return;
+    console.log('3')
 
     // ── 3. Thresholds — location-specific and org-wide in one query ──────────
     const { data: thresholds, error: thresholdError } = await supabase
@@ -62,6 +65,7 @@ export async function checkWarehouseLowStockAfterFulfillment(
         console.error("[warehouseLowStock] Failed to fetch thresholds:", thresholdError);
         return;
     }
+    console.log('4')
 
     // ── 4. Build threshold map: item_id → best match ─────────────────────────
     // Location-specific row wins over org-wide (location_id IS NULL).
@@ -81,14 +85,18 @@ export async function checkWarehouseLowStockAfterFulfillment(
             });
         }
     }
+    console.log('5')
 
     // ── 5. Evaluate each item ────────────────────────────────────────────────
     for (const loc of itemLocations) {
         const itemId = loc.item_id;
         const currentQty = loc.current_quantity;
 
+        console.log(loc)
+
         if (itemId === null || currentQty === null) continue;
         const threshold = thresholdMap.get(itemId);
+        console.log(threshold)
 
         if (!threshold) continue; // no threshold configured — skip
 
@@ -105,6 +113,7 @@ export async function checkWarehouseLowStockAfterFulfillment(
         } else if (currentQty < threshold.low_threshold) {
             urgencyLevel = "low";
         }
+        console.log('6')
 
         if (!urgencyLevel) continue; // stock is healthy — skip
 
@@ -127,6 +136,8 @@ export async function checkWarehouseLowStockAfterFulfillment(
         }
 
         if (existingAlert) continue; // already alerting — skip
+        console.log('7')
+
 
         // ── 7. Insert new alert row ──────────────────────────────────────────
         const { data: newAlert, error: insertError } = await supabase
@@ -148,6 +159,8 @@ export async function checkWarehouseLowStockAfterFulfillment(
             );
             continue;
         }
+
+        console.log('8')
 
         // ── 8. Invoke send-low-stock-alert edge function ─────────────────────
         const { error: fnError } = await supabase.functions.invoke(

@@ -42,9 +42,12 @@ export function useAlerts(filters?: { locationId?: string; storageSpaceId?: stri
 }
 
 export function useLowStockItems(groupBy: 'location' | 'item' = 'location') {
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
     return useQuery({
-        queryKey: ['low-stock-items', groupBy],
-        queryFn: () => getLowStockItems(groupBy),
+        queryKey: ['low-stock-items', groupBy, organizationId],
+        queryFn: () => getLowStockItems(organizationId!, groupBy),
+        enabled: !!organizationId,
         staleTime: 30 * 1000, // 30 seconds
     });
 }
@@ -130,7 +133,7 @@ export function useBulkUpdateInventory() {
             }>;
         }) => {
             if (!userInfo?.id) throw new Error('userInfo not authenticated');
-            return bulkUpdateInventory(data.itemLocations, userInfo.id, organizationId);
+            return bulkUpdateInventory(data.itemLocations, userInfo.id, false, organizationId);
         },
         onSuccess: (_, variables) => {
             const firstItem = variables.itemLocations[0];
