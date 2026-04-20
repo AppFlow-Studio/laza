@@ -125,7 +125,6 @@ export default function ItemGrid({
                                 <TableHead>Category</TableHead>
                                 <TableHead>Unit</TableHead>
                                 <TableHead>Min Quantity</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>

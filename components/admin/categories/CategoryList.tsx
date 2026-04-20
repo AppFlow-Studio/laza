@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Trash2, Package, ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Package, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 
@@ -24,17 +23,10 @@ interface Category {
 
 interface CategoryListProps {
     categories: Category[];
-    onEdit: (category: Category) => void;
-    onDelete: (category: Category) => void;
     isLoading?: boolean;
 }
 
-export default function CategoryList({
-    categories,
-    onEdit,
-    onDelete,
-    isLoading,
-}: CategoryListProps) {
+export default function CategoryList({ categories, isLoading }: CategoryListProps) {
     const [openId, setOpenId] = useState<string | null>(null);
 
     if (isLoading) {
@@ -73,21 +65,14 @@ export default function CategoryList({
                         key={category.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{
-                            delay: index * 0.05,
-                            type: "spring",
-                            stiffness: 100,
-                        }}
+                        transition={{ delay: index * 0.05, type: "spring", stiffness: 100 }}
                         className="group relative backdrop-blur-xl bg-gradient-to-br from-white/60 to-white/30 rounded-2xl border border-white/50 shadow-lg hover:shadow-xl hover:border-white/70 transition-all duration-300"
                     >
                         <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-50/20 via-transparent to-pink-50/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
-                        {/* Header row */}
                         <div
                             className="relative flex items-center justify-between gap-4 p-5 cursor-pointer select-none"
-                            onClick={() =>
-                                setOpenId(isOpen ? null : category.id)
-                            }
+                            onClick={() => setOpenId(isOpen ? null : category.id)}
                         >
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-3 mb-1.5">
@@ -96,10 +81,7 @@ export default function CategoryList({
                                     </h3>
                                     {category.item_count !== undefined && (
                                         <span className="text-xs px-2.5 py-1 bg-zinc-900/5 backdrop-blur-sm text-zinc-600 rounded-full font-medium border border-zinc-200/50">
-                                            {category.item_count} item
-                                            {category.item_count !== 1
-                                                ? "s"
-                                                : ""}
+                                            {category.item_count} item{category.item_count !== 1 ? "s" : ""}
                                         </span>
                                     )}
                                 </div>
@@ -110,43 +92,14 @@ export default function CategoryList({
                                 )}
                             </div>
 
-                            <div className="flex items-center gap-1">
-                                {/* Edit/Delete — stop propagation so click doesn't toggle accordion */}
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onEdit(category);
-                                        }}
-                                        className="h-9 w-9 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                                    >
-                                        <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onDelete(category);
-                                        }}
-                                        className="h-9 w-9 rounded-xl hover:bg-red-50 hover:text-red-600 transition-colors"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-
-                                <ChevronDown
-                                    className={cn(
-                                        "w-5 h-5 text-zinc-400 transition-transform duration-300 ml-1",
-                                        isOpen && "rotate-180",
-                                    )}
-                                />
-                            </div>
+                            <ChevronDown
+                                className={cn(
+                                    "w-5 h-5 text-zinc-400 transition-transform duration-300",
+                                    isOpen && "rotate-180",
+                                )}
+                            />
                         </div>
 
-                        {/* Accordion content */}
                         <AnimatePresence initial={false}>
                             {isOpen && (
                                 <motion.div
@@ -154,10 +107,7 @@ export default function CategoryList({
                                     initial={{ height: 0, opacity: 0 }}
                                     animate={{ height: "auto", opacity: 1 }}
                                     exit={{ height: 0, opacity: 0 }}
-                                    transition={{
-                                        duration: 0.25,
-                                        ease: "easeInOut",
-                                    }}
+                                    transition={{ duration: 0.25, ease: "easeInOut" }}
                                     className="overflow-hidden"
                                 >
                                     <div className="px-5 pb-5 border-t border-white/50 pt-4">
@@ -178,20 +128,13 @@ export default function CategoryList({
                                                             </p>
                                                             {item.sku && (
                                                                 <p className="text-xs text-zinc-400">
-                                                                    SKU:{" "}
-                                                                    {item.sku}
+                                                                    SKU: {item.sku}
                                                                 </p>
                                                             )}
                                                         </div>
                                                         <div className="text-right">
                                                             <p className="text-xs text-zinc-500">
-                                                                Min:{" "}
-                                                                {
-                                                                    item.min_quantity
-                                                                }{" "}
-                                                                {
-                                                                    item.unit_of_measure
-                                                                }
+                                                                Min: {item.min_quantity} {item.unit_of_measure}
                                                             </p>
                                                         </div>
                                                     </div>
