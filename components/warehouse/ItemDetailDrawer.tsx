@@ -323,33 +323,48 @@ function ShipmentRow({ record }: { record: ItemShipmentRecord }) {
 									</tr>
 									</thead>
 									<tbody className="divide-y divide-gray-50">
-									{(record.box_configs && record.box_configs.length > 0
-											? record.box_configs
-											: [{
-												pieces_per_box: record.config_pieces_per_box,
-												box_count:      record.config_box_count,
-												total_pieces:   record.config_total_pieces,
-												notes:          record.config_notes,
-											}]
-									).map((cfg, i) => (
-										<tr
-											key={i}
-											className="transition-colors hover:bg-indigo-50/40 text-xs"
-										>
+									{record.box_configs && record.box_configs.length > 0 ? (
+										record.box_configs.map((cfg, i) => (
+											<tr
+												key={i}
+												className="transition-colors hover:bg-indigo-50/40 text-xs"
+											>
+												<td className="px-3 py-2 tabular-nums text-xs">
+													{fmt(cfg.pieces_per_box)}
+												</td>
+												<td className="px-3 py-2 text-right tabular-nums text-xs">
+													{fmt(cfg.box_count)}
+												</td>
+												<td className="px-3 py-2 text-right text-xs">
+													{fmt(cfg.total_pieces)}
+												</td>
+												<td className="px-3 py-2 text-xs">
+													{cfg.notes ?? "—"}
+												</td>
+											</tr>
+										))
+									) : record.config_pieces_per_box != null ? (
+										<tr className="transition-colors hover:bg-indigo-50/40 text-xs">
 											<td className="px-3 py-2 tabular-nums text-xs">
-												{fmt(cfg.pieces_per_box)}
+												{fmt(record.config_pieces_per_box)}
 											</td>
 											<td className="px-3 py-2 text-right tabular-nums text-xs">
-												{fmt(cfg.box_count)}
+												{fmt(record.config_box_count)}
 											</td>
 											<td className="px-3 py-2 text-right text-xs">
-												{fmt(cfg.total_pieces)}
+												{fmt(record.config_total_pieces)}
 											</td>
 											<td className="px-3 py-2 text-xs">
-												{cfg.notes ?? "—"}
+												{record.config_notes ?? "—"}
 											</td>
 										</tr>
-									))}
+									) : (
+										<tr>
+											<td colSpan={4} className="px-3 py-3 text-xs text-amber-600 italic">
+												Mixed/Unknown box size — enter manually
+											</td>
+										</tr>
+									)}
 									</tbody>
 								</table>
 							</div>

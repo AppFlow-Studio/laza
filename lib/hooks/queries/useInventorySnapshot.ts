@@ -23,11 +23,13 @@ export function useCreateInventorySnapshot() {
                          locationId,
                          userId,
                          items,
+                         organizationId,
                      }: {
             locationId: string;
             userId: string;
             items: SnapshotItem[];
-        }) => createInventorySnapshot(locationId, userId, items),
+            organizationId: string;
+        }) => createInventorySnapshot(locationId, userId, items, organizationId),
 
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['inventory'] });
