@@ -23,16 +23,13 @@ export default function ItemsPage() {
 
     const isLoading = allItemsLoading || categoriesLoading || searchLoading;
 
-    let items = allItems || [];
-    if (categoryFilter && items.length > 0) {
+    let items = (debouncedSearch ? searchResults : allItems) || [];
+    if (categoryFilter) {
         items = items.filter((item: any) => {
             const itemCategoryId = item.category_id
                 || (typeof item.category === 'object' && item.category !== null ? item.category.id : null);
-            return itemCategoryId?.toString() === categoryFilter;
+            return itemCategoryId?.toString() === categoryFilter?.toString();
         });
-    }
-    if (debouncedSearch) {
-        items = searchResults || [];
     }
 
     return (

@@ -108,7 +108,7 @@ export async function bulkUpdateItems(itemIds: string[], updates: Partial<Item>)
     const supabase = await createServerSupabaseClient();
 
     // Only allow updating specific fields for bulk operations
-    const allowedFields: (keyof Item)[] = ['min_quantity', 'category_id', 'unit_of_measure'];
+    const allowedFields: (keyof Item)[] = ['min_quantity', 'category_id', 'unit_of_measure', 'is_warehouse_item'];
     const filteredUpdates: Partial<Item> = {};
 
     for (const key of allowedFields) {

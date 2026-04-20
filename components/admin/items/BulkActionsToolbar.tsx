@@ -10,6 +10,7 @@ interface BulkActionsToolbarProps {
     onUpdateCategory: () => void;
     onUpdateUnit: () => void;
     onUpdatePrice?: () => void;
+    onUpdateWarehouse?: () => void;
     onBulkUpdate: () => void;
     onDelete: () => void;
     onClearSelection: () => void;
@@ -22,6 +23,7 @@ export default function BulkActionsToolbar({
     onUpdateCategory,
     onUpdateUnit,
     onUpdatePrice = undefined,
+    onUpdateWarehouse = undefined,
     onBulkUpdate,
     onDelete,
     onClearSelection,
@@ -92,6 +94,17 @@ export default function BulkActionsToolbar({
                         >
                             <Percent className="w-4 h-4 mr-1" />
                             Update Price
+                        </Button>
+                    )}
+                    {onUpdateWarehouse && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onUpdateWarehouse}
+                            disabled={isLoading}
+                            className="text-xs"
+                        >
+                            Warehouse
                         </Button>
                     )}
                     <Button

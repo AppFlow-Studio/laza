@@ -37,7 +37,7 @@ export default function ItemsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
-    const [bulkUpdateField, setBulkUpdateField] = useState<'min_quantity' | 'category' | 'unit' | 'price' | 'all'>('all');
+    const [bulkUpdateField, setBulkUpdateField] = useState<'min_quantity' | 'category' | 'unit' | 'price' | 'warehouse' | 'all'>('all');
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
     const debouncedSearch = useDebounce(searchQuery, 300);
     const { viewMode, setViewMode } = useAdminStore();
@@ -52,18 +52,13 @@ export default function ItemsPage() {
 
     const isLoading = allItemsLoading || categoriesLoading || searchLoading;
 
-    let items = allItems || [];
-    // Filter by category if selected
-    if (categoryFilter && items.length > 0) {
+    let items = (debouncedSearch ? searchResults : allItems) || [];
+    if (categoryFilter) {
         items = items.filter((item: any) => {
-            // Handle category as object (from join) or category_id
             const itemCategoryId = item.category_id
                 || (typeof item.category === 'object' && item.category !== null ? item.category.id : null);
-            return itemCategoryId?.toString() === categoryFilter;
+            return itemCategoryId?.toString() === categoryFilter?.toString();
         });
-    }
-    if (debouncedSearch) {
-        items = searchResults || [];
     }
 
     const handleFormSuccess = () => {
@@ -183,6 +178,10 @@ export default function ItemsPage() {
                 }}
                 onUpdatePrice={() => {
                     setBulkUpdateField('price');
+                    setShowBulkUpdateModal(true);
+                }}
+                onUpdateWarehouse={() => {
+                    setBulkUpdateField('warehouse');
                     setShowBulkUpdateModal(true);
                 }}
                 onBulkUpdate={() => {

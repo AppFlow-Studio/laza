@@ -15,6 +15,7 @@ const bulkUpdateSchema = z.object({
     category_id: z.string().optional().nullable(),
     unit_of_measure: z.enum(['pcs', 'kg', 'liters', 'lbs', 'oz']).optional(),
     price_increase_pct: z.number().min(0.1).max(1000).optional(),
+    is_warehouse_item: z.enum(['true', 'false', '']).optional(),
 });
 
 type BulkUpdateFormData = z.infer<typeof bulkUpdateSchema>;
@@ -24,7 +25,7 @@ interface BulkUpdateModalProps {
     selectedCount: number;
     onSuccess: () => void;
     onCancel: () => void;
-    updateField?: 'min_quantity' | 'category' | 'unit' | 'price' | 'all';
+    updateField?: 'min_quantity' | 'category' | 'unit' | 'price' | 'warehouse' | 'all';
 }
 
 export default function BulkUpdateModal({
@@ -50,6 +51,7 @@ export default function BulkUpdateModal({
             category_id: undefined,
             unit_of_measure: undefined,
             price_increase_pct: undefined,
+            is_warehouse_item: '',
         },
     });
 
@@ -70,6 +72,10 @@ export default function BulkUpdateModal({
             if (data.unit_of_measure !== undefined) {
                 updates.unit_of_measure = data.unit_of_measure;
             }
+        }
+
+        if ((updateField === 'all' || updateField === 'warehouse') && data.is_warehouse_item !== '' && data.is_warehouse_item !== undefined) {
+            (updates as any).is_warehouse_item = data.is_warehouse_item === 'true';
         }
 
         const hasPriceUpdate = (updateField === 'all' || updateField === 'price') && data.price_increase_pct !== undefined;
@@ -108,6 +114,7 @@ export default function BulkUpdateModal({
     const showCategory = updateField === 'all' || updateField === 'category';
     const showUnit = updateField === 'all' || updateField === 'unit';
     const showPrice = updateField === 'all' || updateField === 'price';
+    const showWarehouse = updateField === 'all' || updateField === 'warehouse';
     const isPending = updateMutation.isPending || priceUpdateMutation.isPending;
 
     return (
@@ -197,6 +204,21 @@ export default function BulkUpdateModal({
                     {errors.price_increase_pct && (
                         <p className="text-sm text-red-500 mt-1">{errors.price_increase_pct.message}</p>
                     )}
+                </div>
+            )}
+
+            {showWarehouse && (
+                <div>
+                    <Label htmlFor="is_warehouse_item">Warehouse Item (Optional)</Label>
+                    <select
+                        id="is_warehouse_item"
+                        {...register('is_warehouse_item')}
+                        className="w-full px-3 py-2 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="">Leave empty to skip</option>
+                        <option value="true">Yes — Warehouse item</option>
+                        <option value="false">No — Not a warehouse item</option>
+                    </select>
                 </div>
             )}
 
