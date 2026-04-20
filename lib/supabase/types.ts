@@ -535,6 +535,7 @@ export type Database = {
           short_label: string | null
           sku: string | null
           unit_of_measure: string | null
+          is_warehouse_item: boolean
           updated_at: string | null
         }
         Insert: {
@@ -552,6 +553,7 @@ export type Database = {
           short_label?: string | null
           sku?: string | null
           unit_of_measure?: string | null
+          is_warehouse_item?: boolean
           updated_at?: string | null
         }
         Update: {
@@ -568,6 +570,7 @@ export type Database = {
           organization_id?: string | null
           short_label?: string | null
           sku?: string | null
+          is_warehouse_item?: boolean
           unit_of_measure?: string | null
           updated_at?: string | null
         }
@@ -3088,3 +3091,6 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
+export type Item = Tables<'items'>
+export type StorageSpace = Tables<'storage_spaces'>
