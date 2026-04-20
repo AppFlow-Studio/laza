@@ -12,18 +12,16 @@ import {
     ArrowLeft, MapPin, Warehouse,
     ChevronRight, Ship, Clock, CheckCircle2, XCircle,
     AlertCircle, FileText, Plus, Anchor, Layers,
-    Search, X, LayoutGrid, List,
+    Search, X, LayoutGrid, List, Receipt, Bell,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, use, useCallback } from "react";
 import type { PalletFilters, PalletWithDetails } from "@/lib/supabase/queries/pallets";
 import { ItemDetailDrawer } from "@/components/warehouse/ItemDetailDrawer";
-import { Receipt, Bell } from "lucide-react";
 import LowStockThresholdManager from "@/components/admin/settings/LowStockThresholdManager";
 import { WarehouseExpensesPanel } from "@/components/super-admin/warehouse/WarehouseExpensesPanel";
 import { LocationNotificationPreferences } from "@/components/location-notification-preferences";
-import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 
 
 type TabId = "inventory" | "shipments" | "pallets" | "thresholds" | "expenses" | "notifications";
@@ -839,8 +837,6 @@ export default function WarehouseDetailPage({ params }: { params: Promise<{ id: 
 
     const { data: warehouse, isLoading } = useWarehouseById(id);
     const { data: palletStats }          = usePalletStats(id);
-    const { data: userInfo } = useUserInfo();
-    const organizationId = userInfo?.members?.organization_id ?? "";
 
     if (isLoading) {
         return (
@@ -943,13 +939,13 @@ export default function WarehouseDetailPage({ params }: { params: Promise<{ id: 
                 <PalletsTab warehouseId={id} />
             )}
 
-            {activeTab === "thresholds" && organizationId && (
-                <LowStockThresholdManager organizationId={organizationId} locationId={id} />
+            {activeTab === "thresholds" && (
+                <LowStockThresholdManager organizationId={warehouse.organization_id} locationId={id} />
             )}
 
-            {activeTab === "expenses" && organizationId && (
+            {activeTab === "expenses" && (
                 <WarehouseExpensesPanel
-                    organizationId={organizationId}
+                    organizationId={warehouse.organization_id}
                     warehouseLocationId={id}
                 />
             )}
