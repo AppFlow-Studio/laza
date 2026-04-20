@@ -597,7 +597,6 @@ function PalletsTab({ warehouseId }: { warehouseId: string }) {
                                         {/* Indented pallet rows */}
                                         {group.pallets.map((pallet, idx) => {
                                             const isLast = idx === group.pallets.length - 1;
-                                            console.log(pallet)
                                             return (
                                                 <tr
                                                     key={pallet.id}
