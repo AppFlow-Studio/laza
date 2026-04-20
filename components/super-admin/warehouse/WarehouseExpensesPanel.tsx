@@ -137,14 +137,14 @@ function useExpenses(
     });
 }
 
-function useExpenseSummary(organizationId: string) {
+function useExpenseSummary(organizationId: string, warehouseLocationId: string) {
     const now = new Date();
     const from = format(startOfMonth(now), "yyyy-MM-dd");
     const to = format(endOfMonth(now), "yyyy-MM-dd");
     return useQuery({
-        queryKey: ["warehouse-expense-summary", organizationId, from, to],
-        queryFn: () => getExpenseSummary(organizationId, { from, to }),
-        enabled: !!organizationId,
+        queryKey: ["warehouse-expense-summary", organizationId, warehouseLocationId, from, to],
+        queryFn: () => getExpenseSummary(organizationId, { from, to }, warehouseLocationId),
+        enabled: !!organizationId && !!warehouseLocationId,
         staleTime: 60 * 1000,
     });
 }
@@ -876,7 +876,7 @@ export function WarehouseExpensesPanel({
         organizationId,
         warehouseLocationId,
     );
-    const { data: summary = [] } = useExpenseSummary(organizationId);
+    const { data: summary = [] } = useExpenseSummary(organizationId, warehouseLocationId);
     const { data: rates = [] } = useExpenseRates(organizationId);
 
     const [showAddForm, setShowAddForm] = useState(false);

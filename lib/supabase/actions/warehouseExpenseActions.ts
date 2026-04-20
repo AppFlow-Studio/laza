@@ -2,7 +2,9 @@
 
 import { WarehouseExpenseFilters } from "../queries/warehouseExpenses";
 import { createServiceRoleClient } from "../server";
-import { WarehouseExpense, WarehouseExpenseInsert } from "@/lib/supabase/types";
+import type { Tables, TablesInsert } from "@/lib/supabase/types";
+type WarehouseExpense = Tables<"warehouse_expenses">;
+type WarehouseExpenseInsert = TablesInsert<"warehouse_expenses">;
 
 
 export async function createWarehouseExpenseAction(
