@@ -61,6 +61,9 @@ export async function getWarehouseExpensesAction(
     if (filters?.dateTo) {
         query = query.lte("expense_date", filters.dateTo);
     }
+    if (filters?.warehouseLocationId) {
+        query = query.eq("warehouse_location_id", filters.warehouseLocationId);
+    }
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);

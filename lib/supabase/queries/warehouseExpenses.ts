@@ -21,6 +21,7 @@ export interface WarehouseExpenseFilters {
     purchaseOrderId?: string;
     dateFrom?: string;
     dateTo?: string;
+    warehouseLocationId?: string;
 }
 
 export interface ExpenseSummary {
