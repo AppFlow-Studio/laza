@@ -697,9 +697,7 @@ export default function NewOrderPage() {
                 (item.sku ?? "").toLowerCase().includes(q);
             const matchCat =
                 !categoryFilter ||
-                item.category?.forEach(
-                    (category) => category.id === categoryFilter,
-                );
+                item.category?.some((c) => c.id === categoryFilter);
             return matchSearch && matchCat;
         });
     }, [orderableItems, search, categoryFilter]);
@@ -874,8 +872,6 @@ export default function NewOrderPage() {
             return;
         }
         if (!validateOrder()) return;
-
-        console.log(buildPayload("submitted"));
 
         try {
             await createTicket(buildPayload("submitted"));
