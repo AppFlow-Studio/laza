@@ -68,11 +68,11 @@ const navigation = [
     { name: "Items", href: "/super-admin/items", icon: Package },
     { name: "Categories", href: "/super-admin/categories", icon: Tags },
     // { name: "Inventory", href: "/super-admin/inventory", icon: BarChart3 },
-    {
-        name: "Settings",
-        href: "/super-admin/settings/notifications",
-        icon: Settings,
-    },
+    // {
+    //     name: "Settings",
+    //     href: "/super-admin/settings/notifications",
+    //     icon: Settings,
+    // },
 ];
 
 const warehouseChildren = [

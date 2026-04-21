@@ -18,7 +18,9 @@ import {
     ArrowDownRight,
     ArrowUpRight,
     Plus,
+    Bell,
 } from "lucide-react";
+import { LocationNotificationPreferences } from "@/components/location-notification-preferences";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
@@ -30,9 +32,10 @@ import StorageSetupWizard from "@/components/admin/locations/StorageSetupWizard"
 type StorageSpace = Tables<"storage_spaces">;
 
 const TABS = [
-    { key: "stock", label: "In-Store Stock", icon: Package },
-    { key: "employees", label: "Employees", icon: Users },
-    { key: "audit", label: "Audit Logs", icon: Clock },
+    { key: "stock",          label: "In-Store Stock",  icon: Package },
+    { key: "employees",      label: "Employees",       icon: Users },
+    { key: "audit",          label: "Audit Logs",      icon: Clock },
+    { key: "notifications",  label: "Notifications",   icon: Bell },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -343,6 +346,11 @@ export default function SuperAdminStoreDetailPage() {
                             </p>
                         )}
                     </div>
+                )}
+
+                {/* ── Notifications tab ── */}
+                {activeTab === "notifications" && (
+                    <LocationNotificationPreferences locationId={locationId} />
                 )}
 
                 {/* ── Audit logs tab ── */}

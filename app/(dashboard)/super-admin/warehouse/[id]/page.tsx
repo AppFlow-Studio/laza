@@ -12,16 +12,19 @@ import {
     ArrowLeft, MapPin, Warehouse,
     ChevronRight, Ship, Clock, CheckCircle2, XCircle,
     AlertCircle, FileText, Plus, Anchor, Layers,
-    Search, X, LayoutGrid, List,
+    Search, X, LayoutGrid, List, Receipt, Bell,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, use, useCallback } from "react";
 import type { PalletFilters, PalletWithDetails } from "@/lib/supabase/queries/pallets";
 import { ItemDetailDrawer } from "@/components/warehouse/ItemDetailDrawer";
+import LowStockThresholdManager from "@/components/admin/settings/LowStockThresholdManager";
+import { WarehouseExpensesPanel } from "@/components/super-admin/warehouse/WarehouseExpensesPanel";
+import { LocationNotificationPreferences } from "@/components/location-notification-preferences";
 
 
-type TabId = "inventory" | "shipments" | "pallets";
+type TabId = "inventory" | "shipments" | "pallets" | "thresholds" | "expenses" | "notifications";
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
@@ -594,7 +597,6 @@ function PalletsTab({ warehouseId }: { warehouseId: string }) {
                                         {/* Indented pallet rows */}
                                         {group.pallets.map((pallet, idx) => {
                                             const isLast = idx === group.pallets.length - 1;
-                                            console.log(pallet)
                                             return (
                                                 <tr
                                                     key={pallet.id}
@@ -820,7 +822,7 @@ export default function WarehouseDetailPage({ params }: { params: Promise<{ id: 
     const router = useRouter();
     const searchParams = useSearchParams();
     const rawTab       = searchParams.get("tab");
-    const activeTab: TabId = (["inventory", "shipments", "pallets"] as TabId[]).includes(rawTab as TabId)
+    const activeTab: TabId = (["inventory", "shipments", "pallets", "thresholds", "expenses", "notifications"] as TabId[]).includes(rawTab as TabId)
         ? (rawTab as TabId)
         : "inventory";
 
@@ -864,9 +866,12 @@ export default function WarehouseDetailPage({ params }: { params: Promise<{ id: 
         : (warehouse.address as Record<string, string>);
 
     const tabs: { id: TabId; label: string; icon: React.ElementType; count?: number }[] = [
-        { id: "inventory", label: "Inventory", icon: LayoutGrid },
-        { id: "shipments", label: "Shipments", icon: Ship},
-        { id: "pallets", label: "Pallets", icon: Layers, count: palletStats?.total },
+        { id: "inventory",     label: "Inventory",      icon: LayoutGrid },
+        { id: "shipments",     label: "Shipments",      icon: Ship },
+        { id: "pallets",       label: "Pallets",        icon: Layers, count: palletStats?.total },
+        { id: "thresholds",    label: "Thresholds",     icon: Thermometer },
+        { id: "expenses",      label: "Expenses",       icon: Receipt },
+        { id: "notifications", label: "Notifications",  icon: Bell },
     ];
 
     return (
@@ -931,6 +936,21 @@ export default function WarehouseDetailPage({ params }: { params: Promise<{ id: 
             )}
             {activeTab === "pallets" && (
                 <PalletsTab warehouseId={id} />
+            )}
+
+            {activeTab === "thresholds" && (
+                <LowStockThresholdManager organizationId={warehouse.organization_id} locationId={id} />
+            )}
+
+            {activeTab === "expenses" && (
+                <WarehouseExpensesPanel
+                    organizationId={warehouse.organization_id}
+                    warehouseLocationId={id}
+                />
+            )}
+
+            {activeTab === "notifications" && (
+                <LocationNotificationPreferences locationId={id} />
             )}
         </div>
     );
