@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Package, Edit, Trash2, Check, AlertTriangle } from 'lucide-react';
+import { Package, Edit, Trash2, Check, AlertTriangle, Warehouse } from 'lucide-react';
 import { Item } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';
 import {
@@ -170,7 +170,8 @@ export default function ItemGrid({
                                                     {getCategoryName(item)}
                                                 </span>
                                                 {(item as any).is_warehouse_item && (
-                                                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600">
+                                                        <Warehouse size={10} />
                                                         Warehouse
                                                     </span>
                                                 )}
@@ -290,7 +291,8 @@ export default function ItemGrid({
                                         {getCategoryName(item)}
                                     </div>
                                     {(item as any).is_warehouse_item && (
-                                        <div className="px-2 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600">
+                                        <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600">
+                                            <Warehouse size={10} />
                                             Warehouse
                                         </div>
                                     )}
