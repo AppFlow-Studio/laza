@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAdminStore } from '@/lib/stores/adminStore';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
-import { useDeleteItem, useBulkUpdateItems, useBulkDeleteItems } from '@/lib/hooks/queries/useItems';
+import { useSuperAdminDeleteItem, useSuperAdminBulkUpdateItems, useSuperAdminBulkDeleteItems } from '@/lib/hooks/queries/useItems';
 import toast from 'react-hot-toast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useSearchItems } from '@/lib/hooks/queries/useItems';
@@ -46,9 +46,9 @@ export default function ItemsPage() {
     const { data: categories, isLoading: categoriesLoading } = useCategories();
     const { data: searchResults, isLoading: searchLoading } = useSearchItems(debouncedSearch);
 
-    const deleteMutation = useDeleteItem();
-    const bulkUpdateMutation = useBulkUpdateItems();
-    const bulkDeleteMutation = useBulkDeleteItems();
+    const deleteMutation = useSuperAdminDeleteItem();
+    const bulkUpdateMutation = useSuperAdminBulkUpdateItems();
+    const bulkDeleteMutation = useSuperAdminBulkDeleteItems();
 
     const isLoading = allItemsLoading || categoriesLoading || searchLoading;
 

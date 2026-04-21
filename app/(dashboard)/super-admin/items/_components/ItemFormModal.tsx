@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
-import { useCreateItem, useUpdateItem } from "@/lib/hooks/queries/useItems";
+import { useSuperAdminCreateItem, useSuperAdminUpdateItem } from "@/lib/hooks/queries/useItems";
 import { useCategories } from "@/lib/hooks/queries/useCategories";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { Switch } from "@/components/ui/switch";
@@ -41,8 +41,8 @@ interface ItemFormModalProps {
 export default function ItemFormModal({ item, onSuccess, onCancel }: ItemFormModalProps) {
     const { data: userInfo } = useUserInfo();
     const { data: categories, isLoading: categoriesLoading } = useCategories();
-    const createMutation = useCreateItem();
-    const updateMutation = useUpdateItem();
+    const createMutation = useSuperAdminCreateItem();
+    const updateMutation = useSuperAdminUpdateItem();
 
     const {
         register,
@@ -116,10 +116,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: ItemFormMod
                 await updateMutation.mutateAsync({ id: String(item.id), updates: payload });
                 toast.success("Item updated successfully");
             } else {
-                // Cast to any to pass is_warehouse_item + cbm_per_carton through the strict
-                // createItem type — the underlying query and DB both accept these fields.
-                // TODO: widen createItem's type signature to include is_warehouse_item.
-                await createMutation.mutateAsync({ item: { organization_id: organizationId, ...payload } as any });
+                await createMutation.mutateAsync({ organization_id: organizationId, ...payload });
                 toast.success("Item created successfully");
             }
 

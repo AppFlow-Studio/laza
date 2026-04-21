@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerSupabaseClient } from '../server';
+import { createServerSupabaseClient, createServiceRoleClient } from '../server';
 import { Item } from '../types';
 import { auth } from '@clerk/nextjs/server';
 export async function getAllItems(organizationId: string) {
@@ -148,6 +148,85 @@ export async function bulkUpdateItemPrices(items: Array<{ id: number; cost_per_u
 
 export async function bulkDeleteItems(itemIds: string[]) {
     const supabase = await createServerSupabaseClient();
+    const { error } = await supabase
+        .from('items')
+        .delete()
+        .in('id', itemIds);
+
+    if (error) throw error;
+}
+
+// --- Super-admin mutations (service role — bypasses RLS) ---
+// The /super-admin route is already Clerk-protected; these bypass RLS so that
+// super_admin users (who share role='admin' in the DB) can still write after
+// the A1 migration removes the generic admin write policies.
+
+export async function superAdminCreateItem(item: {
+    organization_id: string;
+    name: string;
+    sku?: string | null;
+    category_id: number | null;
+    unit_of_measure: 'pcs' | 'kg' | 'liters' | 'lbs' | 'oz';
+    min_quantity: number;
+    is_warehouse_item?: boolean;
+    cbm_per_carton?: number | null;
+}) {
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+        .from('items')
+        .insert(item)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data as Item;
+}
+
+export async function superAdminUpdateItem(id: string, updates: Partial<Item> & { cbm_per_carton?: number | null }) {
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+        .from('items')
+        .update(updates)
+        .eq('id', id)
+        .select();
+
+    if (error) throw error;
+    return data;
+}
+
+export async function superAdminDeleteItem(id: string) {
+    const supabase = createServiceRoleClient();
+    const { error } = await supabase
+        .from('items')
+        .delete()
+        .eq('id', id);
+
+    if (error) throw error;
+}
+
+export async function superAdminBulkUpdateItems(itemIds: string[], updates: Partial<Item>) {
+    const supabase = createServiceRoleClient();
+
+    const allowedFields: (keyof Item)[] = ['min_quantity', 'category_id', 'unit_of_measure', 'is_warehouse_item'];
+    const filteredUpdates: Partial<Item> = {};
+    for (const key of allowedFields) {
+        if (updates[key] !== undefined) filteredUpdates[key] = updates[key];
+    }
+
+    if (Object.keys(filteredUpdates).length === 0) throw new Error('No valid fields to update');
+
+    const { data, error } = await supabase
+        .from('items')
+        .update(filteredUpdates)
+        .in('id', itemIds)
+        .select();
+
+    if (error) throw error;
+    return data as Item[];
+}
+
+export async function superAdminBulkDeleteItems(itemIds: string[]) {
+    const supabase = createServiceRoleClient();
     const { error } = await supabase
         .from('items')
         .delete()

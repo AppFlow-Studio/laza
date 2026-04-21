@@ -12,6 +12,11 @@ import {
     bulkUpdateItems,
     bulkDeleteItems,
     bulkUpdateItemPrices,
+    superAdminCreateItem,
+    superAdminUpdateItem,
+    superAdminDeleteItem,
+    superAdminBulkUpdateItems,
+    superAdminBulkDeleteItems,
 } from '@/lib/supabase/queries/items';
 import { Item } from '@/lib/supabase/types';
 import { useUserInfo } from './useUserInfo';
@@ -116,6 +121,61 @@ export function useBulkUpdateItemPrices() {
     return useMutation({
         mutationFn: (items: Array<{ id: number; cost_per_unit: number }>) =>
             bulkUpdateItemPrices(items),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['items'] });
+        },
+    });
+}
+
+// --- Super-admin hooks (use service role client, bypass RLS) ---
+
+export function useSuperAdminCreateItem() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (item: Parameters<typeof superAdminCreateItem>[0]) => superAdminCreateItem(item),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['items'] });
+        },
+    });
+}
+
+export function useSuperAdminUpdateItem() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, updates }: { id: string; updates: Parameters<typeof superAdminUpdateItem>[1] }) =>
+            superAdminUpdateItem(id, updates),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['items'] });
+            queryClient.invalidateQueries({ queryKey: ['item', variables.id] });
+        },
+    });
+}
+
+export function useSuperAdminDeleteItem() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: superAdminDeleteItem,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['items'] });
+        },
+    });
+}
+
+export function useSuperAdminBulkUpdateItems() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ itemIds, updates }: { itemIds: string[]; updates: Partial<Item> }) =>
+            superAdminBulkUpdateItems(itemIds, updates),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['items'] });
+        },
+    });
+}
+
+export function useSuperAdminBulkDeleteItems() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (itemIds: string[]) => superAdminBulkDeleteItems(itemIds),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['items'] });
         },
