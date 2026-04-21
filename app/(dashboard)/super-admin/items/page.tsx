@@ -27,7 +27,7 @@ import toast from 'react-hot-toast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useSearchItems } from '@/lib/hooks/queries/useItems';
 import { useCategories } from '@/lib/hooks/queries/useCategories';
-import ItemForm from '@/components/admin/items/ItemForm';
+import ItemFormModal from '@/app/(dashboard)/super-admin/items/_components/ItemFormModal';
 
 export default function ItemsPage() {
     const [showAddForm, setShowAddForm] = useState(false);
@@ -226,7 +226,7 @@ export default function ItemsPage() {
                 onClose={handleFormCancel}
                 title={editingItem ? 'Edit Item' : 'Add Item'}
             >
-                <ItemForm
+                <ItemFormModal
                     item={editingItem}
                     onSuccess={handleFormSuccess}
                     onCancel={handleFormCancel}
