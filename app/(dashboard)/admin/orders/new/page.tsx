@@ -25,6 +25,17 @@ import {
 } from "lucide-react";
 import { Sheet } from "react-modal-sheet";
 import { toast } from "react-hot-toast";
+import { motion } from "motion/react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { useWarehouseCatalog } from "@/lib/hooks/queries/useWarehouse";
 import { useCategories } from "@/lib/hooks/queries/useCategories";
@@ -52,6 +63,7 @@ type CartEntry = {
     item: WarehouseCatalogItem & { box_quantity: number };
     boxes: number;
     selectedConfig: ShipmentBoxConfig | null;
+    unitPrice: number | null;
 };
 
 // ─── Validation ───────────────────────────────────────────────────────────────
@@ -339,6 +351,11 @@ function CatalogItemRow({
     const requiresConfigSelection = availableConfigs.length > 0;
 
     const ppb = effectivePiecesPerBox(item, localConfig);
+    const unitPrice = item.warehouse_transfer_price ?? null;
+    const missingPrice = unitPrice == null;
+    const pricePerBox = unitPrice != null && item.box_quantity != null
+        ? unitPrice * item.box_quantity
+        : null;
     const inCart = !!cartEntry;
     const displayBoxes = parseInt(inputVal) || 1;
 
@@ -380,9 +397,11 @@ function CatalogItemRow({
     return (
         <div
             className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-100 ${
-                inCart
-                    ? "border-indigo-300 bg-indigo-50/40"
-                    : "border-gray-200 bg-white hover:border-violet-200 hover:shadow-[0_1px_6px_rgba(99,102,241,0.07)]"
+                missingPrice
+                    ? "border-gray-100 bg-gray-50 opacity-60 pointer-events-none"
+                    : inCart
+                      ? "border-indigo-300 bg-indigo-50/40"
+                      : "border-gray-200 bg-white hover:border-violet-200 hover:shadow-[0_1px_6px_rgba(99,102,241,0.07)]"
             }`}
         >
             <div className="flex-1 min-w-0">
@@ -406,6 +425,20 @@ function CatalogItemRow({
                         >
                             {item.sku}
                         </span>
+                    </div>
+                )}
+                {missingPrice ? (
+                    <div className="mt-1 text-[11px] text-amber-600 font-medium flex items-center gap-1">
+                        <AlertCircle size={10} /> Price not yet set — ask super admin to enable ordering
+                    </div>
+                ) : (
+                    <div className="mt-1 text-[11px] text-gray-500">
+                        {formatCurrency(unitPrice!)} / unit
+                        {pricePerBox != null && (
+                            <span className="ml-1 text-indigo-600 font-semibold">
+                                · {formatCurrency(pricePerBox)} / box
+                            </span>
+                        )}
                     </div>
                 )}
 
@@ -560,6 +593,10 @@ function CartRow({
     );
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function NewOrderPage() {
     const router = useRouter();
@@ -588,6 +625,7 @@ export default function NewOrderPage() {
     const [notes, setNotes] = useState("");
     const [deliveryType, setDeliveryType] = useState<DeliveryType>("company");
     const [reviewSheetOpen, setReviewSheetOpen] = useState(false);
+    const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
 
     // ── Restore local draft on mount (network failure recovery) ──────────────
     // If a previous submit attempt failed due to network issues, the cart was
@@ -620,6 +658,7 @@ export default function NewOrderPage() {
                         },
                         boxes: entry.boxes,
                         selectedConfig: null,
+                        unitPrice: item.warehouse_transfer_price ?? null,
                     };
                 }
             }
@@ -670,6 +709,13 @@ export default function NewOrderPage() {
     const totalBoxes = cartEntries.reduce((s, e) => s + e.boxes, 0);
     const hasItems = totalItems > 0;
 
+    const subtotal = cartEntries.reduce((sum, e) => {
+        if (e.unitPrice == null || e.item.box_quantity == null) return sum;
+        return sum + e.unitPrice * e.item.box_quantity * e.boxes;
+    }, 0);
+
+    const hasMissingPrice = cartEntries.some((e) => e.unitPrice == null);
+
     const handleConfigChange = useCallback(
         (itemId: number, config: ShipmentBoxConfig | null) => {
             setCart((prev) =>
@@ -692,7 +738,12 @@ export default function NewOrderPage() {
         ) => {
             setCart((prev) => ({
                 ...prev,
-                [item.id]: { item, boxes, selectedConfig: config },
+                [item.id]: {
+                    item,
+                    boxes,
+                    selectedConfig: config,
+                    unitPrice: item.warehouse_transfer_price ?? null,
+                },
             }));
         },
         [],
@@ -962,12 +1013,10 @@ export default function NewOrderPage() {
                                         className="text-gray-300"
                                     />
                                 </div>
-                                <p className="text-sm font-medium text-gray-400">
-                                    No items in catalog
-                                </p>
-                                <p className="text-xs text-gray-300 mt-1">
-                                    Items need a box_quantity set by the super
-                                    admin before they can be ordered
+                                <p className="text-sm font-semibold text-gray-500">No orderable items yet</p>
+                                <p className="text-xs text-gray-400 mt-1 max-w-xs">
+                                    Your super admin hasn&apos;t flagged any items as &quot;warehouse items.&quot;
+                                    Reach out to them to set up the catalog.
                                 </p>
                             </div>
                         ) : filteredItems.length === 0 ? (
@@ -1041,6 +1090,17 @@ export default function NewOrderPage() {
                                 </div>
                             ))}
                         </div>
+                        {hasItems && (
+                            <motion.div
+                                key={subtotal}
+                                animate={{ scale: [1, 1.02, 1] }}
+                                transition={{ duration: 0.08 }}
+                                className="mt-3 flex items-center justify-between px-4 py-2.5 bg-indigo-50 rounded-xl"
+                            >
+                                <span className="text-xs font-semibold text-indigo-700">Subtotal</span>
+                                <span className="text-sm font-bold text-indigo-700">{formatCurrency(subtotal)}</span>
+                            </motion.div>
+                        )}
                     </div>
 
                     {/* Cart items — scrollable middle section */}
@@ -1124,9 +1184,9 @@ export default function NewOrderPage() {
                                 Save Draft
                             </button>
                             <button
-                                onClick={handleSubmit}
+                                onClick={() => setConfirmSubmitOpen(true)}
                                 disabled={
-                                    !hasItems || isSubmitting || missingContext
+                                    !hasItems || isSubmitting || missingContext || hasMissingPrice
                                 }
                                 className="flex-[2] py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all hover:enabled:-translate-y-px hover:enabled:shadow-[0_4px_12px_rgba(99,102,241,.3)] flex items-center justify-center gap-2"
                             >
@@ -1158,8 +1218,8 @@ export default function NewOrderPage() {
                                 {totalBoxes} box
                                 {totalBoxes !== 1 ? "es" : ""}
                             </p>
-                            <p className="text-[11px] text-gray-400">
-                                Tap to review before submitting
+                            <p className="text-[11px] text-indigo-600 font-semibold">
+                                {formatCurrency(subtotal)}
                             </p>
                         </div>
                         <button
@@ -1314,12 +1374,13 @@ export default function NewOrderPage() {
                                 <button
                                     onClick={() => {
                                         setReviewSheetOpen(false);
-                                        handleSubmit();
+                                        setConfirmSubmitOpen(true);
                                     }}
                                     disabled={
                                         !hasItems ||
                                         isSubmitting ||
-                                        missingContext
+                                        missingContext ||
+                                        hasMissingPrice
                                     }
                                     className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-[0_2px_12px_rgba(99,102,241,.3)]"
                                 >
@@ -1356,6 +1417,31 @@ export default function NewOrderPage() {
                 </Sheet.Container>
                 <Sheet.Backdrop onTap={() => setReviewSheetOpen(false)} />
             </Sheet>
+
+            {/* Submit confirmation modal */}
+            <AlertDialog open={confirmSubmitOpen} onOpenChange={setConfirmSubmitOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm order submission</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Submit order for <strong>{formatCurrency(subtotal)}</strong>?
+                            Prices lock at submission and won&apos;t change if the warehouse updates them later.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                setConfirmSubmitOpen(false);
+                                handleSubmit();
+                            }}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                            Confirm &amp; Submit
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
