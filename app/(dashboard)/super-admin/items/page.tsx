@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { useItems } from '@/lib/hooks/queries/useItems';
+import { useSuperAdminItems } from '@/lib/hooks/queries/useItems';
 import ItemGrid from '@/components/admin/items/ItemGrid';
 import SearchBar from '@/components/admin/shared/SearchBar';
 import FilterDropdown from '@/components/admin/shared/FilterDropdown';
@@ -27,7 +27,7 @@ import toast from 'react-hot-toast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useSearchItems } from '@/lib/hooks/queries/useItems';
 import { useCategories } from '@/lib/hooks/queries/useCategories';
-import ItemFormModal from '@/app/(dashboard)/super-admin/items/_components/ItemFormModal';
+import ItemFormModal from '@/app/(dashboard)/super-admin/items/components/ItemFormModal';
 
 export default function ItemsPage() {
     const [showAddForm, setShowAddForm] = useState(false);
@@ -42,7 +42,7 @@ export default function ItemsPage() {
     const debouncedSearch = useDebounce(searchQuery, 300);
     const { viewMode, setViewMode } = useAdminStore();
 
-    const { data: allItems, isLoading: allItemsLoading } = useItems();
+    const { data: allItems, isLoading: allItemsLoading } = useSuperAdminItems();
     const { data: categories, isLoading: categoriesLoading } = useCategories();
     const { data: searchResults, isLoading: searchLoading } = useSearchItems(debouncedSearch);
 
