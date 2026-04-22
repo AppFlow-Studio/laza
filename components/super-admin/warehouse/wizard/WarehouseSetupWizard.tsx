@@ -36,9 +36,11 @@ export default function WarehouseSetupWizard() {
     }, []);
 
     const goToStep = useCallback((step: number) => {
-        setDirection(step > currentStep ? 1 : -1);
-        setCurrentStep(step);
-    }, [currentStep]);
+        setCurrentStep(prev => {
+            setDirection(step > prev ? 1 : -1);
+            return step;
+        });
+    }, []);
 
     // Step 1 form submit
     const handleDetailsSubmit = (data: WarehouseFormData) => {
@@ -77,8 +79,9 @@ export default function WarehouseSetupWizard() {
             queryClient.invalidateQueries({ queryKey: ["warehouse-location"] });
             setCreatedLocationId(location.id);
             toast.success("Warehouse created successfully!");
-        } catch (error: any) {
-            toast.error(error.message || "Failed to create warehouse");
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to create warehouse";
+            toast.error(message);
         } finally {
             setIsSubmitting(false);
         }
@@ -179,13 +182,15 @@ export default function WarehouseSetupWizard() {
                     {/* Footer navigation */}
                     {!createdLocationId && (
                         <div className="flex items-center justify-between mt-6 pt-4 border-t border-zinc-200">
-                            <Button
-                                variant="outline"
-                                onClick={handleBack}
-                                disabled={currentStep === 1 || isSubmitting}
-                            >
-                                <ArrowLeft className="w-4 h-4 mr-2" /> Back
-                            </Button>
+                            {currentStep > 1 ? (
+                                <Button
+                                    variant="outline"
+                                    onClick={handleBack}
+                                    disabled={isSubmitting}
+                                >
+                                    <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                                </Button>
+                            ) : <div />}
 
                             <div className="flex gap-2">
                                 {showFooterNext && (
@@ -194,7 +199,7 @@ export default function WarehouseSetupWizard() {
                                     </Button>
                                 )}
                                 {showFooterSubmit && (
-                                    <Button onClick={handleSubmit} disabled={isSubmitting || !warehouseData}>
+                                    <Button onClick={handleSubmit} disabled={isSubmitting || !warehouseData || !organizationId}>
                                         {isSubmitting ? (
                                             <>
                                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
