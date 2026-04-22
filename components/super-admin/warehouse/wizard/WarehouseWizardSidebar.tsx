@@ -15,7 +15,7 @@ interface Props {
 }
 
 export default function WarehouseWizardSidebar({ currentStep, completedSteps, onStepClick }: Props) {
-    const canNavigateTo = (step: number) => completedSteps.has(step) || step === currentStep;
+    const canNavigateTo = (step: number) => completedSteps.has(step) && step !== currentStep;
 
     return (
         <nav className="space-y-1">
@@ -29,12 +29,12 @@ export default function WarehouseWizardSidebar({ currentStep, completedSteps, on
                     <div key={step.number} className="relative">
                         <button
                             type="button"
-                            onClick={() => isClickable && onStepClick(step.number)}
+                            onClick={() => onStepClick(step.number)}
                             disabled={!isClickable}
                             className={cn(
                                 "w-full flex items-start gap-3 p-3 rounded-lg text-left transition-colors",
                                 isCurrent && "bg-indigo-50",
-                                isClickable && !isCurrent && "hover:bg-zinc-50",
+                                isClickable && "hover:bg-zinc-50",
                                 !isClickable && "opacity-50 cursor-not-allowed"
                             )}
                         >
