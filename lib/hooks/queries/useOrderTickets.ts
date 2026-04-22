@@ -18,6 +18,7 @@ import {
 	getRemainderTicketsAction,
 	getAutoApprovedTicketsAction,
 	getTicketsWithDiscrepanciesAction,
+	getTicketItemCostsAction,
 } from "@/lib/supabase/actions/orderTicketActions";
 import {
 	createTicket,
@@ -81,6 +82,17 @@ export function useAllTickets(orgId: string | undefined, filters?: TicketFilters
 		queryFn:   () => getAllTicketsAction(orgId!, filters),
 		enabled:   !!orgId,
 		staleTime: 30_000,
+	});
+}
+
+// ─── useTicketItemCosts — super admin only ────────────────────────────────────
+
+export function useTicketItemCosts(itemIds: number[], enabled: boolean) {
+	return useQuery({
+		queryKey:  ["ticket-item-costs", itemIds],
+		queryFn:   () => getTicketItemCostsAction(itemIds),
+		enabled:   enabled && itemIds.length > 0,
+		staleTime: 5 * 60_000,
 	});
 }
 

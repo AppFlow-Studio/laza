@@ -15,6 +15,7 @@ import {
 	getRemainderTickets,
 	getAutoApprovedTickets,
 	getTicketsWithDiscrepancies,
+	getTicketItemCosts,
 	type TicketFilters,
 } from "@/lib/supabase/queries/orderTickets";
 
@@ -53,4 +54,8 @@ export async function getAutoApprovedTicketsAction(
 
 export async function getTicketsWithDiscrepanciesAction(organizationId: string) {
 	return getTicketsWithDiscrepancies(organizationId);
+}
+
+export async function getTicketItemCostsAction(itemIds: number[]) {
+	return getTicketItemCosts(itemIds);
 }

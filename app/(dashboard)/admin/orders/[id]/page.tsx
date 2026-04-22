@@ -34,6 +34,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import {
     useTicket,
+    useTicketItemCosts,
     useCreateTicket,
     useSubmitTicket,
     useConfirmTicket,
@@ -67,6 +68,9 @@ type TicketItem = {
     quantity_units: number;
     fulfilled_boxes: number | null;
     fulfilled_units: number | null;
+    unit_price_at_time: number | null;
+    price_locked_at: string | null;
+    line_cost: number | null;
     items: {
         id: number;
         name: string;
@@ -948,142 +952,276 @@ function ConfirmReceiptModal({
 function ItemsTable({
     ticket,
     isDraftEditing,
+    isSuperAdmin,
+    costMap,
 }: {
     ticket: Ticket;
     isDraftEditing: boolean;
+    isSuperAdmin: boolean;
+    costMap: Map<number, number>;
 }) {
     const { status, order_ticket_items } = ticket;
-    const showFulfilled = [
-        "fulfilled",
-        "in_transit",
-        "delivered",
-        "confirmed",
-    ].includes(status);
+    const isPriceLocked = status !== "draft";
+
+    // First item with a locked timestamp — used for the callout banner
+    const priceLockTimestamp = order_ticket_items.find(
+        (i) => i.price_locked_at,
+    )?.price_locked_at;
+
+    // Column config
+    const cols = isDraftEditing
+        ? "1fr 120px"
+        : isSuperAdmin && isPriceLocked
+          ? "1fr 95px 75px 105px 90px 105px 80px"
+          : "1fr 95px 75px 105px";
+
+    const headers = isDraftEditing
+        ? ["Item", "Qty (boxes)"]
+        : isSuperAdmin && isPriceLocked
+          ? ["Item", "Unit price", "Qty", "Line total", "Unit cost", "Line cost", "Margin"]
+          : ["Item", "Unit price", "Qty", "Line total"];
+
+    // Footer totals
+    const totalBilled = order_ticket_items.reduce((sum, item) => {
+        if (!item.unit_price_at_time) return sum;
+        const qty = item.fulfilled_boxes ?? item.quantity_boxes;
+        return sum + item.unit_price_at_time * qty;
+    }, 0);
+
+    const totalCost = isSuperAdmin
+        ? order_ticket_items.reduce((sum, item) => {
+              const unitCost = costMap.get(item.item_id);
+              if (!unitCost) return sum;
+              const qty = item.fulfilled_boxes ?? item.quantity_boxes;
+              return sum + unitCost * qty;
+          }, 0)
+        : 0;
+
+    const totalMargin = totalBilled - totalCost;
+    const marginPct = totalCost > 0 ? (totalMargin / totalCost) * 100 : null;
+
+    const hasAnyPrice = order_ticket_items.some(
+        (i) => i.unit_price_at_time != null,
+    );
 
     return (
-        <div className="border border-gray-200 rounded-xl overflow-hidden">
-            <div
-                className="grid gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100"
-                style={{
-                    gridTemplateColumns: showFulfilled
-                        ? "1fr 100px 90px 90px 70px"
-                        : isDraftEditing
-                          ? "1fr 120px"
-                          : "1fr 90px 90px",
-                }}
-            >
-                {(showFulfilled
-                    ? ["Item", "SKU", "Ordered", "Fulfilled", ""]
-                    : isDraftEditing
-                      ? ["Item", "Qty (boxes)"]
-                      : ["Item", "SKU", "Qty (boxes)"]
-                ).map((h) => (
-                    <span
-                        key={h}
-                        className="text-[10px] font-bold uppercase tracking-widest text-gray-400"
+        <div className="flex flex-col gap-2">
+            {/* Prices locked callout — submitted / fulfilled / confirmed */}
+            {isPriceLocked && priceLockTimestamp && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                    <svg
+                        className="w-3.5 h-3.5 flex-shrink-0 text-amber-600"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
                     >
-                        {h}
+                        <path d="M8 1a3.5 3.5 0 0 0-3.5 3.5V6H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1.5V4.5A3.5 3.5 0 0 0 8 1zm-2 3.5a2 2 0 1 1 4 0V6H6V4.5z" />
+                    </svg>
+                    <span>
+                        Prices locked on{" "}
+                        <strong>
+                            {new Intl.DateTimeFormat("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                            }).format(new Date(priceLockTimestamp))}
+                        </strong>{" "}
+                        at{" "}
+                        <strong>
+                            {new Intl.DateTimeFormat("en-US", {
+                                hour: "numeric",
+                                minute: "2-digit",
+                            }).format(new Date(priceLockTimestamp))}
+                        </strong>
                     </span>
-                ))}
-            </div>
-            {order_ticket_items.map((line) => {
-                const name =
-                    line.items?.short_label ??
-                    line.items?.name ??
-                    "Unknown item";
-                const sku = line.items?.sku;
-                const isFullFilled =
-                    line.fulfilled_boxes !== null &&
-                    line.fulfilled_boxes >= line.quantity_boxes;
-                const isPartialFill =
-                    line.fulfilled_boxes !== null &&
-                    line.fulfilled_boxes > 0 &&
-                    !isFullFilled;
-                const isZeroFill =
-                    line.fulfilled_boxes !== null && line.fulfilled_boxes === 0;
-                const fulBadge = isFullFilled ? (
-                    <span className="text-[10px] font-semibold bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">
-                        Full
-                    </span>
-                ) : isPartialFill ? (
-                    <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full">
-                        Partial
-                    </span>
-                ) : isZeroFill ? (
-                    <span className="text-[10px] font-semibold bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full">
-                        None
-                    </span>
-                ) : null;
-                const fulTextClass = isFullFilled
-                    ? "text-green-700 font-semibold"
-                    : isPartialFill
-                      ? "text-amber-700 font-semibold"
-                      : "text-gray-400";
+                </div>
+            )}
 
-                return (
-                    <div
-                        key={line.id}
-                        className="grid gap-3 items-center px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors"
-                        style={{
-                            gridTemplateColumns: showFulfilled
-                                ? "1fr 100px 90px 90px 70px"
-                                : isDraftEditing
-                                  ? "1fr 120px"
-                                  : "1fr 90px 90px",
-                        }}
-                    >
-                        <div>
-                            <div className="text-sm font-semibold text-gray-900">
-                                {name}
-                            </div>
-                            {!isDraftEditing && sku && (
-                                <div
-                                    style={{
-                                        fontFamily:
-                                            "var(--font-mono, monospace)",
-                                    }}
-                                    className="text-[10px] text-gray-400 mt-0.5"
-                                >
-                                    {sku}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+                {/* Header */}
+                <div
+                    className="grid gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100"
+                    style={{ gridTemplateColumns: cols }}
+                >
+                    {headers.map((h) => (
+                        <span
+                            key={h}
+                            className="text-[10px] font-bold uppercase tracking-widest text-gray-400"
+                        >
+                            {h}
+                        </span>
+                    ))}
+                </div>
+
+                {/* Rows */}
+                {order_ticket_items.map((line) => {
+                    const name =
+                        line.items?.short_label ??
+                        line.items?.name ??
+                        "Unknown item";
+                    const sku = line.items?.sku;
+                    const qty = line.fulfilled_boxes ?? line.quantity_boxes;
+                    const unitPrice = line.unit_price_at_time;
+                    const lineTotal =
+                        unitPrice != null ? unitPrice * qty : null;
+                    const unitCost =
+                        isSuperAdmin ? costMap.get(line.item_id) : undefined;
+                    const lineCost =
+                        unitCost != null ? unitCost * qty : null;
+                    const margin =
+                        lineTotal != null && lineCost != null
+                            ? lineTotal - lineCost
+                            : null;
+
+                    return (
+                        <div
+                            key={line.id}
+                            className="grid gap-3 items-center px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors"
+                            style={{ gridTemplateColumns: cols }}
+                        >
+                            {/* Item name + SKU */}
+                            <div>
+                                <div className="text-sm font-semibold text-gray-900">
+                                    {name}
                                 </div>
+                                {!isDraftEditing && sku && (
+                                    <div
+                                        style={{
+                                            fontFamily:
+                                                "var(--font-mono, monospace)",
+                                        }}
+                                        className="text-[10px] text-gray-400 mt-0.5"
+                                    >
+                                        {sku}
+                                    </div>
+                                )}
+                            </div>
+
+                            {isDraftEditing ? (
+                                <div className="flex items-center">
+                                    <input
+                                        type="number"
+                                        defaultValue={line.quantity_boxes}
+                                        min={1}
+                                        max={999}
+                                        step={1}
+                                        onKeyDown={(e) =>
+                                            [
+                                                ".",
+                                                "e",
+                                                "E",
+                                                "-",
+                                                "+",
+                                            ].includes(e.key) &&
+                                            e.preventDefault()
+                                        }
+                                        className="border border-gray-200 rounded-none px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-center h-[26px] w-full text-xs font-semibold"
+                                    />
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Unit price */}
+                                    <div className="text-xs tabular-nums text-gray-700">
+                                        {unitPrice != null
+                                            ? `$${unitPrice.toFixed(2)}`
+                                            : "—"}
+                                    </div>
+                                    {/* Qty */}
+                                    <div className="text-xs text-gray-600 font-medium">
+                                        {line.quantity_boxes} boxes
+                                    </div>
+                                    {/* Line total */}
+                                    <div className="text-xs tabular-nums font-semibold text-gray-900">
+                                        {lineTotal != null
+                                            ? `$${lineTotal.toFixed(2)}`
+                                            : "—"}
+                                    </div>
+                                    {/* Super admin cost columns */}
+                                    {isSuperAdmin && isPriceLocked && (
+                                        <>
+                                            <div className="text-xs tabular-nums text-gray-500">
+                                                {unitCost != null
+                                                    ? `$${unitCost.toFixed(2)}`
+                                                    : "—"}
+                                            </div>
+                                            <div className="text-xs tabular-nums text-gray-500">
+                                                {lineCost != null
+                                                    ? `$${lineCost.toFixed(2)}`
+                                                    : "—"}
+                                            </div>
+                                            <div
+                                                className={`text-xs tabular-nums font-medium ${
+                                                    margin != null && margin > 0
+                                                        ? "text-green-600"
+                                                        : margin != null &&
+                                                            margin < 0
+                                                          ? "text-red-500"
+                                                          : "text-gray-400"
+                                                }`}
+                                            >
+                                                {margin != null
+                                                    ? `${margin > 0 ? "+" : ""}$${margin.toFixed(2)}`
+                                                    : "—"}
+                                            </div>
+                                        </>
+                                    )}
+                                </>
                             )}
                         </div>
-                        {!showFulfilled && !isDraftEditing && (
-                            <div className="text-xs text-gray-600 font-semibold">
-                                {line.quantity_boxes} boxes
-                            </div>
-                        )}
-                        {isDraftEditing && (
-                            <div className="flex items-center">
-                                <input
-                                    type="number"
-                                    defaultValue={line.quantity_boxes}
-                                    min={1}
-                                    max={999}
-                                    step={1}
-                                    onKeyDown={(e) =>
-                                        [".", "e", "E", "-", "+"].includes(
-                                            e.key,
-                                        ) && e.preventDefault()
-                                    }
-                                    className="border border-gray-200 rounded-none px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-center h-[26px] w-full text-xs font-semibold"
-                                />
-                            </div>
-                        )}
-                        {showFulfilled && (
+                    );
+                })}
+
+                {/* Footer totals */}
+                {!isDraftEditing && (
+                    <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-gray-500">
+                                {isPriceLocked ? "Total billed" : "Subtotal"}
+                            </span>
+                            <span className="text-sm font-bold text-gray-900 tabular-nums">
+                                {hasAnyPrice
+                                    ? `$${totalBilled.toFixed(2)}`
+                                    : "—"}
+                            </span>
+                        </div>
+                        {isSuperAdmin && isPriceLocked && totalCost > 0 && (
                             <>
-                                <div className="text-xs font-semibold text-gray-700">
-                                    {line.quantity_boxes} boxes
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-400">
+                                        Total cost
+                                    </span>
+                                    <span className="text-xs tabular-nums text-gray-600">
+                                        ${totalCost.toFixed(2)}
+                                    </span>
                                 </div>
-                                <div className={`text-xs ${fulTextClass}`}>
-                                    {line.fulfilled_boxes ?? "—"} boxes
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-400">
+                                        Total margin
+                                    </span>
+                                    <span
+                                        className={`text-xs tabular-nums font-semibold ${totalMargin > 0 ? "text-green-600" : totalMargin < 0 ? "text-red-500" : "text-gray-400"}`}
+                                    >
+                                        {totalMargin > 0 ? "+" : ""}$
+                                        {totalMargin.toFixed(2)}
+                                    </span>
                                 </div>
-                                <div>{fulBadge}</div>
+                                {marginPct != null && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-gray-400">
+                                            Margin %
+                                        </span>
+                                        <span
+                                            className={`text-xs tabular-nums font-semibold ${marginPct > 0 ? "text-green-600" : marginPct < 0 ? "text-red-500" : "text-gray-400"}`}
+                                        >
+                                            {marginPct > 0 ? "+" : ""}
+                                            {marginPct.toFixed(1)}%
+                                        </span>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
-                );
-            })}
+                )}
+            </div>
         </div>
     );
 }
@@ -1139,9 +1277,23 @@ export default function TicketDetailPage() {
 
     const { data: userInfo } = useUserInfo();
     const { data: warehouseLocation } = useWarehouseLocation();
+    const isSuperAdmin = userInfo?.role === "super_admin";
 
     const { data: rawTicket, isLoading } = useTicket(ticketId);
     const ticket = rawTicket as Ticket | undefined;
+
+    const itemIds = useMemo(
+        () => ticket?.order_ticket_items.map((i) => i.item_id) ?? [],
+        [ticket],
+    );
+    const { data: itemCosts = [] } = useTicketItemCosts(itemIds, isSuperAdmin);
+    const costMap = useMemo(() => {
+        const map = new Map<number, number>();
+        itemCosts.forEach((r) => {
+            if (r.current_unit_cost != null) map.set(r.id, r.current_unit_cost);
+        });
+        return map;
+    }, [itemCosts]);
 
     const { mutate: submitTicket, isPending: isSubmitting } = useSubmitTicket();
     const { mutate: createTicket, isPending: isResubmitting } =
@@ -1340,7 +1492,12 @@ export default function TicketDetailPage() {
 
                     {activeTab === "items" && (
                         <>
-                            <ItemsTable ticket={t} isDraftEditing={isDraft} />
+                            <ItemsTable
+                            ticket={t}
+                            isDraftEditing={isDraft}
+                            isSuperAdmin={isSuperAdmin}
+                            costMap={costMap}
+                        />
                             {isDraft && (
                                 <div className="mt-4">
                                     <label className="text-xs font-semibold text-gray-600 block mb-1.5">
