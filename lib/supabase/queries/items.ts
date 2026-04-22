@@ -235,3 +235,14 @@ export async function superAdminBulkDeleteItems(itemIds: string[]) {
     if (error) throw error;
 }
 
+export async function getSuperAdminItems(organizationId: string) {
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+        .from('items')
+        .select(`*, category(*), item_warehouse_pricing(warehouse_transfer_price)`)
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+}

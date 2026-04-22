@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from 'react';
-import { useItems } from '@/lib/hooks/queries/useItems';
+import { BulkMarkupModal } from '@/app/(dashboard)/super-admin/items/components/BulkMarkupModal';
+import { useSuperAdminItems } from '@/lib/hooks/queries/useItems';
 import ItemGrid from '@/components/admin/items/ItemGrid';
 import SearchBar from '@/components/admin/shared/SearchBar';
 import FilterDropdown from '@/components/admin/shared/FilterDropdown';
@@ -27,7 +28,7 @@ import toast from 'react-hot-toast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useSearchItems } from '@/lib/hooks/queries/useItems';
 import { useCategories } from '@/lib/hooks/queries/useCategories';
-import ItemFormModal from '@/app/(dashboard)/super-admin/items/_components/ItemFormModal';
+import ItemFormModal from '@/app/(dashboard)/super-admin/items/components/ItemFormModal';
 
 export default function ItemsPage() {
     const [showAddForm, setShowAddForm] = useState(false);
@@ -39,10 +40,11 @@ export default function ItemsPage() {
     const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
     const [bulkUpdateField, setBulkUpdateField] = useState<'min_quantity' | 'category' | 'unit' | 'price' | 'warehouse' | 'all'>('all');
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+    const [bulkMarkupOpen, setBulkMarkupOpen] = useState(false);
     const debouncedSearch = useDebounce(searchQuery, 300);
     const { viewMode, setViewMode } = useAdminStore();
 
-    const { data: allItems, isLoading: allItemsLoading } = useItems();
+    const { data: allItems, isLoading: allItemsLoading } = useSuperAdminItems();
     const { data: categories, isLoading: categoriesLoading } = useCategories();
     const { data: searchResults, isLoading: searchLoading } = useSearchItems(debouncedSearch);
 
@@ -188,6 +190,7 @@ export default function ItemsPage() {
                     setBulkUpdateField('all');
                     setShowBulkUpdateModal(true);
                 }}
+                onApplyMarkup={() => setBulkMarkupOpen(true)}
                 onDelete={() => setShowBulkDeleteDialog(true)}
                 onClearSelection={() => setSelectedItems(new Set())}
                 isLoading={bulkUpdateMutation.isPending || bulkDeleteMutation.isPending}
@@ -250,6 +253,21 @@ export default function ItemsPage() {
                     />
                 </MobileSheet>
             )}
+
+            {/* Bulk Markup Modal */}
+            <BulkMarkupModal
+                open={bulkMarkupOpen}
+                onClose={() => setBulkMarkupOpen(false)}
+                selectedItems={(allItems ?? [])
+                    .filter((item: any) => selectedItems.has(item.id))
+                    .map((item: any) => ({
+                        id: Number(item.id),
+                        name: item.name,
+                        is_warehouse_item: item.is_warehouse_item ?? false,
+                        current_unit_cost: item.current_unit_cost ?? null,
+                        item_warehouse_pricing: item.item_warehouse_pricing ?? null,
+                    }))}
+            />
 
             {/* Bulk Delete Confirmation Dialog */}
             <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>

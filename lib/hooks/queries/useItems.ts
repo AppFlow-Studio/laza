@@ -17,6 +17,7 @@ import {
     superAdminDeleteItem,
     superAdminBulkUpdateItems,
     superAdminBulkDeleteItems,
+    getSuperAdminItems,
 } from '@/lib/supabase/queries/items';
 import { Item } from '@/lib/supabase/types';
 import { useUserInfo } from './useUserInfo';
@@ -27,6 +28,16 @@ export function useItems() {
     return useQuery({
         queryKey: ['items', organizationId],
         queryFn: () => getAllItems(organizationId!),
+        enabled: !!organizationId,
+    });
+}
+
+export function useSuperAdminItems() {
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
+    return useQuery({
+        queryKey: ['items', organizationId],
+        queryFn: () => getSuperAdminItems(organizationId!),
         enabled: !!organizationId,
     });
 }

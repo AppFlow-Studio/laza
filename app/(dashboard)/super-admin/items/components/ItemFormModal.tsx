@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,8 +9,10 @@ import { cn } from "@/lib/utils";
 import { useSuperAdminCreateItem, useSuperAdminUpdateItem } from "@/lib/hooks/queries/useItems";
 import { useCategories } from "@/lib/hooks/queries/useCategories";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
+import { useUser } from "@clerk/nextjs";
 import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
+import { useUpsertItemPricing } from "@/lib/hooks/mutations/useUpsertItemPricing";
 
 const itemSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -33,16 +35,21 @@ interface ItemFormModalProps {
         unit_of_measure: "pcs" | "kg" | "liters" | "lbs" | "oz";
         min_quantity: number;
         is_warehouse_item?: boolean | null;
+        current_unit_cost?: number | null;
+        cbm_per_carton?: number | null;
+        item_warehouse_pricing?: { warehouse_transfer_price: number | null } | null;
     } | null;
     onSuccess?: () => void;
     onCancel?: () => void;
 }
 
 export default function ItemFormModal({ item, onSuccess, onCancel }: ItemFormModalProps) {
+    const { user } = useUser();
     const { data: userInfo } = useUserInfo();
     const { data: categories, isLoading: categoriesLoading } = useCategories();
     const createMutation = useSuperAdminCreateItem();
     const updateMutation = useSuperAdminUpdateItem();
+    const pricingMutation = useUpsertItemPricing(item?.item_warehouse_pricing?.warehouse_transfer_price);
 
     const {
         register,
@@ -65,6 +72,13 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: ItemFormMod
 
     const isWarehouseItem = watch("is_warehouse_item");
 
+    const [transferPrice, setTransferPrice] = useState<number | null>(
+        item?.item_warehouse_pricing?.warehouse_transfer_price ?? null
+    );
+    const [cbmPerCarton, setCbmPerCarton] = useState<number | null>(
+        item?.cbm_per_carton ?? null
+    );
+
     useEffect(() => {
         if (item && categories) {
             let categoryId: number | null = null;
@@ -81,6 +95,8 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: ItemFormMod
                 min_quantity: item.min_quantity || 0,
                 is_warehouse_item: item.is_warehouse_item ?? false,
             });
+            setTransferPrice(item.item_warehouse_pricing?.warehouse_transfer_price ?? null);
+            setCbmPerCarton(item.cbm_per_carton ?? null);
         } else if (!item) {
             reset({
                 name: "",
@@ -90,6 +106,8 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: ItemFormMod
                 min_quantity: 0,
                 is_warehouse_item: false,
             });
+            setTransferPrice(null);
+            setCbmPerCarton(null);
         }
     }, [item, categories, reset]);
 
@@ -115,9 +133,25 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: ItemFormMod
             if (item) {
                 await updateMutation.mutateAsync({ id: String(item.id), updates: payload });
                 toast.success("Item updated successfully");
+                if (isWarehouseItem && transferPrice != null) {
+                    pricingMutation.mutate({
+                        itemId: Number(item.id),
+                        warehouseTransferPrice: transferPrice,
+                        cbmPerCarton,
+                        updatedBy: user?.id ?? '',
+                    });
+                }
             } else {
-                await createMutation.mutateAsync({ organization_id: organizationId, ...payload });
+                const newItem = await createMutation.mutateAsync({ organization_id: organizationId, ...payload });
                 toast.success("Item created successfully");
+                if (isWarehouseItem && transferPrice != null) {
+                    pricingMutation.mutate({
+                        itemId: newItem.id,
+                        warehouseTransferPrice: transferPrice,
+                        cbmPerCarton,
+                        updatedBy: user?.id ?? '',
+                    });
+                }
             }
 
             onSuccess?.();
@@ -127,7 +161,7 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: ItemFormMod
         }
     };
 
-    const isPending = createMutation.isPending || updateMutation.isPending;
+    const isPending = createMutation.isPending || updateMutation.isPending || pricingMutation.isPending;
 
     const selectClass =
         "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed appearance-none";
@@ -227,7 +261,83 @@ export default function ItemFormModal({ item, onSuccess, onCancel }: ItemFormMod
                         transition={{ duration: 0.18 }}
                         style={{ overflow: "hidden" }}
                     >
-                        {/* Cost + Price fields land here in B4 */}
+                        <div className="space-y-4 pt-1">
+                        {/* Cost section — read only */}
+                        <div className="space-y-3 rounded-lg border border-border p-4 bg-muted/30">
+                            <p className="text-sm font-medium text-foreground">Landed cost</p>
+                            {item?.current_unit_cost != null ? (
+                                <p className="text-sm text-muted-foreground">
+                                    ${Number(item.current_unit_cost).toFixed(2)}{' '}
+                                    <span className="text-xs">(auto-updated on PO receipt, not editable here)</span>
+                                </p>
+                            ) : (
+                                <p className="text-sm text-muted-foreground italic">
+                                    Not set yet — updated automatically on PO receipt.
+                                </p>
+                            )}
+
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium text-foreground">
+                                    CBM per carton
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.001"
+                                    min="0"
+                                    placeholder="e.g. 0.024"
+                                    value={cbmPerCarton ?? ''}
+                                    onChange={(e) =>
+                                        setCbmPerCarton(e.target.value === '' ? null : Number(e.target.value))
+                                    }
+                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Cubic metres per carton. Used to split shipping fees. Leave blank if unknown — Naji will provide.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Price section — editable */}
+                        <div className="space-y-3 rounded-lg border border-border p-4">
+                            <p className="text-sm font-medium text-foreground">Transfer price</p>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                                    $
+                                </span>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    value={transferPrice ?? ''}
+                                    onChange={(e) =>
+                                        setTransferPrice(e.target.value === '' ? null : Number(e.target.value))
+                                    }
+                                    className="w-full rounded-md border border-input bg-background pl-7 pr-3 py-2 text-sm"
+                                />
+                            </div>
+                            <p className="text-xs text-muted-foreground">Transfer price (per unit) — USD</p>
+
+                            {/* Live margin helper */}
+                            {transferPrice != null && item?.current_unit_cost != null ? (() => {
+                                const cost = Number(item.current_unit_cost)
+                                const margin = transferPrice - cost
+                                const marginPct = cost > 0 ? (margin / cost) * 100 : null
+                                const color =
+                                    margin > 0 ? 'text-green-600' : margin < 0 ? 'text-red-500' : 'text-muted-foreground'
+                                return (
+                                    <p className={`text-xs font-medium ${color}`}>
+                                        Landed cost ${cost.toFixed(2)} · Margin ${margin.toFixed(2)}
+                                        {marginPct != null && ` (${marginPct.toFixed(1)}%)`}
+                                    </p>
+                                )
+                            })() : (
+                                <p className="text-xs text-muted-foreground">
+                                    Margin will show once landed cost and transfer price are both set.
+                                </p>
+                            )}
+                        </div>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>

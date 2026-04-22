@@ -843,3 +843,18 @@ export async function getAutoApprovedTickets(
     if (error) throw error;
     return data;
 }
+
+// ─── getTicketItemCosts — super admin only ────────────────────────────────────
+// Reads current_unit_cost from items_with_costs view, which enforces
+// is_super_admin() via RLS — returns empty rows for any non-super-admin caller.
+
+export async function getTicketItemCosts(itemIds: number[]) {
+    if (!itemIds.length) return [];
+    const supabase = createServerSupabaseClient();
+    const { data, error } = await supabase
+        .from("items_with_costs")
+        .select("id, current_unit_cost")
+        .in("id", itemIds);
+    if (error || !data) return [];
+    return data as { id: number; current_unit_cost: number | null }[];
+}
