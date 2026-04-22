@@ -11,6 +11,13 @@ import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
 const LIBRARIES: ("places")[] = ["places"];
 const MAP_CONTAINER_STYLE = { width: "100%", height: "300px" };
 const DEFAULT_CENTER = { lat: 40.73, lng: -73.93 };
+const MAP_OPTIONS: google.maps.MapOptions = {
+    streetViewControl: false,
+    mapTypeControl:    false,
+    fullscreenControl: false,
+    clickableIcons:    false,
+    styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }],
+};
 
 const warehouseSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -217,13 +224,7 @@ export default function WarehouseDetailsStep({ defaultValues, onSubmit }: Props)
                             center={mapCenter}
                             zoom={markerPosition ? 15 : 11}
                             onClick={handleMapClick}
-                            options={{
-                                streetViewControl: false,
-                                mapTypeControl:    false,
-                                fullscreenControl: false,
-                                clickableIcons:    false,
-                                styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }],
-                            }}
+                            options={MAP_OPTIONS}
                         >
                             {markerPosition && (
                                 <Marker position={markerPosition} draggable onDragEnd={handleMarkerDragEnd} />
