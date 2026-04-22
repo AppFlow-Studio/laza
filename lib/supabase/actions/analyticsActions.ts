@@ -64,7 +64,7 @@ export async function getBurnRates(
 	organizationId: string,
 	daysLookback = 90,
 ): Promise<BurnRateRow[]> {
-	const supabase = createServerSupabaseClient();
+	const supabase = createServiceRoleClient();
 
 	const { data, error } = await supabase.rpc("get_warehouse_burn_rates", {
 		p_organization_id: organizationId,
@@ -82,7 +82,7 @@ export async function getReorderAlerts(
 	leadTimeDays = 45,
 	bufferDays = 14,
 ): Promise<ReorderAlertRow[]> {
-	const supabase = createServerSupabaseClient();
+	const supabase = createServiceRoleClient();
 
 	const { data, error } = await supabase.rpc("get_reorder_alerts", {
 		p_organization_id: organizationId,

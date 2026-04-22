@@ -73,19 +73,21 @@ function WarehouseCard({ warehouse }: { warehouse: Location & { storage_spaces?:
                 </span>
 			</div>
 
-			<div>
-				<p className="font-semibold text-zinc-900 group-hover:text-indigo-600 transition-colors">
-					{warehouse.name}
-				</p>
-				<p className="text-xs text-zinc-400 mt-1 flex items-center gap-1">
-					<MapPin className="w-3 h-3 shrink-0" />
-					{formatAddress(warehouse.address)}
-				</p>
-			</div>
-
 			<div className="flex items-center justify-between pt-3">
+				<div>
+					<p className="font-semibold text-zinc-900 group-hover:text-indigo-600 transition-colors">
+						{warehouse.name}
+					</p>
+					<p className="text-xs text-zinc-400 mt-1 flex items-center gap-1">
+						<MapPin className="w-3 h-3 shrink-0" />
+						{formatAddress(warehouse.address)}
+					</p>
+				</div>
 
-				<ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-indigo-400 transition-colors" />
+				<div className="flex items-center justify-between pt-3">
+
+					<ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-indigo-400 transition-colors" />
+				</div>
 			</div>
 		</Link>
 	);

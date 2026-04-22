@@ -107,7 +107,6 @@ export function ReceivingWizard({
     // ── Phase B: confirm receipt first (if not already received), then assign pallets ──
     const handlePhaseBSubmit = async (data: PhaseBData) => {
         try {
-            // Only call confirmReceipt when PO hasn't been received yet
             if (!receiptConfirmed) {
                 await confirmReceipt.mutateAsync({
                     purchaseOrderId:   po.id,
@@ -121,9 +120,7 @@ export function ReceivingWizard({
             }
 
             await assignToPallets.mutateAsync({
-                purchaseOrderId:    po.id,
-                organizationId,
-                warehouseLocationId,
+                purchaseOrderId:   po.id,
                 palletAssignments: data.pallets.map((p) => ({
                     pallet_label: p.pallet_label,
                     items: p.items
