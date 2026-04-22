@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { BulkMarkupModal } from '@/app/(dashboard)/super-admin/items/_components/BulkMarkupModal';
+import { BulkMarkupModal } from '@/app/(dashboard)/super-admin/items/components/BulkMarkupModal';
 import { useSuperAdminItems } from '@/lib/hooks/queries/useItems';
 import ItemGrid from '@/components/admin/items/ItemGrid';
 import SearchBar from '@/components/admin/shared/SearchBar';
@@ -258,8 +258,8 @@ export default function ItemsPage() {
             <BulkMarkupModal
                 open={bulkMarkupOpen}
                 onClose={() => setBulkMarkupOpen(false)}
-                selectedItems={items
-                    .filter((item: any) => selectedItems.has(String(item.id)))
+                selectedItems={(allItems ?? [])
+                    .filter((item: any) => selectedItems.has(item.id))
                     .map((item: any) => ({
                         id: Number(item.id),
                         name: item.name,
