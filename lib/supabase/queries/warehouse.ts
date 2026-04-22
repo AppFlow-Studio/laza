@@ -42,6 +42,8 @@ export type WarehouseCatalogItem = {
     sku: string | null;
     unit_of_measure: "pcs" | "kg" | "liters" | "lbs" | "oz";
     box_quantity: number | null;
+    is_warehouse_item: boolean;
+    warehouse_transfer_price: number | null;
     category:
         | {
               id: number;
@@ -172,7 +174,7 @@ export async function getWarehouseLocation(organizationId: string) {
 export async function getWarehouseCatalog(organizationId: string) {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
-        .from("items")
+        .from("items_with_prices")
         .select(
             `
             id,
@@ -181,6 +183,8 @@ export async function getWarehouseCatalog(organizationId: string) {
             sku,
             unit_of_measure,
             box_quantity,
+            is_warehouse_item,
+            warehouse_transfer_price,
             category (
                 id,
                 name
@@ -188,6 +192,7 @@ export async function getWarehouseCatalog(organizationId: string) {
         `,
         )
         .eq("organization_id", organizationId)
+        .eq("is_warehouse_item", true)
         .order("name", { ascending: true });
 
     if (error) throw error;

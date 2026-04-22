@@ -22,12 +22,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAdminStore } from '@/lib/stores/adminStore';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
-import { useDeleteItem, useBulkUpdateItems, useBulkDeleteItems } from '@/lib/hooks/queries/useItems';
+import { useSuperAdminDeleteItem, useSuperAdminBulkUpdateItems, useSuperAdminBulkDeleteItems } from '@/lib/hooks/queries/useItems';
 import toast from 'react-hot-toast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useSearchItems } from '@/lib/hooks/queries/useItems';
 import { useCategories } from '@/lib/hooks/queries/useCategories';
-import ItemForm from '@/components/admin/items/ItemForm';
+import ItemFormModal from '@/app/(dashboard)/super-admin/items/_components/ItemFormModal';
 
 export default function ItemsPage() {
     const [showAddForm, setShowAddForm] = useState(false);
@@ -46,9 +46,9 @@ export default function ItemsPage() {
     const { data: categories, isLoading: categoriesLoading } = useCategories();
     const { data: searchResults, isLoading: searchLoading } = useSearchItems(debouncedSearch);
 
-    const deleteMutation = useDeleteItem();
-    const bulkUpdateMutation = useBulkUpdateItems();
-    const bulkDeleteMutation = useBulkDeleteItems();
+    const deleteMutation = useSuperAdminDeleteItem();
+    const bulkUpdateMutation = useSuperAdminBulkUpdateItems();
+    const bulkDeleteMutation = useSuperAdminBulkDeleteItems();
 
     const isLoading = allItemsLoading || categoriesLoading || searchLoading;
 
@@ -226,7 +226,7 @@ export default function ItemsPage() {
                 onClose={handleFormCancel}
                 title={editingItem ? 'Edit Item' : 'Add Item'}
             >
-                <ItemForm
+                <ItemFormModal
                     item={editingItem}
                     onSuccess={handleFormSuccess}
                     onCancel={handleFormCancel}

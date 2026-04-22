@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { useBulkUpdateItems, useBulkUpdateItemPrices, useItems } from '@/lib/hooks/queries/useItems';
+import { useSuperAdminBulkUpdateItems, useBulkUpdateItemPrices, useItems } from '@/lib/hooks/queries/useItems';
 import toast from 'react-hot-toast';
 import { useCategories } from '@/lib/hooks/queries/useCategories';
 
@@ -35,7 +35,7 @@ export default function BulkUpdateModal({
     onCancel,
     updateField = 'all',
 }: BulkUpdateModalProps) {
-    const updateMutation = useBulkUpdateItems();
+    const updateMutation = useSuperAdminBulkUpdateItems();
     const priceUpdateMutation = useBulkUpdateItemPrices();
     const { data: categories } = useCategories();
     const { data: allItems } = useItems();
