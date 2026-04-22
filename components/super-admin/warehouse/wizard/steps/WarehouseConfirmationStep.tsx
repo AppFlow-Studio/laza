@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { CheckCircle2, MapPin, Pencil, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WarehouseFormData } from "./WarehouseDetailsStep";
@@ -69,12 +70,13 @@ export default function WarehouseConfirmationStep({ warehouseData, createdLocati
     );
 }
 
-function SectionCard({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode }) {
+function SectionCard({ title, onEdit, children }: { title: string; onEdit: () => void; children: ReactNode }) {
     return (
         <div className="border border-zinc-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-zinc-900 text-sm">{title}</h3>
                 <button
+                    type="button"
                     onClick={onEdit}
                     className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
                 >
