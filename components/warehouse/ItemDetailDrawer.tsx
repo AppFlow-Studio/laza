@@ -8,6 +8,8 @@ import {
 	useItemShipmentHistory,
 	useItemCostHistory,
 } from "@/lib/hooks/queries/useItemDetail";
+import { useItemPriceHistory } from "@/lib/hooks/queries/useItemPriceHistory";
+import type { PriceHistoryRecord } from "@/lib/supabase/queries/priceHistory";
 import type { ItemShipmentRecord } from "@/lib/supabase/queries/itemDetail";
 import {
 	LineChart,
@@ -29,7 +31,7 @@ interface ItemDetailDrawerProps {
 	onClose: () => void;
 }
 
-type Tab = "overview" | "stock" | "shipments" | "cost";
+type Tab = "overview" | "stock" | "shipments" | "cost" | "price";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -707,6 +709,192 @@ function CostHistoryTab({ itemId }: { itemId: number }) {
 	);
 }
 
+// ─── Price History Tab ────────────────────────────────────────────────────────
+
+const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
+	initial_set: { label: "Initial", color: "bg-blue-100 text-blue-700" },
+	manual_edit: { label: "Manual", color: "bg-purple-100 text-purple-700" },
+	bulk_markup: { label: "Bulk", color: "bg-amber-100 text-amber-700" },
+};
+
+function PriceHistoryTab({ itemId }: { itemId: number }) {
+	const { data: history = [], isLoading } = useItemPriceHistory(itemId);
+	const [batchFilter, setBatchFilter] = useState<string | null>(null);
+
+	if (isLoading) return <TabSkeleton rows={5} />;
+	if (history.length === 0)
+		return <EmptyState message="No price history yet for this item." />;
+
+	// Chart: oldest first
+	const chartData = [...history].reverse().map((h) => ({
+		date: fmtDateShort(h.created_at),
+		price: Number(h.new_price),
+	}));
+
+	// Batch counts for "batch of N" badges
+	const batchCounts = history.reduce<Record<string, number>>((acc, h) => {
+		if (h.batch_id) acc[h.batch_id] = (acc[h.batch_id] ?? 0) + 1;
+		return acc;
+	}, {});
+
+	const latest = history[0];
+	const earliest = history[history.length - 1];
+	const netChange =
+		earliest.previous_price != null
+			? latest.new_price - earliest.previous_price
+			: null;
+	const isUp = netChange != null && netChange > 0;
+	const isDown = netChange != null && netChange < 0;
+
+	const allValues = history.flatMap((h) =>
+		[h.previous_price, h.new_price].filter((v): v is number => v != null)
+	);
+	const minY = Math.floor(Math.min(...allValues) * 0.95 * 100) / 100;
+	const maxY = Math.ceil(Math.max(...allValues) * 1.05 * 100) / 100;
+
+	const filtered = batchFilter
+		? history.filter((h) => h.batch_id === batchFilter)
+		: history;
+
+	return (
+		<div className="flex flex-col gap-5 p-6">
+			{/* Summary cards */}
+			<div className="flex gap-3">
+				<div className="flex flex-col bg-white rounded-xl shadow-sm border border-zinc-200 px-4 py-3 flex-1">
+					<span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+						Current Price
+					</span>
+					<span className="text-xl font-semibold tabular-nums text-gray-900">
+						${Number(latest.new_price).toFixed(2)}
+					</span>
+				</div>
+				<div className="flex flex-col bg-white rounded-xl shadow-sm border border-zinc-200 px-4 py-3 flex-1">
+					<span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+						Changes
+					</span>
+					<span className="text-xl font-semibold tabular-nums text-gray-900">
+						{history.length}
+					</span>
+				</div>
+				{netChange != null && (
+					<div className="flex flex-col bg-white rounded-xl shadow-sm border border-zinc-200 px-4 py-3 flex-1">
+						<span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+							Net Change
+						</span>
+						<span className={`text-xl font-semibold tabular-nums ${isUp ? "text-red-500" : isDown ? "text-emerald-500" : "text-gray-900"}`}>
+							{isUp ? "+" : ""}${netChange.toFixed(2)}
+						</span>
+					</div>
+				)}
+			</div>
+
+			{/* Line chart */}
+			<div className="rounded-xl border border-gray-200 bg-white shadow-sm px-4 pt-4 pb-2">
+				<p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+					Transfer Price Over Time
+				</p>
+				<ResponsiveContainer width="100%" height={200}>
+					<LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+						<CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+						<XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+						<YAxis
+							domain={[minY, maxY]}
+							tickFormatter={(v) => `$${v.toFixed(2)}`}
+							tick={{ fontSize: 10, fill: "#9ca3af" }}
+							tickLine={false}
+							axisLine={false}
+							width={56}
+						/>
+						<Tooltip
+							formatter={(v: number) => [`$${v.toFixed(2)}`, "Price"]}
+							labelStyle={{ fontSize: 11 }}
+							contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
+						/>
+						<Line
+							type="monotone"
+							dataKey="price"
+							stroke="#6366f1"
+							strokeWidth={2}
+							dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }}
+							activeDot={{ r: 5, fill: "#6366f1" }}
+							connectNulls
+						/>
+					</LineChart>
+				</ResponsiveContainer>
+			</div>
+
+			{/* Batch filter active */}
+			{batchFilter && (
+				<div className="flex items-center gap-2 text-xs text-gray-500">
+					<span>Filtered by batch</span>
+					<button onClick={() => setBatchFilter(null)} className="underline text-blue-600">
+						Clear
+					</button>
+				</div>
+			)}
+
+			{/* Change log */}
+			<div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+				<table className="min-w-full divide-y divide-gray-100">
+					<thead className="bg-gray-50">
+					<tr>
+						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Date</th>
+						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Source</th>
+						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Before</th>
+						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">After</th>
+						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Δ</th>
+					</tr>
+					</thead>
+					<tbody className="divide-y divide-gray-50">
+					{filtered.map((row) => {
+						const src = SOURCE_LABELS[row.change_source] ?? { label: row.change_source, color: "bg-gray-100 text-gray-600" };
+						const delta = row.previous_price != null ? Number(row.new_price) - Number(row.previous_price) : null;
+						const deltaUp = delta != null && delta > 0;
+						const deltaDown = delta != null && delta < 0;
+						const batchCount = row.batch_id ? batchCounts[row.batch_id] : null;
+
+						return (
+							<tr key={row.id} className="hover:bg-gray-50/50">
+								<td className="px-4 py-2.5 text-xs text-gray-600">
+									<div>{fmtDate(row.created_at)}</div>
+									{row.change_reason && (
+										<div className="text-[10px] text-gray-400 mt-0.5">{row.change_reason}</div>
+									)}
+								</td>
+								<td className="px-4 py-2.5">
+									<div className="flex items-center gap-1.5 flex-wrap">
+										<span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${src.color}`}>
+											{src.label}
+										</span>
+										{batchCount && batchCount > 1 && (
+											<button
+												onClick={() => setBatchFilter(batchFilter === row.batch_id ? null : row.batch_id!)}
+												className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 border border-gray-200"
+											>
+												Batch ×{batchCount}
+											</button>
+										)}
+									</div>
+								</td>
+								<td className="px-4 py-2.5 text-right tabular-nums text-xs text-gray-400">
+									{row.previous_price != null ? `$${Number(row.previous_price).toFixed(2)}` : "—"}
+								</td>
+								<td className="px-4 py-2.5 text-right tabular-nums text-xs font-semibold text-gray-800">
+									${Number(row.new_price).toFixed(2)}
+								</td>
+								<td className={`px-4 py-2.5 text-right tabular-nums text-xs font-medium ${deltaUp ? "text-red-500" : deltaDown ? "text-emerald-500" : "text-gray-400"}`}>
+									{delta != null ? `${deltaUp ? "+" : ""}$${delta.toFixed(2)}` : "—"}
+								</td>
+							</tr>
+						);
+					})}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	);
+}
+
 // ─── Loading / Empty states ────────────────────────────────────────────────────
 
 function TabSkeleton({ rows }: { rows: number }) {
@@ -780,6 +968,7 @@ export function ItemDetailDrawer({
 		{ id: "stock", label: "Stock" },
 		{ id: "shipments", label: "Shipments" },
 		{ id: "cost", label: "Cost History" },
+		{ id: "price", label: "Price History" },
 	];
 
 	return (
@@ -879,6 +1068,9 @@ export function ItemDetailDrawer({
 							)}
 							{activeTab === "cost" && (
 								<CostHistoryTab itemId={itemId} />
+							)}
+							{activeTab === "price" && (
+								<PriceHistoryTab itemId={itemId} />
 							)}
 						</>
 					)}
