@@ -116,8 +116,9 @@ type Ticket = {
 
 type WarehouseStockRow = {
     item_id: number;
-    current_quantity: number;
-    items: { id: number; name: string; unit_of_measure: string } | null;
+    box_count: number;
+    total_pieces: number | null;
+    item_name: string;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -691,7 +692,8 @@ export default function SuperAdminTicketDetailPage() {
     const stockMap = useMemo(() => {
         const map = new Map<number, number>();
         (warehouseStock as WarehouseStockRow[] | undefined)?.forEach((row) => {
-            map.set(row.item_id, row.current_quantity);
+            const pieces = row.total_pieces ?? 0;
+            map.set(row.item_id, (map.get(row.item_id) ?? 0) + pieces);
         });
         return map;
     }, [warehouseStock]);

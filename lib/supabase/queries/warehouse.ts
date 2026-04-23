@@ -52,29 +52,34 @@ export type WarehouseCatalogItem = {
         | null;
 };
 
-// Inventory item — includes quantity fields
+// Inventory item — row from warehouse_inventory_overview (pallet-level view)
 // Super Admin only
 export type WarehouseInventoryItem = {
-    id: string;
+    pallet_inventory_id: string;
+    pallet_id: string;
     item_id: number;
-    location_id: string;
+    purchase_order_item_id: string | null;
+    box_count: number;
+    initial_box_count: number | null;
+    pieces_per_box_override: number | null;
+    inventory_created_at: string | null;
+    inventory_updated_at: string | null;
+    organization_id: string;
+    pallet_label: string;
+    pallet_status: string;
     storage_space_id: string | null;
-    current_quantity: number;
-    min_quantity_override: number | null;
-    last_updated: string;
-    items: {
-        id: number;
-        name: string;
-        sku: string | null;
-        unit_of_measure: string;
-        box_quantity: number | null;
-        min_quantity: number;
-        category: {
-            id: number;
-            name: string;
-        } | null;
-    };
-    storage_spaces: WarehouseStorageSpace | null;
+    warehouse_location_id: string;
+    purchase_order_id: string | null;
+    received_at: string | null;
+    item_name: string;
+    item_display_label: string;
+    sku: string | null;
+    item_default_ppb: number | null;
+    po_pieces_per_box: number | null;
+    has_mixed_configs: boolean | null;
+    effective_ppb: number | null;
+    total_pieces: number | null;
+    config_source: string | null;
 };
 
 export type WarehouseStats = {
@@ -208,27 +213,11 @@ export async function getWarehouseCatalog(organizationId: string) {
 export async function getWarehouseInventory(warehouseLocationId: string) {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
-        .from("item_locations")
-        .select(
-            `
-            *,
-            items (
-                id,
-                name,
-                sku,
-                unit_of_measure,
-                box_quantity,
-                min_quantity,
-                category (
-                    id,
-                    name
-                )
-            ),
-            storage_spaces (*)
-        `,
-        )
-        .eq("location_id", warehouseLocationId)
-        .order("last_updated", { ascending: false });
+        .from("warehouse_inventory_overview")
+        .select("*")
+        .eq("warehouse_location_id", warehouseLocationId)
+        .neq("pallet_status", "retired")
+        .order("item_name", { ascending: true });
 
     if (error) throw error;
     return data as WarehouseInventoryItem[];
