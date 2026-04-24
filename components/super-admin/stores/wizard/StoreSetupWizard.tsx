@@ -227,10 +227,11 @@ export default function StoreSetupWizard() {
             // 5. Send admin invitation if not skipped
             if (inviteData?.email) {
                 await createInvitationMutation.mutateAsync({
-                    email:              inviteData.email,
-                    role:               'admin',
+                    email:                 inviteData.email,
+                    role:                  'admin',
                     organizationId,
-                    assignedLocationId: location.id,
+                    assigned_location_id:  location.id,
+                    assigned_location_ids: [location.id],
                 });
             }
 
