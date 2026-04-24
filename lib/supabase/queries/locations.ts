@@ -36,7 +36,7 @@ export async function getAllLocations(organizationId: string) {
     if (!data) return [];
 
     const callerRole = caller?.role;
-
+    console.log(callerRole)
     // Super admin sees everything
     if (callerRole === 'super_admin') return data as Location[];
 
@@ -49,6 +49,7 @@ export async function getAllLocations(organizationId: string) {
 
         const assignedIds = assignments?.map((a: any) => a.location_id) ?? [];
 
+        console.log(data, assignedIds)
         // No assignments = unscoped admin, sees all
         if (assignedIds.length === 0) return data as Location[];
 
