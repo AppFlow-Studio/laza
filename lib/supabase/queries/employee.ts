@@ -146,7 +146,7 @@ export async function getEmployeeStats(userId: string, locationId: string) {
         .eq('location_id', locationId)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
     // Get items managed count
     const { count: itemsManaged } = await supabase
