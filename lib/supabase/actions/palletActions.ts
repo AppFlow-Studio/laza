@@ -25,7 +25,7 @@ export async function getPOForReceivingAction(purchaseOrderId: string) {
         .from('purchase_orders')
         .select(`
             id, po_number, supplier_name, status,
-            expected_arrival, actual_arrival, organization_id,
+            expected_arrival, actual_arrival, organization_id, warehouse_location_id, 
             purchase_order_items (
                 id, item_id, quantity_ordered, quantity_received,
                 pieces_per_box, unit_price_before, unit_cost_after, cbm, cartons,
@@ -233,8 +233,6 @@ export async function confirmPOReceiptAction(
 
 export async function assignShipmentToPalletsAction(
     purchaseOrderId: string,
-    organizationId: string,
-    warehouseLocationId: string,
     userId: string,
     palletAssignments: PalletAssignment[],
 ) {

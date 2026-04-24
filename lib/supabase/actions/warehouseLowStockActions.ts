@@ -37,19 +37,33 @@ export async function checkWarehouseLowStockAfterFulfillment(
     console.log('2')
 
     // ── 2. Current warehouse quantities for fulfilled items ──────────────────
-    const { data: itemLocations, error: itemLocError } = await supabase
-        .from("item_locations")
-        .select("item_id, current_quantity")
-        .eq("location_id", warehouseLocationId)
+    const { data: overviewRows, error: itemLocError } = await supabase
+        .from("warehouse_inventory_overview")
+        .select("item_id, box_count, total_pieces")
+        .eq("warehouse_location_id", warehouseLocationId)
+        .neq("pallet_status", "retired")
         .in("item_id", fulfilledItemIds);
-    console.log(itemLocations, fulfilledItemIds)
+    console.log(overviewRows, fulfilledItemIds)
 
     if (itemLocError) {
-        console.error("[warehouseLowStock] Failed to fetch item_locations:", itemLocError);
+        console.error("[warehouseLowStock] Failed to fetch warehouse_inventory_overview:", itemLocError);
         return;
     }
 
-    if (!itemLocations?.length) return;
+    // Aggregate box_count per item across all active pallets
+    const itemQtyMap = new Map<number, number>();
+    for (const row of overviewRows ?? []) {
+        console.log(row)
+        if (row.item_id === null) continue;
+        itemQtyMap.set(row.item_id, (itemQtyMap.get(row.item_id) ?? 0) + (row.total_pieces ?? 0));
+    }
+
+    const itemLocations = Array.from(itemQtyMap.entries()).map(([item_id, current_quantity]) => ({
+        item_id,
+        current_quantity,
+    }));
+
+    if (!itemLocations.length) return;
     console.log('3')
 
     // ── 3. Thresholds — location-specific and org-wide in one query ──────────
@@ -113,11 +127,11 @@ export async function checkWarehouseLowStockAfterFulfillment(
         } else if (currentQty < threshold.low_threshold) {
             urgencyLevel = "low";
         }
-        console.log('6')
+        console.log('6', urgencyLevel)
 
         if (!urgencyLevel) continue; // stock is healthy — skip
 
-        // ── 6. Deduplication: skip if unresolved alert already exists ────────
+        // ── 6. Deduplication: skip if an unresolved alert already exists ────────
         const { data: existingAlert, error: alertCheckError } = await supabase
             .from("alerts")
             .select("id")

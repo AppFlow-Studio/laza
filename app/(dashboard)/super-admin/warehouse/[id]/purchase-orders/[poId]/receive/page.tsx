@@ -5,7 +5,7 @@ import { use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { usePOForReceiving } from "@/lib/hooks/queries/useReceiving";
-import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
+import {useWarehouseById, useWarehouseLocation} from "@/lib/hooks/queries/useWarehouse";
 import { usePallets } from "@/lib/hooks/queries/usePallets";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import {
@@ -67,11 +67,11 @@ export default function ReceiveShipmentPage({
     const router = useRouter();
 
     const { data: po,               isLoading: poLoading  } = usePOForReceiving(poId);
-    const { data: warehouseLocation, isLoading: whLoading  } = useWarehouseLocation();
+    const { data: warehouseLocation, isLoading: whLoading  } = useWarehouseById(warehouseId);
 
     // Check whether pallets have already been created for this PO
     const { data: existingPallets, isLoading: palletsLoading } = usePallets(
-        warehouseLocation?.id,
+        warehouseId,
         { purchaseOrderId: poId }
     );
 
@@ -88,7 +88,7 @@ export default function ReceiveShipmentPage({
         );
     }
 
-    if (!po || !warehouseLocation) {
+    if (!po) {
         return (
             <div className="py-16 text-center text-sm text-zinc-500">
                 Purchase order not found.
@@ -178,7 +178,7 @@ export default function ReceiveShipmentPage({
                     </div>
                     <ReceivingWizard
                         po={po}
-                        warehouseLocationId={warehouseLocation.id}
+                        warehouseLocationId={po?.warehouse_location_id?.id}
                         organizationId={po.organization_id}
                         initialStep={2}
                         onComplete={() =>
@@ -197,7 +197,7 @@ export default function ReceiveShipmentPage({
     return (
         <ReceivingWizard
             po={po}
-            warehouseLocationId={warehouseLocation.id}
+            warehouseLocationId={warehouseLocation?.id}
             organizationId={po.organization_id}
             onComplete={() =>
                 router.push(

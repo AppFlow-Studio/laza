@@ -659,17 +659,54 @@ function PalletsTab({ warehouseId }: { warehouseId: string }) {
     );
 }
 
+type AggregatedInventoryItem = {
+    item_id: number;
+    item_name: string;
+    item_display_label: string;
+    sku: string | null;
+    total_boxes: number;
+    total_pieces: number;
+    pallet_count: number;
+    effective_ppb: number | null;
+};
+
+function aggregateByItem(rows: any[]): AggregatedInventoryItem[] {
+    const map = new Map<number, AggregatedInventoryItem>();
+    for (const row of rows) {
+        const existing = map.get(row.item_id);
+        if (existing) {
+            existing.total_boxes  += row.box_count ?? 0;
+            existing.total_pieces += row.total_pieces ?? 0;
+            existing.pallet_count += 1;
+        } else {
+            map.set(row.item_id, {
+                item_id:           row.item_id,
+                item_name:         row.item_name ?? "Unknown",
+                item_display_label: row.item_display_label ?? row.item_name ?? "Unknown",
+                sku:               row.sku,
+                total_boxes:       row.box_count ?? 0,
+                total_pieces:      row.total_pieces ?? 0,
+                pallet_count:      1,
+                effective_ppb:     row.effective_ppb,
+            });
+        }
+    }
+    return [...map.values()].sort((a, b) => a.item_name.localeCompare(b.item_name));
+}
+
 function InventoryTab({ warehouseId }: { warehouseId: string }) {
-    const [search, setSearch]           = useState("");
+    const [search, setSearch]                 = useState("");
     const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
-    const [drawerOpen, setDrawerOpen]   = useState(false);
+    const [drawerOpen, setDrawerOpen]         = useState(false);
 
     const { data: inventory, isLoading } = useWarehouseInventory(warehouseId);
 
-    const filtered = (inventory ?? []).filter((row: any) =>
+    const aggregated = aggregateByItem(inventory ?? []);
+
+    const filtered = aggregated.filter((row) =>
         !search ||
-        row.items?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        row.items?.sku?.toLowerCase().includes(search.toLowerCase())
+        row.item_name.toLowerCase().includes(search.toLowerCase()) ||
+        row.sku?.toLowerCase().includes(search.toLowerCase())
     );
 
     const openDrawer = (itemId: number) => {
@@ -730,76 +767,40 @@ function InventoryTab({ warehouseId }: { warehouseId: string }) {
                             <tr className="border-b border-zinc-100 bg-zinc-50/50 text-left">
                                 <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">Item</th>
                                 <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">SKU</th>
-                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">Storage Space</th>
-                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Quantity</th>
-                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Min Qty</th>
-                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">Status</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Boxes</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Pieces</th>
+                                <th className="px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide text-right">Pallets</th>
                             </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-100">
-                            {filtered.map((row: any) => {
-                                const qty    = row.current_quantity ?? 0;
-                                const minQty = row.min_quantity_override ?? row.items?.min_quantity ?? 0;
-                                const isLow  = minQty > 0 && qty <= minQty;
-                                const isOut  = qty === 0;
-
-                                return (
-                                    <tr
-                                        key={row.id}
-                                        onClick={() => row.item_id && openDrawer(row.item_id)}
-                                        className="hover:bg-indigo-50/40 transition-colors cursor-pointer"
-                                    >
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0">
-                                                    <Package className="w-4 h-4 text-zinc-400" />
-                                                </div>
-                                                <span className="font-medium text-zinc-900">
-                                                    {row.items?.name ?? "Unknown"}
-                                                </span>
+                            {filtered.map((row) => (
+                                <tr
+                                    key={row.item_id}
+                                    onClick={() => openDrawer(row.item_id)}
+                                    className="hover:bg-indigo-50/40 transition-colors cursor-pointer"
+                                >
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0">
+                                                <Package className="w-4 h-4 text-zinc-400" />
                                             </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className="font-mono text-xs text-zinc-500">
-                                                {row.items?.sku ?? "—"}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-zinc-600">
-                                            {row.storage_spaces?.name ?? "—"}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <span className={`text-sm font-semibold ${
-                                                isOut  ? "text-red-600"   :
-                                                isLow  ? "text-amber-600" :
-                                                         "text-zinc-900"
-                                            }`}>
-                                                {qty}
-                                            </span>
-                                            <span className="text-xs text-zinc-400 ml-1">
-                                                {row.items?.unit_of_measure ?? ""}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-right text-sm text-zinc-500">
-                                            {minQty > 0 ? minQty : "—"}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {isOut ? (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                                                    Out of stock
-                                                </span>
-                                            ) : isLow ? (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                                                    Low stock
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                                                    In stock
-                                                </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                                            <span className="font-medium text-zinc-900">{row.item_name}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <span className="font-mono text-xs text-zinc-500">{row.sku ?? "—"}</span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        <span className="text-sm font-semibold text-zinc-900">{row.total_boxes}</span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        <span className="text-sm text-zinc-600">{row.total_pieces > 0 ? row.total_pieces.toLocaleString() : "—"}</span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        <span className="text-sm text-zinc-500">{row.pallet_count}</span>
+                                    </td>
+                                </tr>
+                            ))}
                             </tbody>
                         </table>
                     </div>

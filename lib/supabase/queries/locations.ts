@@ -186,6 +186,7 @@ export async function createLocation(location: {
     is_active?: boolean;
     latitude?: number | null;
     longitude?: number | null;
+    location_type?: string;
 }) {
     const { auth } = await import('@clerk/nextjs/server');
     const { userId } = await auth();
