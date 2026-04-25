@@ -116,12 +116,31 @@ export async function createTicket(input: CreateTicketInput) {
 
     if (ticketError) throw ticketError;
 
-    const lineItems = input.items.map((item) => ({
-        ticket_id: ticket.id,
-        item_id: item.itemId,
-        quantity_boxes: item.quantityBoxes,
-        quantity_units: item.quantityUnits,
-    }));
+    // Snapshot warehouse-to-store transfer price at creation time.
+    // Source is item_warehouse_pricing (set by super admin), same as the
+    // trg_snapshot_transfer_prices_on_submit trigger. The trigger only fires
+    // on draft→submitted UPDATE; direct-as-submitted inserts bypass it.
+    const srClient = createServiceRoleClient();
+    const { data: pricingRows } = await srClient
+        .from("item_warehouse_pricing")
+        .select("item_id, warehouse_transfer_price")
+        .in("item_id", input.items.map((i) => i.itemId));
+    const priceMap = new Map<number, number>(
+        (pricingRows ?? []).map((r) => [r.item_id, r.warehouse_transfer_price]),
+    );
+    const now = new Date().toISOString();
+
+    const lineItems = input.items.map((item) => {
+        const price = priceMap.get(item.itemId);
+        return {
+            ticket_id: ticket.id,
+            item_id: item.itemId,
+            quantity_boxes: item.quantityBoxes,
+            quantity_units: item.quantityUnits,
+            unit_price_at_time: price ?? null,
+            price_locked_at: price != null ? now : null,
+        };
+    });
 
     console.log(lineItems);
     
@@ -503,7 +522,7 @@ export async function confirmTicket(
       id, status, requesting_location_id, organization_id,
       order_ticket_items (
         id, item_id, fulfilled_boxes, fulfilled_units,
-        items ( id, name ),
+        items ( id, name, box_quantity ),
         order_ticket_fulfillment_lines (
           id, boxes_deducted, pieces_per_box_at_time, total_pieces
         )
@@ -585,7 +604,8 @@ export async function confirmTicket(
                 return sum + proRatedBoxes * line.pieces_per_box_at_time;
             }, 0);
         } else {
-            totalPiecesToAdd = actualBoxes;
+            const ppb = (rawItem as any)?.box_quantity ?? 1;
+            totalPiecesToAdd = actualBoxes * ppb;
         }
 
         // Update store item_locations with ACTUAL pieces received.
@@ -850,7 +870,8 @@ export async function getAutoApprovedTickets(
 
 export async function getTicketItemCosts(itemIds: number[]) {
     if (!itemIds.length) return [];
-    const supabase = createServerSupabaseClient();
+    // Use service role to bypass is_super_admin() RLS on items_with_costs.
+    const supabase = createServiceRoleClient();
     const { data, error } = await supabase
         .from("items_with_costs")
         .select("id, current_unit_cost")

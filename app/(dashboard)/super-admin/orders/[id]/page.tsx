@@ -469,31 +469,35 @@ function ItemsTable({
 
     // Columns: Item | Unit price | Qty | Line total | Unit cost | Line cost | Margin | [Stock]
     const cols = isActionable
-        ? "1fr 95px 75px 105px 90px 105px 80px 90px"
-        : "1fr 95px 75px 105px 90px 105px 80px";
+        ? "1fr 95px 75px 90px 90px 90px 105px 80px 90px"
+        : "1fr 95px 75px 90px 90px 90px 105px 80px";
     const headers = isActionable
-        ? ["Item", "Unit price", "Qty", "Line total", "Unit cost", "Line cost", "Margin", "Stock"]
-        : ["Item", "Unit price", "Qty", "Line total", "Unit cost", "Line cost", "Margin"];
+        ? ["Item", "Unit price", "Qty Boxes","Qty Units", "Line total", "Unit cost", "Line cost", "Margin", "Stock"]
+        : ["Item", "Unit price", "Qty Boxes","Qty Units", "Line total", "Unit cost", "Line cost", "Margin"];
 
     const fmt = (n: number) =>
         new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 
     const totalBilled = lines.reduce((sum, item) => {
         if (!item.unit_price_at_time) return sum;
-        const qty = item.fulfilled_boxes ?? item.quantity_boxes;
+        const qty = item.fulfilled_units ?? item.quantity_units;
         return sum + item.unit_price_at_time * qty;
     }, 0);
 
+    console.log('map',costMap)
     const totalCost = lines.reduce((sum, item) => {
         const unitCost = costMap.get(item.item_id);
+        console.log('item', item)
         if (!unitCost) return sum;
-        const qty = item.fulfilled_boxes ?? item.quantity_boxes;
+        const qty = item.fulfilled_units ?? item.quantity_units;
         return sum + unitCost * qty;
     }, 0);
+    console.log('totalCost', totalCost)
 
     const totalMargin = totalBilled - totalCost;
     const marginPct = totalCost > 0 ? (totalMargin / totalCost) * 100 : null;
 
+    console.log(totalCost, totalBilled, totalMargin, marginPct);
     return (
         <div className="flex flex-col gap-2">
             {/* Prices locked callout */}
@@ -525,13 +529,15 @@ function ItemsTable({
 
                 {/* Rows */}
                 {lines.map((line) => {
+                    console.log(line)
                     const name = line.items?.short_label ?? line.items?.name ?? "Unknown";
                     const sku = line.items?.sku;
-                    const qty = line.fulfilled_boxes ?? line.quantity_boxes;
+                    const qtyUnits = line.fulfilled_units ?? line.quantity_units;
+                    const qtyBox = line.fulfilled_boxes ?? line.quantity_boxes;
                     const unitPrice = line.unit_price_at_time;
-                    const lineTotal = unitPrice != null ? unitPrice * qty : null;
-                    const unitCost = costMap.get(line.item_id);
-                    const lineCost = unitCost != null ? unitCost * qty : null;
+                    const lineTotal = line.line_total;
+                    const unitCost = line.unit_cost_at_time;
+                    const lineCost = line.line_cost;
                     const margin = lineTotal != null && lineCost != null ? lineTotal - lineCost : null;
 
                     const stockStatus = getStockStatus(line, stockMap);
@@ -562,7 +568,8 @@ function ItemsTable({
                             <div className="text-sm font-medium text-gray-700">
                                 {unitPrice != null ? fmt(unitPrice) : <span className="text-gray-300">—</span>}
                             </div>
-                            <div className="text-sm text-gray-600">{qty} boxes</div>
+                            <div className="text-sm text-gray-600">{qtyBox} boxes</div>
+                            <div className="text-sm text-gray-600">{qtyUnits} units</div>
                             <div className="text-sm font-semibold text-gray-900">
                                 {lineTotal != null ? fmt(lineTotal) : <span className="text-gray-300">—</span>}
                             </div>
@@ -591,9 +598,10 @@ function ItemsTable({
                         </div>
                         <div />
                         <div />
-                        <div className="text-sm font-bold text-gray-900">{totalBilled > 0 ? fmt(totalBilled) : "—"}</div>
                         <div />
-                        <div className="text-sm font-semibold text-gray-700">{totalCost > 0 ? fmt(totalCost) : "—"}</div>
+                        <div className="text-sm font-bold text-gray-900">{totalBilled > 0 ? fmt(totalBilled) : ""}</div>
+                        <div />
+                        <div className="text-sm font-semibold text-gray-700">{totalCost > 0 ? fmt(totalCost) : ""}</div>
                         <div className={`text-sm font-bold ${totalMargin > 0 ? "text-green-600" : totalMargin < 0 ? "text-red-500" : "text-gray-400"}`}>
                             {totalCost > 0 ? (
                                 <>
@@ -602,7 +610,7 @@ function ItemsTable({
                                         <span className="text-[10px] font-semibold">({marginPct.toFixed(1)}%)</span>
                                     )}
                                 </>
-                            ) : "—"}
+                            ) : ""}
                         </div>
                         {isActionable && <div />}
                     </div>

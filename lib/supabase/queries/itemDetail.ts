@@ -48,6 +48,7 @@ export interface PalletStock {
 	box_count: number;
 	effective_pieces_per_box: number;
 	total_pieces: number;
+	has_mixed_configs: boolean;
 	status: "active" | "empty" | "retired";
 }
 
@@ -58,6 +59,7 @@ export interface ItemOverview {
 	sku: string | null;
 	category_name: string | null;
 	current_pieces_per_box: number;
+	has_mixed_configs: boolean;
 	warehouse_boxes: number;
 	warehouse_pieces: number;
 	unit_cost: number | null;
@@ -125,7 +127,7 @@ export async function getItemOverview(
 	// Fetch warehouse pallet inventory totals (scoped to this warehouse)
 	const { data: palletRows, error: palletError } = await supabase
 		.from("pallet_inventory")
-		.select("box_count, pieces_per_box_override, warehouse_pallets!inner(id, status, warehouse_location_id)")
+		.select("box_count, pieces_per_box_override, warehouse_pallets!inner(id, status, warehouse_location_id), purchase_order_items(pieces_per_box, has_mixed_configs, po_item_box_configs(pieces_per_box, box_count, total_pieces))")
 		.eq("item_id", itemId)
 		.eq("warehouse_pallets.warehouse_location_id", warehouseLocationId)
 		.in("warehouse_pallets.status", ["active", "empty"])
@@ -136,11 +138,19 @@ export async function getItemOverview(
 		palletRows?.reduce((sum, r) => sum + (r.box_count ?? 0), 0) ?? 0;
 	const warehousePieces =
 		palletRows?.reduce((sum: number, r: any) => {
+			const configs = r.purchase_order_items?.po_item_box_configs as
+				| { pieces_per_box: number; box_count: number; total_pieces: number | null }[]
+				| undefined;
+			if (configs && configs.length > 0) {
+				return sum + configs.reduce((s, c) => s + (c.total_pieces ?? c.box_count * c.pieces_per_box), 0);
+			}
 			const ppb = r.pieces_per_box_override ?? defaultPpb;
 			return sum + (r.box_count ?? 0) * ppb;
 		}, 0) ?? 0;
 	const activePalletCount =
 		palletRows?.filter((r: any) => (r.warehouse_pallets as any)?.status === "active").length ?? 0;
+	const hasMixedConfigs =
+		palletRows?.some((r: any) => r.purchase_order_items?.has_mixed_configs === true) ?? false;
 
 	console.log("palletRows", palletRows, palletError)
 
@@ -153,6 +163,7 @@ export async function getItemOverview(
 		sku: item.sku ?? null,
 		category_name: (item.category as { name: string } | null)?.name ?? null,
 		current_pieces_per_box: item.box_quantity ?? 0,
+		has_mixed_configs: hasMixedConfigs,
 		warehouse_boxes: warehouseBoxes,
 		warehouse_pieces: warehousePieces,
 		box_quantity:item.box_quantity,
@@ -181,7 +192,8 @@ export async function getItemPalletStock(itemId: number): Promise<PalletStock[]>
       box_count,
       pieces_per_box_override,
       warehouse_pallets!inner(id, pallet_label, status, storage_space_id),
-      items!inner(box_quantity)
+      items!inner(box_quantity),
+      purchase_order_items(pieces_per_box, has_mixed_configs, po_item_box_configs(pieces_per_box, box_count, total_pieces))
     `
 		)
 		.eq("item_id", itemId)
@@ -214,7 +226,15 @@ export async function getItemPalletStock(itemId: number): Promise<PalletStock[]>
 
 	return (data as any[]).map((r) => {
 		const pallet = r.warehouse_pallets as any;
-		const ppb = r.pieces_per_box_override ?? (r.items as any)?.box_quantity ?? 0;
+		const poi = r.purchase_order_items as any;
+		const configs = poi?.po_item_box_configs as
+			| { pieces_per_box: number; box_count: number; total_pieces: number | null }[]
+			| undefined;
+		const ppb = r.pieces_per_box_override ?? poi?.pieces_per_box ?? (r.items as any)?.box_quantity ?? 0;
+		const total_pieces =
+			configs && configs.length > 0
+				? configs.reduce((s, c) => s + (c.total_pieces ?? c.box_count * c.pieces_per_box), 0)
+				: r.box_count * ppb;
 		return {
 			pallet_id: pallet.id,
 			pallet_label: pallet.pallet_label,
@@ -224,7 +244,8 @@ export async function getItemPalletStock(itemId: number): Promise<PalletStock[]>
 				: null,
 			box_count: r.box_count,
 			effective_pieces_per_box: ppb,
-			total_pieces: r.box_count * ppb,
+			total_pieces,
+			has_mixed_configs: poi?.has_mixed_configs ?? false,
 			status: pallet.status as PalletStock["status"],
 		};
 	});

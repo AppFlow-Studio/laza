@@ -196,6 +196,9 @@ export function useFulfillTicket() {
 				p_delivery_type: deliveryType,
 			});
 
+			console.log(data, error)
+			console.log(adminUserId)
+
 			if (error) throw error;
 			return data as {
 				ticket_id:           string;

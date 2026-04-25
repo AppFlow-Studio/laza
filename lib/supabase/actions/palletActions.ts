@@ -67,7 +67,7 @@ async function queryPallets(
             pallet_inventory (
                 *,
                 items ( name, short_label, sku ),
-                purchase_order_items ( pieces_per_box )
+                purchase_order_items ( pieces_per_box, po_item_box_configs ( pieces_per_box, box_count, total_pieces ) )
             )
         `);
 
@@ -163,7 +163,7 @@ export async function getPalletByIdAction(palletId: string) {
             pallet_inventory (
                 *,
                 items ( name, short_label, sku, unit_of_measure, current_unit_cost ),
-                purchase_order_items ( pieces_per_box, unit_cost_after )
+                purchase_order_items ( pieces_per_box, unit_cost_after, po_item_box_configs ( pieces_per_box, box_count, total_pieces ) )
             )
         `)
         .eq('id', palletId)

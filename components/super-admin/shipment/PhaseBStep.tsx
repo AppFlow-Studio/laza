@@ -51,6 +51,7 @@ const phaseBSchema = z.object({
                             purchase_order_item_id: z.string(),
                             item_name: z.string(),
                             max_boxes: z.number(),
+                            max_units: z.number(),
                             default_pieces_per_box: z.number(),
                             box_configs: z
                                 .array(boxConfigSchema)
@@ -105,6 +106,7 @@ function buildDefaultPallet(
                     item_name:
                         poItem?.items?.short_label ?? poItem?.items?.name ?? "—",
                     max_boxes: maxBoxes,
+                    max_units: li.quantity_received,
                     default_pieces_per_box: ppb,
                     box_configs: [{ pieces_per_box: ppb, box_count: maxBoxes }],
                 };
@@ -127,18 +129,17 @@ function UnassignedPanel({
     const rows = phaseAData.lineItems
         .map((li) => {
             const poItem = poItems.find((i) => i.item_id === li.item_id);
-            const ppb = li.pieces_per_box;
-            const totalBoxes = ppb > 0 ? Math.floor(li.quantity_received / ppb) : 0;
-            const assigned = watchedPallets.reduce((sum, p) => {
+            const totalUnits = li.quantity_received;
+            const assignedUnits = watchedPallets.reduce((sum, p) => {
                 const match = p.items.find((i) => i.item_id === li.item_id);
                 if (!match) return sum;
-                return sum + totalBoxesForItem(match.box_configs ?? []);
+                return sum + totalUnitsForItem(match.box_configs ?? []);
             }, 0);
-            const remaining = totalBoxes - assigned;
+            const remaining = totalUnits - assignedUnits;
             return {
                 name: poItem?.items?.short_label ?? poItem?.items?.name ?? "—",
-                total: totalBoxes,
-                assigned,
+                total: totalUnits,
+                assigned: assignedUnits,
                 remaining,
             };
         })
@@ -169,7 +170,7 @@ function UnassignedPanel({
                         </span>
                         <div className="flex items-center gap-2">
                             <span className="text-xs tabular-nums text-zinc-400">
-                                {row.assigned}/{row.total}
+                                {row.assigned.toLocaleString()}/{row.total.toLocaleString()} pcs
                             </span>
                             <span
                                 className={cn(
@@ -185,7 +186,7 @@ function UnassignedPanel({
                                     ? "✓"
                                     : row.remaining < 0
                                         ? `${row.remaining} over`
-                                        : `${row.remaining} left`}
+                                        : `${row.remaining.toLocaleString()} left`}
                             </span>
                         </div>
                     </div>
@@ -415,8 +416,8 @@ function PalletCard({
                     const configs = watchedItem?.box_configs ?? [];
                     const totalBoxesThisItem = totalBoxesForItem(configs);
                     const totalUnitsThisItem = totalUnitsForItem(configs);
-                    const maxBoxes = watchedItem?.max_boxes ?? 0;
-                    const isOver = totalBoxesThisItem > maxBoxes;
+                    const maxUnits = watchedItem?.max_units ?? 0;
+                    const isOver = totalUnitsThisItem > maxUnits;
 
                     return (
                         <div
@@ -429,7 +430,7 @@ function PalletCard({
                                         {watchedItem?.item_name ?? "—"}
                                     </p>
                                     <p className="text-xs text-zinc-400">
-                                        Max {maxBoxes} box{maxBoxes !== 1 ? "es" : ""}
+                                        Max {maxUnits} piece{maxUnits !== 1 ? "s" : ""}
                                     </p>
                                 </div>
                                 <div className="text-right text-xs tabular-nums">
@@ -437,7 +438,7 @@ function PalletCard({
                                         {totalBoxesThisItem} box{totalBoxesThisItem !== 1 ? "es" : ""}
                                         {isOver && (
                                             <span className="ml-1 text-red-500">
-                                                (over by {totalBoxesThisItem - maxBoxes})
+                                                (over by {(totalUnitsThisItem - maxUnits).toLocaleString()} pcs)
                                             </span>
                                         )}
                                     </p>
@@ -514,15 +515,14 @@ export function PhaseBStep({ po, phaseAData, onSubmit, onValidityChange }: Phase
     }, [watchedPallets, onValidityChange]);
 
     const handleFormSubmit = (data: PhaseBData) => {
+        console.log(data, phaseAData)
         const overItems = phaseAData.lineItems.filter((li) => {
-            const ppb = li.pieces_per_box;
-            const maxBoxes = ppb > 0 ? Math.floor(li.quantity_received / ppb) : 0;
-            const assigned = data.pallets.reduce((sum, p) => {
+            const assignedUnits = data.pallets.reduce((sum, p) => {
                 const match = p.items.find((i) => i.item_id === li.item_id);
                 if (!match) return sum;
-                return sum + totalBoxesForItem(match.box_configs ?? []);
+                return sum + totalUnitsForItem(match.box_configs ?? []);
             }, 0);
-            return assigned > maxBoxes;
+            return assignedUnits > li.quantity_received;
         });
 
         if (overItems.length > 0) {
