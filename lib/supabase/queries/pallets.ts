@@ -22,7 +22,10 @@ export type PalletWithDetails = WarehousePallet & {
 	warehouse: { name: string } | null;
 	pallet_inventory: (PalletInventory & {
 		items: { name: string; short_label: string | null; sku: string | null } | null;
-		purchase_order_items: { pieces_per_box: number } | null;
+		purchase_order_items: {
+			pieces_per_box: number;
+			po_item_box_configs: { pieces_per_box: number; box_count: number; total_pieces: number | null }[];
+		} | null;
 	})[];
 };
 
@@ -56,7 +59,7 @@ export async function getPallets(
       pallet_inventory (
         *,
         items ( name, short_label, sku ),
-        purchase_order_items ( pieces_per_box )
+        purchase_order_items ( pieces_per_box, po_item_box_configs ( pieces_per_box, box_count, total_pieces ) )
       )
     `
 		)
@@ -119,7 +122,7 @@ export async function getPalletById(
       pallet_inventory (
         *,
         items ( name, short_label, sku, unit_of_measure, current_unit_cost ),
-        purchase_order_items ( pieces_per_box, unit_cost_after )
+        purchase_order_items ( pieces_per_box, unit_cost_after, po_item_box_configs ( pieces_per_box, box_count, total_pieces ) )
       )
     `
 		)

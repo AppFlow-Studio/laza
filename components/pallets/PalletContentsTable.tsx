@@ -21,6 +21,20 @@ function getEffectivePpb(row: InventoryRow): number {
   );
 }
 
+function getTotalUnits(row: InventoryRow): number {
+  const configs = (row.purchase_order_items as any)?.po_item_box_configs as
+    | { pieces_per_box: number; box_count: number; total_pieces: number | null }[]
+    | undefined;
+  if (configs && configs.length > 0) {
+    return configs.reduce(
+      (s, c) => s + (c.total_pieces ?? c.box_count * c.pieces_per_box),
+      0
+    );
+  }
+  const ppb = getEffectivePpb(row);
+  return row.box_count * ppb;
+}
+
 export function PalletContentsTable({ inventory }: PalletContentsTableProps) {
   const { id } = useParams<{ id: string }>();
   const [isOpen, setIsOpen] = useState(false);
@@ -62,7 +76,7 @@ export function PalletContentsTable({ inventory }: PalletContentsTableProps) {
           <tbody className="divide-y divide-gray-50">
             {inventory.map((row) => {
               const ppb = getEffectivePpb(row);
-              const totalUnits = row.box_count * ppb;
+              const totalUnits = getTotalUnits(row);
               const unitCost =
                 (row as any).purchase_order_items?.unit_cost_after ??
                 (row as any).items?.current_unit_cost;
@@ -89,10 +103,16 @@ export function PalletContentsTable({ inventory }: PalletContentsTableProps) {
                     <span className="text-gray-400">/{row.initial_box_count}</span>
                   </td>
                   <td className="px-4 py-3 text-sm tabular-nums text-gray-600">
-                    {ppb > 0 ? ppb : "—"}
+                    {(() => {
+                      const configs = (row.purchase_order_items as any)?.po_item_box_configs as
+                        | { pieces_per_box: number; box_count: number }[]
+                        | undefined;
+                      if (configs && configs.length > 1) return "mixed";
+                      return ppb > 0 ? ppb : "—";
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-sm tabular-nums text-gray-900">
-                    {ppb > 0 ? totalUnits.toLocaleString() : "—"}
+                    {totalUnits > 0 ? totalUnits.toLocaleString() : "—"}
                   </td>
                   <td className="px-4 py-3 text-sm tabular-nums text-gray-600">
                     {unitCost != null

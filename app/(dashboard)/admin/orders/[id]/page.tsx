@@ -972,27 +972,28 @@ function ItemsTable({
     const cols = isDraftEditing
         ? "1fr 120px"
         : isSuperAdmin && isPriceLocked
-          ? "1fr 95px 75px 105px 90px 105px 80px"
-          : "1fr 95px 75px 105px";
+          ? "1fr 95px 75px 90px 105px 90px 105px 80px"
+          : "1fr 95px 75px 90px 105px";
 
     const headers = isDraftEditing
         ? ["Item", "Qty (boxes)"]
         : isSuperAdmin && isPriceLocked
-          ? ["Item", "Unit price", "Qty", "Line total", "Unit cost", "Line cost", "Margin"]
-          : ["Item", "Unit price", "Qty", "Line total"];
+          ? ["Item", "Unit price", "Qty Boxes","Qty Units", "Line total", "Unit cost", "Line cost", "Margin"]
+          : ["Item", "Unit price", "Qty Boxes","Qty Units", "Line total"];
 
     // Footer totals
     const totalBilled = order_ticket_items.reduce((sum, item) => {
         if (!item.unit_price_at_time) return sum;
-        const qty = item.fulfilled_boxes ?? item.quantity_boxes;
+        const qty = item.fulfilled_units ?? item.quantity_units;
         return sum + item.unit_price_at_time * qty;
     }, 0);
+    console.log(order_ticket_items)
 
     const totalCost = isSuperAdmin
         ? order_ticket_items.reduce((sum, item) => {
               const unitCost = costMap.get(item.item_id);
               if (!unitCost) return sum;
-              const qty = item.fulfilled_boxes ?? item.quantity_boxes;
+              const qty = item.fulfilled_units ?? item.quantity_units;
               return sum + unitCost * qty;
           }, 0)
         : 0;
@@ -1054,19 +1055,19 @@ function ItemsTable({
 
                 {/* Rows */}
                 {order_ticket_items.map((line) => {
+                    console.log(line)
                     const name =
                         line.items?.short_label ??
                         line.items?.name ??
                         "Unknown item";
                     const sku = line.items?.sku;
-                    const qty = line.fulfilled_boxes ?? line.quantity_boxes;
+                    const qtyBoxes = line.fulfilled_boxes ?? line.quantity_boxes;
+                    const qtyUnits = line.fulfilled_units ?? line.quantity_units;
                     const unitPrice = line.unit_price_at_time;
-                    const lineTotal =
-                        unitPrice != null ? unitPrice * qty : null;
+                    const lineTotal = line?.line_total;
                     const unitCost =
                         isSuperAdmin ? costMap.get(line.item_id) : undefined;
-                    const lineCost =
-                        unitCost != null ? unitCost * qty : null;
+                    const lineCost = line.line_cost;
                     const margin =
                         lineTotal != null && lineCost != null
                             ? lineTotal - lineCost
@@ -1128,6 +1129,9 @@ function ItemsTable({
                                     {/* Qty */}
                                     <div className="text-xs text-gray-600 font-medium">
                                         {line.quantity_boxes} boxes
+                                    </div>
+                                    <div className="text-xs text-gray-600 font-medium">
+                                        {line.quantity_units} units
                                     </div>
                                     {/* Line total */}
                                     <div className="text-xs tabular-nums font-semibold text-gray-900">

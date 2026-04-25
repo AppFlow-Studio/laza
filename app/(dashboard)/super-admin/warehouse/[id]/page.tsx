@@ -554,7 +554,7 @@ function PalletsTab({ warehouseId }: { warehouseId: string }) {
                                 return (
                                     <>
                                         {/* Shipment group header */}
-                                        <tr key={`grp-${group.label}`} className="bg-zinc-50/80 border-y border-zinc-100">
+                                        <tr key={`grp-${group.poId}`} className="bg-zinc-50/80 border-y border-zinc-100">
                                             <td colSpan={7} className="px-4 py-2.5">
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-50">

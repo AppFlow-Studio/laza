@@ -104,7 +104,10 @@ function OverviewTab({
 			value: fmt(overview.warehouse_pieces),
 			accent: true,
 		},
-		{ label: "Pieces / Box", value: fmt(overview.current_pieces_per_box) },
+		{
+			label: "Pieces / Box",
+			value: overview.has_mixed_configs ? "mixed" : fmt(overview.current_pieces_per_box),
+		},
 		{ label: "Active Pallets", value: fmt(overview.active_pallet_count) },
 		{
 			label: "Unit Cost",
@@ -231,7 +234,7 @@ function StockTab({ itemId }: { itemId: number }) {
 											{fmt(p.box_count)}
 										</td>
 										<td className="px-3 py-2.5 text-right tabular-nums  text-xs">
-											{fmt(p.effective_pieces_per_box)}
+											{p.has_mixed_configs ? "mixed" : fmt(p.effective_pieces_per_box)}
 										</td>
 										<td className="px-3 py-2.5 text-right tabular-nums  text-xs">
 											{fmt(p.total_pieces)}
