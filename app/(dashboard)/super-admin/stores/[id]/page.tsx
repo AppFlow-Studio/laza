@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useLocationWithDetails } from "@/lib/hooks/queries/useLocations";
 import { useEmployeesByLocation } from "@/lib/hooks/queries/useEmployees";
-import { useAlerts, useInventoryLogs } from "@/lib/hooks/queries/useInventory";
+import { useAlerts, useInventoryByLocation, useInventoryLogs } from "@/lib/hooks/queries/useInventory";
 import { useDeleteStorageSpace } from "@/lib/hooks/queries/useStorageSpace";
 import toast from "react-hot-toast";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
@@ -31,6 +31,7 @@ import SearchBar from "@/components/admin/shared/SearchBar";
 import { Tables } from "@/lib/supabase/types";
 import MobileSheet from "@/components/admin/shared/MobileSheet";
 import StorageSetupWizard from "@/components/admin/locations/StorageSetupWizard";
+import StoreInventoryMatrix from "@/components/super-admin/stores/StoreInventoryMatrix";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -62,8 +63,10 @@ export default function SuperAdminStoreDetailPage() {
     const { data: employees } = useEmployeesByLocation(locationId);
     const { data: alerts } = useAlerts({ resolved: false, locationId });
     const { data: logs } = useInventoryLogs({ locationId, limit: 100 });
+    const { data: inventory } = useInventoryByLocation(locationId);
 
     const [activeTab, setActiveTab] = useState<TabKey>("stock");
+    const [stockView, setStockView] = useState<"spaces" | "matrix">("spaces");
     const [showStorageSetup, setShowStorageSetup] = useState(false);
     const [pendingDelete, setPendingDelete] = useState<StorageSpace | null>(null);
     const deleteStorageSpace = useDeleteStorageSpace();
@@ -214,7 +217,29 @@ export default function SuperAdminStoreDetailPage() {
                 {/* ── Stock tab ── */}
                 {activeTab === "stock" && (
                     <div className="space-y-4">
-                    <div className="flex justify-end">
+                    <div className="flex items-center justify-between">
+                        <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-0.5">
+                            <button
+                                onClick={() => setStockView("spaces")}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                                    stockView === "spaces"
+                                        ? "bg-indigo-600 text-white"
+                                        : "text-zinc-500 hover:text-zinc-900"
+                                }`}
+                            >
+                                Spaces
+                            </button>
+                            <button
+                                onClick={() => setStockView("matrix")}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                                    stockView === "matrix"
+                                        ? "bg-indigo-600 text-white"
+                                        : "text-zinc-500 hover:text-zinc-900"
+                                }`}
+                            >
+                                Matrix
+                            </button>
+                        </div>
                         <Button
                             size="sm"
                             onClick={() => setShowStorageSetup(true)}
@@ -224,6 +249,12 @@ export default function SuperAdminStoreDetailPage() {
                             Add Storage
                         </Button>
                     </div>
+                    {stockView === "matrix" ? (
+                        <StoreInventoryMatrix
+                            storageSpaces={location.storage_spaces ?? []}
+                            inventory={inventory ?? []}
+                        />
+                    ) : (
                     <div className="grid grid-cols-2 gap-4">
                         {!location.storage_spaces?.length ? (
                             <div className="col-span-2 flex flex-col items-center justify-center py-16 text-center">
@@ -310,6 +341,7 @@ export default function SuperAdminStoreDetailPage() {
                             ))
                         )}
                     </div>
+                    )}
                     </div>
                 )}
 
