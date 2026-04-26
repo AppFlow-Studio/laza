@@ -1,7 +1,7 @@
 "use server"
 
 import type { Database } from "@/lib/supabase/types";
-import { createWarehouseExpenseAction, getWarehouseExpensesAction, getExpenseSummaryAction } from "../actions/warehouseExpenseActions";
+import { createWarehouseExpenseAction, getWarehouseExpensesAction } from "../actions/warehouseExpenseActions";
 import { createServiceRoleClient } from "../server";
 
 type WarehouseExpense =
@@ -64,6 +64,7 @@ export async function getExpenseSummary(
     dateRange?: { from: string; to: string },
     warehouseLocationId?: string,
 ): Promise<ExpenseSummary[]> {
+    const supabase = createServiceRoleClient()
     const now = new Date();
     const from =
         dateRange?.from ??
@@ -87,7 +88,7 @@ export async function getExpenseSummary(
         query = query.eq("warehouse_location_id", warehouseLocationId);
     }
 
-    const { data, error } = await query;
+    const { data : rows, error } = await query;
 
     if (error) throw error;
 
