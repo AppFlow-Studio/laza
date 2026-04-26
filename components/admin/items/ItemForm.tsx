@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { useCreateItem, useUpdateItem } from "@/lib/hooks/queries/useItems";
 import { useCategories } from "@/lib/hooks/queries/useCategories";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
+import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
 
 const itemSchema = z.object({
@@ -16,6 +17,7 @@ const itemSchema = z.object({
     category: z.number().optional().nullable(),
     unit_of_measure: z.enum(["pcs", "kg", "liters", "lbs", "oz"]),
     min_quantity: z.number().min(0),
+    is_warehouse_item: z.boolean().default(false),
 });
 
 type ItemFormData = z.infer<typeof itemSchema>;
@@ -32,6 +34,7 @@ interface ItemFormProps {
         } | null;
         unit_of_measure: "pcs" | "kg" | "liters" | "lbs" | "oz";
         min_quantity: number;
+        is_warehouse_item?: boolean | null;
     } | null;
     onSuccess?: () => void;
     onCancel?: () => void;
@@ -46,6 +49,7 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
     const {
         register,
         handleSubmit,
+        control,
         formState: { errors },
         reset,
     } = useForm<ItemFormData>({
@@ -56,6 +60,7 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
             category: null,
             unit_of_measure: "pcs",
             min_quantity: 0,
+            is_warehouse_item: false,
         },
     });
 
@@ -77,6 +82,7 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                 category: categoryId,
                 unit_of_measure: item.unit_of_measure || "pcs",
                 min_quantity: item.min_quantity || 0,
+                is_warehouse_item: item.is_warehouse_item ?? false,
             });
         } else if (!item) {
             reset({
@@ -85,6 +91,7 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                 category: null,
                 unit_of_measure: "pcs",
                 min_quantity: 0,
+                is_warehouse_item: false,
             });
         }
     }, [item, categories, reset]);
@@ -106,6 +113,7 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                         category_id: data.category || null,
                         unit_of_measure: data.unit_of_measure,
                         min_quantity: data.min_quantity,
+                        is_warehouse_item: data.is_warehouse_item,
                     },
                 });
                 toast.success("Item updated successfully");
@@ -118,6 +126,7 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                         category_id: data.category || null,
                         unit_of_measure: data.unit_of_measure,
                         min_quantity: data.min_quantity,
+                        is_warehouse_item: data.is_warehouse_item,
                     },
                 });
                 toast.success("Item created successfully");
@@ -262,6 +271,25 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                         {errors.min_quantity.message}
                     </p>
                 )}
+            </div>
+
+            {/* Warehouse Item */}
+            <div className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3">
+                <div>
+                    <p className="text-sm font-medium text-gray-700">Warehouse Item</p>
+                    <p className="text-xs text-gray-400 mt-0.5">This item can be ordered from the warehouse.</p>
+                </div>
+                <Controller
+                    name="is_warehouse_item"
+                    control={control}
+                    render={({ field }) => (
+                        <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={isPending}
+                        />
+                    )}
+                />
             </div>
 
             {/* Actions */}

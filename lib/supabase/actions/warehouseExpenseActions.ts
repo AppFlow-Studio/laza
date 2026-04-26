@@ -2,7 +2,9 @@
 
 import { WarehouseExpenseFilters } from "../queries/warehouseExpenses";
 import { createServiceRoleClient } from "../server";
-import { WarehouseExpense, WarehouseExpenseInsert } from "@/lib/supabase/types";
+import type { Tables, TablesInsert } from "@/lib/supabase/types";
+type WarehouseExpense = Tables<"warehouse_expenses">;
+type WarehouseExpenseInsert = TablesInsert<"warehouse_expenses">;
 
 
 export async function createWarehouseExpenseAction(
@@ -55,11 +57,17 @@ export async function getWarehouseExpensesAction(
     if (filters?.purchaseOrderId) {
         query = query.eq("purchase_order_id", filters.purchaseOrderId);
     }
+    if (filters?.warehouseLocationId) {
+        query = query.eq("warehouse_location_id", filters.warehouseLocationId);
+    }
     if (filters?.dateFrom) {
         query = query.gte("expense_date", filters.dateFrom);
     }
     if (filters?.dateTo) {
         query = query.lte("expense_date", filters.dateTo);
+    }
+    if (filters?.warehouseLocationId) {
+        query = query.eq("warehouse_location_id", filters.warehouseLocationId);
     }
 
     const { data, error } = await query;

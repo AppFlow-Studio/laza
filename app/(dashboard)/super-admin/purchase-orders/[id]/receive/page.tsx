@@ -71,9 +71,10 @@ export default function ReceiveShipmentPage({
     const { data: po,               isLoading: poLoading  } = usePOForReceiving(id);
     const { data: warehouseLocation, isLoading: whLoading  } = useWarehouseLocation();
 
+    console.log(po)
     // Check whether pallets have already been created for this PO
     const { data: existingPallets, isLoading: palletsLoading } = usePallets(
-        warehouseLocation?.id,
+        po?.warehouse_location_id?.id,
         { purchaseOrderId: id }
     );
 
@@ -90,7 +91,7 @@ export default function ReceiveShipmentPage({
         );
     }
 
-    if (!po || !warehouseLocation) {
+    if (!po) {
         return (
             <div className="py-16 text-center text-sm text-zinc-500">
                 Purchase order not found.
@@ -133,7 +134,7 @@ export default function ReceiveShipmentPage({
                         </h2>
                         <ExistingPalletsList
                             pallets={existingPallets!}
-                            warehouseId={warehouseLocation.id}
+                            warehouseId={po?.warehouse_location_id?.id}
                             poId={id}
                         />
                     </div>
@@ -181,7 +182,7 @@ export default function ReceiveShipmentPage({
                     </div>
                     <ReceivingWizard
                         po={po}
-                        warehouseLocationId={warehouseLocation.id}
+                        warehouseLocationId={po?.warehouse_location_id?.id}
                         organizationId={po.organization_id}
                         initialStep={2}
                         onComplete={() =>
@@ -198,7 +199,7 @@ export default function ReceiveShipmentPage({
     return (
         <ReceivingWizard
             po={po}
-            warehouseLocationId={warehouseLocation.id}
+            warehouseLocationId={po?.warehouse_location_id?.id}
             organizationId={po.organization_id}
             onComplete={() =>
                 router.push(`/super-admin/purchase-orders/${po.id}`)

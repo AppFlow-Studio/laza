@@ -13,6 +13,7 @@ import {
     Settings,
     StretchHorizontal,
     Warehouse,
+    Thermometer,
 } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
@@ -34,7 +35,7 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar";
 import Image from "next/image";
-import { useLocations } from "@/lib/hooks/queries/useLocations";
+import { useLocations, useLocationWithDetails } from "@/lib/hooks/queries/useLocations";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useAdminStore } from "@/lib/stores/adminStore";
@@ -132,6 +133,64 @@ function SidebarLocationBlock() {
     );
 }
 
+// ─── Storage spaces for selected location ─────────────────────────────────────
+function SidebarStorageSpacesBlock() {
+    const { state } = useSidebar();
+    const isCollapsed = state === "collapsed";
+    const pathname = usePathname();
+
+    const { selectedLocationId } = useAdminStore();
+    const { data: location, isLoading } = useLocationWithDetails(selectedLocationId);
+
+    if (isCollapsed || !selectedLocationId) return null;
+
+    const spaces = location?.storage_spaces ?? [];
+
+    return (
+        <SidebarGroup className="pt-0">
+            <div className="px-3 pb-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                    Storage Spaces
+                </span>
+            </div>
+            <SidebarGroupContent>
+                <SidebarMenu>
+                    {isLoading ? (
+                        <div className="space-y-1 px-2">
+                            <Skeleton className="h-7 w-full" />
+                            <Skeleton className="h-7 w-full" />
+                        </div>
+                    ) : spaces.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-zinc-400">
+                            No storage spaces
+                        </div>
+                    ) : (
+                        spaces.map((space) => {
+                            const href = `/admin/storage-spaces/${space.id}`;
+                            const isActive = pathname === href || pathname?.startsWith(href + "/");
+                            return (
+                                <SidebarMenuItem key={space.id}>
+                                    <SidebarMenuButton
+                                        asChild
+                                        isActive={isActive}
+                                        tooltip={space.name}
+                                        className="text-xs"
+                                    >
+                                        <Link href={href}>
+                                            <Thermometer className="h-3.5 w-3.5" />
+                                            <span className="truncate">{space.name}</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            );
+                        })
+                    )}
+                </SidebarMenu>
+            </SidebarGroupContent>
+        </SidebarGroup>
+    );
+}
+
 // ─── Layout ───────────────────────────────────────────────────────────────────
 export default function AdminLayout({
     children,
@@ -211,6 +270,8 @@ export default function AdminLayout({
                                     </SidebarMenu>
                                 </SidebarGroupContent>
                             </SidebarGroup>
+
+                            <SidebarStorageSpacesBlock />
                         </SidebarContent>
 
                         {/* Footer */}

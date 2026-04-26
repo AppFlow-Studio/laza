@@ -9,9 +9,12 @@ import { motion } from 'motion/react';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
 import QuantityUpdateModal from '@/components/admin/inventory/QuantityUpdateModal';
 import EditStorageSpaceModal from '../locations/EditStorageSpaceModal';
+import {useAdminStore} from "@/lib/stores/adminStore";
 
 export default function ImmediateActions() {
-    const { data: alerts, isLoading } = useAlerts({ resolved: false });
+    const { selectedLocationId } = useAdminStore();
+
+    const { data: alerts, isLoading } = useAlerts({ resolved: false, locationId:selectedLocationId });
     const [editingAlert, setEditingAlert] = useState<{
         alertId: string;
         itemId: string;

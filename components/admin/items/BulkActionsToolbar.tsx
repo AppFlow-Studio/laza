@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Settings, Trash2, X } from 'lucide-react';
+import { Settings, Trash2, X, Percent, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BulkActionsToolbarProps {
@@ -9,6 +9,9 @@ interface BulkActionsToolbarProps {
     onUpdateMinQuantity: () => void;
     onUpdateCategory: () => void;
     onUpdateUnit: () => void;
+    onUpdatePrice?: () => void;
+    onUpdateWarehouse?: () => void;
+    onApplyMarkup?: () => void;
     onBulkUpdate: () => void;
     onDelete: () => void;
     onClearSelection: () => void;
@@ -20,6 +23,9 @@ export default function BulkActionsToolbar({
     onUpdateMinQuantity,
     onUpdateCategory,
     onUpdateUnit,
+    onUpdatePrice = undefined,
+    onUpdateWarehouse = undefined,
+    onApplyMarkup = undefined,
     onBulkUpdate,
     onDelete,
     onClearSelection,
@@ -80,6 +86,41 @@ export default function BulkActionsToolbar({
                     >
                         Update Unit
                     </Button>
+                    {onUpdatePrice && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onUpdatePrice}
+                            disabled={isLoading}
+                            className="text-xs"
+                        >
+                            <Percent className="w-4 h-4 mr-1" />
+                            Update Price
+                        </Button>
+                    )}
+                    {onUpdateWarehouse && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onUpdateWarehouse}
+                            disabled={isLoading}
+                            className="text-xs"
+                        >
+                            Warehouse
+                        </Button>
+                    )}
+                    {onApplyMarkup && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onApplyMarkup}
+                            disabled={isLoading}
+                            className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                        >
+                            <TrendingUp className="w-4 h-4 mr-1" />
+                            Apply Markup
+                        </Button>
+                    )}
                     <Button
                         variant="outline"
                         size="sm"

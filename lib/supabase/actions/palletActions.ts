@@ -25,7 +25,7 @@ export async function getPOForReceivingAction(purchaseOrderId: string) {
         .from('purchase_orders')
         .select(`
             id, po_number, supplier_name, status,
-            expected_arrival, actual_arrival, organization_id,
+            expected_arrival, actual_arrival, organization_id, warehouse_location_id, 
             purchase_order_items (
                 id, item_id, quantity_ordered, quantity_received,
                 pieces_per_box, unit_price_before, unit_cost_after, cbm, cartons,
@@ -67,7 +67,7 @@ async function queryPallets(
             pallet_inventory (
                 *,
                 items ( name, short_label, sku ),
-                purchase_order_items ( pieces_per_box )
+                purchase_order_items ( pieces_per_box, po_item_box_configs ( pieces_per_box, box_count, total_pieces ) )
             )
         `);
 
@@ -163,7 +163,7 @@ export async function getPalletByIdAction(palletId: string) {
             pallet_inventory (
                 *,
                 items ( name, short_label, sku, unit_of_measure, current_unit_cost ),
-                purchase_order_items ( pieces_per_box, unit_cost_after )
+                purchase_order_items ( pieces_per_box, unit_cost_after, po_item_box_configs ( pieces_per_box, box_count, total_pieces ) )
             )
         `)
         .eq('id', palletId)
@@ -233,8 +233,6 @@ export async function confirmPOReceiptAction(
 
 export async function assignShipmentToPalletsAction(
     purchaseOrderId: string,
-    organizationId: string,
-    warehouseLocationId: string,
     userId: string,
     palletAssignments: PalletAssignment[],
 ) {

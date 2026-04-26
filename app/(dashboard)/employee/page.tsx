@@ -193,7 +193,7 @@ export default function EmployeeHomePage() {
 
     const { data: storageSpaces } = useEmployeeStorageSpaces(locationId);
     const { data: stats } = useEmployeeStats(
-        userInfo?.userId ?? "",
+        userInfo?.id ?? "",
         locationId,
     );
 

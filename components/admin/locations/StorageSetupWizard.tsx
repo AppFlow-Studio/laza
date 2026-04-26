@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useCreateStorageSpace, useBulkAssignItems } from '@/lib/hooks/queries/useStorageSetup';
+import { useUpdateStorageSpace } from '@/lib/hooks/queries/useStorageSpace';
 import StorageSpaceFormStep from './StorageSpaceFormStep';
 import ItemAssignmentStep from './ItemAssignmentStep';
 import { Button } from '@/components/ui/button';
@@ -20,22 +21,34 @@ type Step = 1 | 2;
 export default function StorageSetupWizard({ locationId, onComplete, onClose }: StorageSetupWizardProps) {
     const [currentStep, setCurrentStep] = useState<Step>(1);
     const [createdStorageSpace, setCreatedStorageSpace] = useState<StorageSpace | null>(null);
+    const [formData, setFormData] = useState<{ name: string; temperature_type: 'frozen' | 'refrigerated' | 'dry' } | null>(null);
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
     const [itemMinQuantityOverrides, setItemMinQuantityOverrides] = useState<Record<string, number | null>>({});
 
     const createStorageSpaceMutation = useCreateStorageSpace();
+    const updateStorageSpaceMutation = useUpdateStorageSpace();
     const bulkAssignMutation = useBulkAssignItems();
 
     const handleStorageSpaceSubmit = async (data: { name: string; temperature_type: 'frozen' | 'refrigerated' | 'dry' }) => {
         try {
-            const storageSpace = await createStorageSpaceMutation.mutateAsync({
-                location_id: locationId,
-                ...data,
-            });
-            setCreatedStorageSpace(storageSpace);
+            setFormData(data);
+            if (createdStorageSpace) {
+                // Already created — just update if changed, then proceed
+                await updateStorageSpaceMutation.mutateAsync({
+                    id: createdStorageSpace.id,
+                    updates: data,
+                });
+                setCreatedStorageSpace({ ...createdStorageSpace, ...data });
+            } else {
+                const storageSpace = await createStorageSpaceMutation.mutateAsync({
+                    location_id: locationId,
+                    ...data,
+                });
+                setCreatedStorageSpace(storageSpace);
+                toast.success('Storage space created successfully');
+            }
             setCurrentStep(2);
-            toast.success('Storage space created successfully');
         } catch (error: any) {
             toast.error(error.message || 'Failed to create storage space');
         }
@@ -146,7 +159,7 @@ export default function StorageSetupWizard({ locationId, onComplete, onClose }: 
         setCurrentStep(1);
     };
 
-    const isLoading = createStorageSpaceMutation.isPending || bulkAssignMutation.isPending;
+    const isLoading = createStorageSpaceMutation.isPending || updateStorageSpaceMutation.isPending || bulkAssignMutation.isPending;
 
     return (
         <div className="flex flex-col h-full">
@@ -185,6 +198,7 @@ export default function StorageSetupWizard({ locationId, onComplete, onClose }: 
                         <StorageSpaceFormStep
                             onSubmit={handleStorageSpaceSubmit}
                             isLoading={isLoading}
+                            defaultValues={formData ?? undefined}
                         />
                     </div>
                 )}
@@ -202,6 +216,7 @@ export default function StorageSetupWizard({ locationId, onComplete, onClose }: 
                             </p>
                         </div>
                         <ItemAssignmentStep
+                            locationId={locationId}
                             selectedItems={selectedItems}
                             itemQuantities={itemQuantities}
                             itemMinQuantityOverrides={itemMinQuantityOverrides}

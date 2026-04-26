@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Package, Edit, Trash2, Check, AlertTriangle } from 'lucide-react';
+import { Package, Edit, Trash2, Check, AlertTriangle, Warehouse } from 'lucide-react';
 import { Item } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';
 import {
@@ -125,7 +125,6 @@ export default function ItemGrid({
                                 <TableHead>Category</TableHead>
                                 <TableHead>Unit</TableHead>
                                 <TableHead>Min Quantity</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -166,9 +165,17 @@ export default function ItemGrid({
                                             {item.sku || '-'}
                                         </TableCell>
                                         <TableCell>
-                                            <span className={cn("px-2 py-1 rounded-full text-xs font-medium", getCategoryColor(getCategoryName(item)))}>
-                                                {getCategoryName(item)}
-                                            </span>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={cn("px-2 py-1 rounded-full text-xs font-medium", getCategoryColor(getCategoryName(item)))}>
+                                                    {getCategoryName(item)}
+                                                </span>
+                                                {(item as any).is_warehouse_item && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600">
+                                                        <Warehouse size={10} />
+                                                        Warehouse
+                                                    </span>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-zinc-600">
                                             {item.unit_of_measure}
@@ -279,8 +286,16 @@ export default function ItemGrid({
                                         <Package className="w-5 h-5 text-indigo-600" />
                                     </div>
                                 </div>
-                                <div className={cn("px-2 py-1 rounded-full text-xs font-medium", getCategoryColor(getCategoryName(item)))}>
-                                    {getCategoryName(item)}
+                                <div className="flex items-center gap-1.5">
+                                    <div className={cn("px-2 py-1 rounded-full text-xs font-medium", getCategoryColor(getCategoryName(item)))}>
+                                        {getCategoryName(item)}
+                                    </div>
+                                    {(item as any).is_warehouse_item && (
+                                        <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600">
+                                            <Warehouse size={10} />
+                                            Warehouse
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

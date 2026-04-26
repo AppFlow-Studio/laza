@@ -75,19 +75,13 @@ export function useAssignShipmentToPallets() {
     return useMutation({
         mutationFn: ({
                          purchaseOrderId,
-                         organizationId,
-                         warehouseLocationId,
                          palletAssignments,
                      }: {
             purchaseOrderId: string;
-            organizationId: string;
-            warehouseLocationId: string;
             palletAssignments: PalletAssignment[];
         }) =>
             assignShipmentToPalletsAction(
                 purchaseOrderId,
-                organizationId,
-                warehouseLocationId,
                 user?.id ?? '',
                 palletAssignments,
             ),

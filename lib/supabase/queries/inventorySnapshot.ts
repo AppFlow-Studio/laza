@@ -55,13 +55,14 @@ export async function seedAllItemsToLocation(
 
     if (toSeed.length === 0) return;
 
-    await createInventorySnapshot(locationId, userId, toSeed);
+    await createInventorySnapshot(locationId, userId, toSeed, organizationId);
 }
 
 export async function createInventorySnapshot(
     locationId: string,
     userId: string,
     items: SnapshotItem[],
+    organizationId: string,
 ): Promise<void> {
     if (items.length === 0) return;
 
@@ -73,6 +74,7 @@ export async function createInventorySnapshot(
         location_id: locationId,
         storage_space_id: storageSpaceId,
         current_quantity: 0,
+        organization_id: organizationId,
     }));
 
     const { error: upsertError } = await supabase
