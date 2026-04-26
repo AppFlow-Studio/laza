@@ -1,6 +1,8 @@
+"use server"
+
 import type { Database } from "@/lib/supabase/types";
-import { createClient } from "@supabase/supabase-js";
-import { createWarehouseExpenseAction, getWarehouseExpensesAction } from "../actions/warehouseExpenseActions";
+import { createWarehouseExpenseAction, getWarehouseExpensesAction, getExpenseSummaryAction } from "../actions/warehouseExpenseActions";
+import { createServiceRoleClient } from "../server";
 
 type WarehouseExpense =
     Database["public"]["Tables"]["warehouse_expenses"]["Row"];
@@ -21,6 +23,7 @@ export interface WarehouseExpenseFilters {
     purchaseOrderId?: string;
     dateFrom?: string;
     dateTo?: string;
+    warehouseLocationId?: string;
 }
 
 export interface ExpenseSummary {
@@ -59,12 +62,8 @@ export async function createWarehouseExpense(
 export async function getExpenseSummary(
     organizationId: string,
     dateRange?: { from: string; to: string },
+    warehouseLocationId?: string,
 ): Promise<ExpenseSummary[]> {
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    );
-
     const now = new Date();
     const from =
         dateRange?.from ??
@@ -77,18 +76,24 @@ export async function getExpenseSummary(
             .toISOString()
             .split("T")[0];
 
-    const { data, error } = await supabase
+    let query = supabase
         .from("warehouse_expenses")
         .select("expense_type, amount")
         .eq("organization_id", organizationId)
         .gte("expense_date", from)
         .lte("expense_date", to);
 
+    if (warehouseLocationId) {
+        query = query.eq("warehouse_location_id", warehouseLocationId);
+    }
+
+    const { data, error } = await query;
+
     if (error) throw error;
 
     // Aggregate client-side — avoids needing a view or RPC for a simple sum
     const summaryMap = new Map<ExpenseType, ExpenseSummary>();
-    for (const row of data ?? []) {
+    for (const row of rows) {
         const type = row.expense_type as ExpenseType;
         const existing = summaryMap.get(type);
         if (existing) {
@@ -114,10 +119,7 @@ export async function getExpenseSummary(
 export async function getExpenseRates(
     organizationId: string,
 ): Promise<ExpenseRate[]> {
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    );
+    const supabase = createServiceRoleClient()
 
     const { data, error } = await supabase
         .from("warehouse_expense_rates")
@@ -139,19 +141,19 @@ export async function updateExpenseRate(
     expenseType: ExpenseType,
     newRate: number,
 ): Promise<ExpenseRate> {
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    );
+    const supabase = createServiceRoleClient()
 
     const { data, error } = await supabase
         .from("warehouse_expense_rates")
         .upsert(
-            { organization_id: organizationId, expense_type: expenseType, default_rate: newRate },
+            {
+                organization_id: organizationId,
+                expense_type: expenseType,
+                default_rate: newRate,
+                rate_unit: "per_pallet",
+            },
             { onConflict: "organization_id,expense_type" },
         )
-        .eq("organization_id", organizationId)
-        .eq("expense_type", expenseType)
         .select()
         .single();
 

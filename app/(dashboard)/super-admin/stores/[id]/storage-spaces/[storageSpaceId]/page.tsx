@@ -8,9 +8,9 @@ import {
     Package,
     History,
     AlertTriangle,
-    Eye,
     Grid,
     List,
+    Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
@@ -19,13 +19,17 @@ import {
     useInventoryByStorageSpace,
     useInventoryLogsByStorageSpace,
 } from "@/lib/hooks/queries/useStorageSpace";
+import { useBulkAssignItems } from "@/lib/hooks/queries/useStorageSetup";
 import { useCategories } from "@/lib/hooks/queries/useCategories";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import SearchBar from "@/components/admin/shared/SearchBar";
 import FilterDropdown from "@/components/admin/shared/FilterDropdown";
 import InventoryLogsList from "@/components/admin/locations/InventoryLogsList";
+import MobileSheet from "@/components/admin/shared/MobileSheet";
+import AddItemsToStorageSpace from "@/components/admin/locations/AddItemsToStorageSpace";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import toast from "react-hot-toast";
 
 export default function SuperAdminStorageSpaceDetailPage() {
     const params = useParams();
@@ -44,17 +48,66 @@ export default function SuperAdminStorageSpaceDetailPage() {
 
     const { data: storageSpace, isLoading: storageSpaceLoading } =
         useStorageSpace(storageSpaceId);
-    const { data: inventory, isLoading: inventoryLoading } =
+    const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } =
         useInventoryByStorageSpace(storageSpaceId);
     const { data: logs, isLoading: logsLoading, refetch: refetchLogs } =
         useInventoryLogsByStorageSpace(storageSpaceId, 50);
     const { data: categories } = useCategories();
+    const bulkAssignMutation = useBulkAssignItems();
 
     const [activeTab, setActiveTab] = useState("items");
     const [viewMode, setViewMode] = useState<"grid" | "list">("list");
     const [searchQuery, setSearchQuery] = useState("");
     const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+    const [showAddItems, setShowAddItems] = useState(false);
+    const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+    const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
+    const [itemMinQuantityOverrides, setItemMinQuantityOverrides] = useState<Record<string, number | null>>({});
     const debouncedSearch = useDebounce(searchQuery, 300);
+
+    const existingItemIds = new Set(inventory?.map((inv: any) => inv.item_id) || []);
+
+    const handleItemToggle = (itemId: string) => {
+        const newSelected = new Set(selectedItems);
+        if (newSelected.has(itemId)) {
+            newSelected.delete(itemId);
+            const newQty = { ...itemQuantities };
+            const newOverrides = { ...itemMinQuantityOverrides };
+            delete newQty[itemId];
+            delete newOverrides[itemId];
+            setItemQuantities(newQty);
+            setItemMinQuantityOverrides(newOverrides);
+        } else {
+            newSelected.add(itemId);
+            setItemQuantities({ ...itemQuantities, [itemId]: 0 });
+            setItemMinQuantityOverrides({ ...itemMinQuantityOverrides, [itemId]: null });
+        }
+        setSelectedItems(newSelected);
+    };
+
+    const handleAddItems = async () => {
+        if (!storageSpace || selectedItems.size === 0) return;
+        try {
+            await bulkAssignMutation.mutateAsync({
+                locationId: storageSpace.location.id,
+                storageSpaceId,
+                items: Array.from(selectedItems).map((itemId) => ({
+                    itemId,
+                    quantity: itemQuantities[itemId] || 0,
+                    minQuantityOverride: itemMinQuantityOverrides[itemId] ?? null,
+                })),
+            });
+            toast.success(`Added ${selectedItems.size} item(s) to storage space`);
+            setSelectedItems(new Set());
+            setItemQuantities({});
+            setItemMinQuantityOverrides({});
+            setShowAddItems(false);
+            refetchInventory();
+            refetchLogs();
+        } catch (error: any) {
+            toast.error(error.message || "Failed to add items");
+        }
+    };
 
     // Filter inventory items
     const filteredInventory =
@@ -188,10 +241,6 @@ export default function SuperAdminStorageSpaceDetailPage() {
                             <span className="px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-600 capitalize">
                                 {storageSpace.temperature_type}
                             </span>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600">
-                                <Eye className="w-3 h-3" />
-                                Read-only
-                            </span>
                         </div>
                         <p className="text-zinc-600">
                             {location.name} • {address.street}, {address.city},{" "}
@@ -244,29 +293,39 @@ export default function SuperAdminStorageSpaceDetailPage() {
                             </TabsTrigger>
                         </TabsList>
                         {activeTab === "items" && (
-                            <div className="flex items-center gap-1 bg-white border border-zinc-200 rounded-lg p-1">
-                                <button
-                                    onClick={() => setViewMode("grid")}
-                                    className={cn(
-                                        "p-2 rounded",
-                                        viewMode === "grid"
-                                            ? "bg-indigo-600 text-white"
-                                            : "text-zinc-600"
-                                    )}
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1 bg-white border border-zinc-200 rounded-lg p-1">
+                                    <button
+                                        onClick={() => setViewMode("grid")}
+                                        className={cn(
+                                            "p-2 rounded",
+                                            viewMode === "grid"
+                                                ? "bg-indigo-600 text-white"
+                                                : "text-zinc-600"
+                                        )}
+                                    >
+                                        <Grid className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode("list")}
+                                        className={cn(
+                                            "p-2 rounded",
+                                            viewMode === "list"
+                                                ? "bg-indigo-600 text-white"
+                                                : "text-zinc-600"
+                                        )}
+                                    >
+                                        <List className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    onClick={() => setShowAddItems(true)}
+                                    className="flex items-center gap-2"
                                 >
-                                    <Grid className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode("list")}
-                                    className={cn(
-                                        "p-2 rounded",
-                                        viewMode === "list"
-                                            ? "bg-indigo-600 text-white"
-                                            : "text-zinc-600"
-                                    )}
-                                >
-                                    <List className="w-4 h-4" />
-                                </button>
+                                    <Plus className="w-4 h-4" />
+                                    Add Items
+                                </Button>
                             </div>
                         )}
                     </div>
@@ -496,6 +555,62 @@ export default function SuperAdminStorageSpaceDetailPage() {
                     </TabsContent>
                 </Tabs>
             </div>
+
+            {/* Add Items Sheet */}
+            <MobileSheet
+                isOpen={showAddItems}
+                onClose={() => {
+                    setShowAddItems(false);
+                    setSelectedItems(new Set());
+                    setItemQuantities({});
+                }}
+                title="Add Items to Storage Space"
+                snapPoints={[0, 0.7, 0.95, 1]}
+                footer={
+                    selectedItems.size > 0 ? (
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setShowAddItems(false);
+                                    setSelectedItems(new Set());
+                                    setItemQuantities({});
+                                }}
+                                className="flex-1"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleAddItems}
+                                className="flex-1"
+                                disabled={bulkAssignMutation.isPending}
+                            >
+                                {bulkAssignMutation.isPending
+                                    ? "Adding..."
+                                    : `Add ${selectedItems.size} Item${selectedItems.size !== 1 ? "s" : ""}`}
+                            </Button>
+                        </div>
+                    ) : undefined
+                }
+            >
+                {storageSpace && (
+                    <AddItemsToStorageSpace
+                        locationId={storageSpace.location.id}
+                        existingItemIds={existingItemIds}
+                        selectedItems={selectedItems}
+                        itemQuantities={itemQuantities}
+                        itemMinQuantityOverrides={itemMinQuantityOverrides}
+                        onItemToggle={handleItemToggle}
+                        onQuantityChange={(itemId, qty) =>
+                            setItemQuantities({ ...itemQuantities, [itemId]: qty })
+                        }
+                        onMinQuantityOverrideChange={(itemId, override) =>
+                            setItemMinQuantityOverrides({ ...itemMinQuantityOverrides, [itemId]: override })
+                        }
+                        isLoading={bulkAssignMutation.isPending}
+                    />
+                )}
+            </MobileSheet>
         </div>
     );
 }

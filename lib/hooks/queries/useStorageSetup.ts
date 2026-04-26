@@ -26,7 +26,6 @@ export function useCreateStorageSpace() {
 export function useBulkAssignItems() {
     const queryClient = useQueryClient();
     const { data: userInfo } = useUserInfo();
-    console.log(userInfo);
     return useMutation({
         mutationFn: (data: {
             locationId: string;

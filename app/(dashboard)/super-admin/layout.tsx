@@ -65,14 +65,12 @@ const navigation = [
     },
     { name: "Orders", href: "/super-admin/orders", icon: StretchHorizontal },
     { name: "Users", href: "/super-admin/users", icon: Users },
-    { name: "Items", href: "/super-admin/items", icon: Package },
-    { name: "Categories", href: "/super-admin/categories", icon: Tags },
     // { name: "Inventory", href: "/super-admin/inventory", icon: BarChart3 },
-    {
-        name: "Settings",
-        href: "/super-admin/settings/notifications",
-        icon: Settings,
-    },
+    // {
+    //     name: "Settings",
+    //     href: "/super-admin/settings/notifications",
+    //     icon: Settings,
+    // },
 ];
 
 const warehouseChildren = [
@@ -92,6 +90,11 @@ const warehouseChildren = [
         href: "/super-admin/warehouse/pallets",
         icon: ArrowsUpFromLine,
     },
+];
+
+const catalogChildren = [
+    { name: "Items", href: "/super-admin/items", icon: Package },
+    { name: "Categories", href: "/super-admin/categories", icon: Tags },
 ];
 
 const analyticsChildren = [
@@ -116,18 +119,22 @@ function CollapsibleNavGroup({
     label,
     icon: Icon,
     basePath,
+    activePaths,
     children,
     pathname,
 }: {
     label: string;
     icon: React.ElementType;
     basePath: string;
+    activePaths?: string[];
     children: { name: string; href: string; icon: React.ElementType }[];
     pathname: string;
 }) {
     const { state } = useSidebar();
     const isCollapsed = state === "collapsed";
-    const isOnSection = pathname?.startsWith(basePath);
+    const isOnSection = activePaths
+        ? activePaths.some((p) => pathname?.startsWith(p))
+        : pathname?.startsWith(basePath);
     const [open, setOpen] = useState(isOnSection);
 
     useEffect(() => {
@@ -217,6 +224,9 @@ export default function SuperAdminLayout({
         analyticsChildren.find(
             (c) => pathname === c.href || pathname?.startsWith(c.href + "/"),
         ) ??
+        catalogChildren.find(
+            (c) => pathname === c.href || pathname?.startsWith(c.href + "/"),
+        ) ??
         navigation.find(
             (item) =>
                 pathname === item.href || pathname?.startsWith(item.href + "/"),
@@ -288,6 +298,16 @@ export default function SuperAdminLayout({
                                             icon={LineChart}
                                             basePath="/super-admin/analytics"
                                             children={analyticsChildren}
+                                            pathname={pathname}
+                                        />
+
+                                        {/* Catalog */}
+                                        <CollapsibleNavGroup
+                                            label="Catalog"
+                                            icon={Package}
+                                            basePath="/super-admin/items"
+                                            activePaths={["/super-admin/items", "/super-admin/categories"]}
+                                            children={catalogChildren}
                                             pathname={pathname}
                                         />
 

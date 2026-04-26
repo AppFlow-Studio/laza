@@ -33,8 +33,12 @@ import {
     useTicket,
     useFulfillTicket,
     usePartialFulfillTicket,
+    useTicketItemCosts,
 } from "@/lib/hooks/queries/useOrderTickets";
-import { useWarehouseOverview } from "@/lib/hooks/queries/useWarehouse";
+import {
+    useWarehouseInventory,
+    useWarehouseLocation,
+} from "@/lib/hooks/queries/useWarehouse";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { RejectTicketDialog } from "@/components/orders/RejectTicketDialog";
 import {
@@ -62,6 +66,8 @@ type TicketItem = {
     quantity_units: number;
     fulfilled_boxes: number | null;
     fulfilled_units: number | null;
+    unit_price_at_time: number | null;
+    price_locked_at: string | null;
     items: {
         id: number;
         name: string;
@@ -110,9 +116,9 @@ type Ticket = {
 
 type WarehouseStockRow = {
     item_id: number;
-    total_boxes: number;
-    display_label: string;
-    unit_of_measure: string;
+    box_count: number;
+    total_pieces: number | null;
+    item_name: string;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -155,8 +161,9 @@ function getStockStatus(
     stockMap: Map<number, number>,
 ): "ok" | "partial" | "none" {
     const stock = stockMap.get(line.item_id) ?? 0;
+    console.log(stock, line)
     if (stock === 0) return "none";
-    if (stock < line.quantity_boxes) return "partial";
+    if (stock < line.quantity_units) return "partial";
     return "ok";
 }
 
@@ -446,111 +453,169 @@ function AvailabilityBanner({
 
 // ── Items table ───────────────────────────────────────────────────────────────
 function ItemsTable({
-    lines,
+    ticket,
     stockMap,
+    costMap,
 }: {
-    lines: TicketItem[];
+    ticket: Ticket;
     stockMap: Map<number, number>;
+    costMap: Map<number, number>;
 }) {
+    const { status, order_ticket_items: lines } = ticket;
+    const isPriceLocked = status !== "draft";
+    const isActionable = status === "submitted" || status === "processing";
+
+    const priceLockTimestamp = lines.find((i) => i.price_locked_at)?.price_locked_at;
+
+    // Columns: Item | Unit price | Qty | Line total | Unit cost | Line cost | Margin | [Stock]
+    const cols = isActionable
+        ? "1fr 95px 75px 90px 90px 90px 105px 80px 90px"
+        : "1fr 95px 75px 90px 90px 90px 105px 80px";
+    const headers = isActionable
+        ? ["Item", "Unit price", "Qty Boxes","Qty Units", "Line total", "Unit cost", "Line cost", "Margin", "Stock"]
+        : ["Item", "Unit price", "Qty Boxes","Qty Units", "Line total", "Unit cost", "Line cost", "Margin"];
+
+    const fmt = (n: number) =>
+        new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+
+    const totalBilled = lines.reduce((sum, item) => {
+        if (!item.unit_price_at_time) return sum;
+        const qty = item.fulfilled_units ?? item.quantity_units;
+        return sum + item.unit_price_at_time * qty;
+    }, 0);
+
+    console.log('map',costMap)
+    const totalCost = lines.reduce((sum, item) => {
+        const unitCost = costMap.get(item.item_id);
+        console.log('item', item)
+        if (!unitCost) return sum;
+        const qty = item.fulfilled_units ?? item.quantity_units;
+        return sum + unitCost * qty;
+    }, 0);
+    console.log('totalCost', totalCost)
+
+    const totalMargin = totalBilled - totalCost;
+    const marginPct = totalCost > 0 ? (totalMargin / totalCost) * 100 : null;
+
+    console.log(totalCost, totalBilled, totalMargin, marginPct);
     return (
-        <div className="border border-gray-200 rounded-xl overflow-hidden">
-            <div
-                className="grid gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100"
-                style={{ gridTemplateColumns: "1fr 100px 100px 130px 90px" }}
-            >
-                {[
-                    "Item",
-                    "Requested",
-                    "Units req.",
-                    "Warehouse stock",
-                    "Status",
-                ].map((h) => (
-                    <span
-                        key={h}
-                        className="text-[10px] font-bold uppercase tracking-widest text-gray-400"
-                    >
-                        {h}
+        <div className="flex flex-col gap-2">
+            {/* Prices locked callout */}
+            {isPriceLocked && priceLockTimestamp && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                    <svg className="w-3.5 h-3.5 flex-shrink-0 text-amber-600" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 1a3.5 3.5 0 0 0-3.5 3.5V6H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1.5V4.5A3.5 3.5 0 0 0 8 1zm-2 3.5a2 2 0 1 1 4 0V6H6V4.5z" />
+                    </svg>
+                    <span>
+                        Prices locked on{" "}
+                        <strong>
+                            {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(priceLockTimestamp))}
+                        </strong>{" "}
+                        at{" "}
+                        <strong>
+                            {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(priceLockTimestamp))}
+                        </strong>
                     </span>
-                ))}
-            </div>
-            {lines.map((line) => {
-                const stockStatus = getStockStatus(line, stockMap);
-                const stock = stockMap.get(line.item_id) ?? 0;
-                const name =
-                    line.items?.short_label ?? line.items?.name ?? "Unknown";
-                const sku = line.items?.sku;
-                const rowBg =
-                    stockStatus === "ok"
-                        ? "bg-green-50/50"
+                </div>
+            )}
+
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+                {/* Header */}
+                <div className="grid gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100" style={{ gridTemplateColumns: cols }}>
+                    {headers.map((h) => (
+                        <span key={h} className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{h}</span>
+                    ))}
+                </div>
+
+                {/* Rows */}
+                {lines.map((line) => {
+                    console.log(line)
+                    const name = line.items?.short_label ?? line.items?.name ?? "Unknown";
+                    const sku = line.items?.sku;
+                    const qtyUnits = line.fulfilled_units ?? line.quantity_units;
+                    const qtyBox = line.fulfilled_boxes ?? line.quantity_boxes;
+                    const unitPrice = line.unit_price_at_time;
+                    const lineTotal = line.line_total;
+                    const unitCost = line.unit_cost_at_time;
+                    const lineCost = line.line_cost;
+                    const margin = lineTotal != null && lineCost != null ? lineTotal - lineCost : null;
+
+                    const stockStatus = getStockStatus(line, stockMap);
+                    const stockPill = stockStatus === "ok"
+                        ? <span className="text-[10px] font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Available</span>
                         : stockStatus === "partial"
-                          ? "bg-amber-50/50"
-                          : "bg-red-50/50";
-                const stockContent =
-                    stockStatus === "ok" ? (
-                        <div className="flex items-center gap-1.5 text-green-700 font-semibold text-sm">
-                            <CheckCircle2 size={13} className="flex-shrink-0" />
-                            {stock} boxes
-                        </div>
-                    ) : stockStatus === "partial" ? (
-                        <div className="flex items-center gap-1.5 text-amber-700 font-semibold text-sm">
-                            <AlertCircle size={13} className="flex-shrink-0" />
-                            {stock} boxes
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-1.5 text-red-600 font-semibold text-sm">
-                            <XCircle size={13} className="flex-shrink-0" />0
-                            boxes
-                        </div>
-                    );
-                const pill =
-                    stockStatus === "ok" ? (
-                        <span className="text-[10px] font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                            Available
-                        </span>
-                    ) : stockStatus === "partial" ? (
-                        <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                            Partial
-                        </span>
-                    ) : (
-                        <span className="text-[10px] font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
-                            No stock
-                        </span>
-                    );
-                return (
-                    <div
-                        key={line.id}
-                        className={`grid gap-3 items-center px-4 py-3 border-b border-gray-50 last:border-0 ${rowBg}`}
-                        style={{
-                            gridTemplateColumns: "1fr 100px 100px 130px 90px",
-                        }}
-                    >
-                        <div>
-                            <div className="text-sm font-semibold text-gray-900">
-                                {name}
+                        ? <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Partial</span>
+                        : <span className="text-[10px] font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">No stock</span>;
+
+                    const rowBg = isActionable
+                        ? stockStatus === "ok" ? "bg-green-50/30" : stockStatus === "partial" ? "bg-amber-50/30" : "bg-red-50/30"
+                        : "";
+
+                    return (
+                        <div
+                            key={line.id}
+                            className={`grid gap-3 items-center px-4 py-3 border-b border-gray-50 last:border-0 ${rowBg}`}
+                            style={{ gridTemplateColumns: cols }}
+                        >
+                            <div>
+                                <div className="text-sm font-semibold text-gray-900">{name}</div>
+                                {sku && (
+                                    <div style={{ fontFamily: "var(--font-mono, monospace)" }} className="text-[10px] text-gray-400 mt-0.5">
+                                        {sku}
+                                    </div>
+                                )}
                             </div>
-                            {sku && (
-                                <div
-                                    style={{
-                                        fontFamily:
-                                            "var(--font-mono, monospace)",
-                                    }}
-                                    className="text-[10px] text-gray-400 mt-0.5"
-                                >
-                                    {sku}
-                                </div>
-                            )}
+                            <div className="text-sm font-medium text-gray-700">
+                                {unitPrice != null ? fmt(unitPrice) : <span className="text-gray-300">—</span>}
+                            </div>
+                            <div className="text-sm text-gray-600">{qtyBox} boxes</div>
+                            <div className="text-sm text-gray-600">{qtyUnits} units</div>
+                            <div className="text-sm font-semibold text-gray-900">
+                                {lineTotal != null ? fmt(lineTotal) : <span className="text-gray-300">—</span>}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                                {unitCost != null ? fmt(unitCost) : <span className="text-gray-300">—</span>}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                                {lineCost != null ? fmt(lineCost) : <span className="text-gray-300">—</span>}
+                            </div>
+                            <div className={`text-sm font-semibold ${margin != null ? (margin > 0 ? "text-green-600" : "text-red-500") : "text-gray-300"}`}>
+                                {margin != null ? fmt(margin) : "—"}
+                            </div>
+                            {isActionable && <div>{stockPill}</div>}
                         </div>
-                        <div className="text-sm font-medium text-gray-700">
-                            {line.quantity_boxes} boxes
+                    );
+                })}
+
+                {/* Footer */}
+                {isPriceLocked && (
+                    <div
+                        className="grid gap-3 items-center px-4 py-3 bg-gray-50 border-t border-gray-100"
+                        style={{ gridTemplateColumns: cols }}
+                    >
+                        <div className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                            {status === "fulfilled" || status === "confirmed" ? "Total billed" : "Subtotal"}
                         </div>
-                        <div className="text-sm text-gray-500">
-                            {line.quantity_units} units
+                        <div />
+                        <div />
+                        <div />
+                        <div className="text-sm font-bold text-gray-900">{totalBilled > 0 ? fmt(totalBilled) : ""}</div>
+                        <div />
+                        <div className="text-sm font-semibold text-gray-700">{totalCost > 0 ? fmt(totalCost) : ""}</div>
+                        <div className={`text-sm font-bold ${totalMargin > 0 ? "text-green-600" : totalMargin < 0 ? "text-red-500" : "text-gray-400"}`}>
+                            {totalCost > 0 ? (
+                                <>
+                                    {fmt(totalMargin)}{" "}
+                                    {marginPct != null && (
+                                        <span className="text-[10px] font-semibold">({marginPct.toFixed(1)}%)</span>
+                                    )}
+                                </>
+                            ) : ""}
                         </div>
-                        <div>{stockContent}</div>
-                        <div>{pill}</div>
+                        {isActionable && <div />}
                     </div>
-                );
-            })}
+                )}
+            </div>
         </div>
     );
 }
@@ -605,6 +670,7 @@ export default function SuperAdminTicketDetailPage() {
     const ticketId = params.id as string;
 
     const { data: userInfo } = useUserInfo();
+    const { data: warehouseLocation } = useWarehouseLocation();
 
     const {
         data: rawTicket,
@@ -613,12 +679,15 @@ export default function SuperAdminTicketDetailPage() {
     } = useTicket(ticketId);
     const ticket = rawTicket as Ticket | undefined;
 
-    const warehouseLocationId = ticket?.warehouse_location_id ?? "";
+    const warehouseLocationId =
+        warehouseLocation?.id ?? ticket?.warehouse_location_id ?? "";
     const {
         data: warehouseStock,
         isLoading: stockLoading,
         refetch: refetchStock,
-    } = useWarehouseOverview(warehouseLocationId, "box");
+    } = useWarehouseInventory(warehouseLocationId);
+
+    console.log("stock" , warehouseStock)
 
     const { mutate: fulfillAll, isPending: isFulfillingAll } =
         useFulfillTicket();
@@ -631,10 +700,24 @@ export default function SuperAdminTicketDetailPage() {
     const stockMap = useMemo(() => {
         const map = new Map<number, number>();
         (warehouseStock as WarehouseStockRow[] | undefined)?.forEach((row) => {
-            map.set(row.item_id, row.total_boxes);
+            const pieces = row.total_pieces ?? 0;
+            map.set(row.item_id, (map.get(row.item_id) ?? 0) + pieces);
         });
         return map;
     }, [warehouseStock]);
+
+    const itemIds = useMemo(
+        () => ticket?.order_ticket_items.map((i) => i.item_id) ?? [],
+        [ticket],
+    );
+    const { data: itemCosts = [] } = useTicketItemCosts(itemIds, itemIds.length > 0);
+    const costMap = useMemo(() => {
+        const map = new Map<number, number>();
+        itemCosts.forEach((r) => {
+            if (r.current_unit_cost != null) map.set(r.id, r.current_unit_cost);
+        });
+        return map;
+    }, [itemCosts]);
 
     const lines = ticket?.order_ticket_items ?? [];
     const allOk =
@@ -896,7 +979,7 @@ export default function SuperAdminTicketDetailPage() {
                         />
                     )}
 
-                    <ItemsTable lines={lines} stockMap={stockMap} />
+                    <ItemsTable ticket={ticket} stockMap={stockMap} costMap={costMap} />
 
                     {isActionable && (
                         <p className="text-[11px] text-gray-400 leading-relaxed">

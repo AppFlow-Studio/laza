@@ -6,12 +6,15 @@ import { Location, StorageSpace } from '../types';
 export async function getEmployeeLocation(userId: string) {
     const supabase = await createServerSupabaseClient();
 
-    // Get user's assigned location from junction table
+    // Get a user's assigned location from the junction table
     const { data: assignment, error: assignmentError } = await supabase
         .from('user_location_assignments')
         .select('location_id')
         .eq('user_id', userId)
+        .limit(1)
         .single();
+
+    console.log(assignment)
 
     if (assignmentError) throw assignmentError;
     if (!assignment?.location_id) {
@@ -146,7 +149,7 @@ export async function getEmployeeStats(userId: string, locationId: string) {
         .eq('location_id', locationId)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
     // Get items managed count
     const { count: itemsManaged } = await supabase

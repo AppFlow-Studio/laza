@@ -820,7 +820,7 @@ function MostOrderedItems({
 
 export default function AnalyticsDashboardPage() {
     const { data: userInfo } = useUserInfo();
-    const orgId = userInfo?.organizationId ?? "";
+    const orgId = userInfo?.members?.organization_id ?? "";
     const [preset, setPreset] = useState<DateRangePreset>("this_month");
     const [customRange, setCustomRange] = useState<DateRange>({});
     const dateRange = useMemo<DateRange>(

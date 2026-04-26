@@ -17,9 +17,10 @@ type StorageSpaceFormData = z.infer<typeof storageSpaceSchema>;
 interface StorageSpaceFormStepProps {
     onSubmit: (data: StorageSpaceFormData) => void;
     isLoading?: boolean;
+    defaultValues?: Partial<StorageSpaceFormData>;
 }
 
-export default function StorageSpaceFormStep({ onSubmit, isLoading }: StorageSpaceFormStepProps) {
+export default function StorageSpaceFormStep({ onSubmit, isLoading, defaultValues }: StorageSpaceFormStepProps) {
     const {
         register,
         handleSubmit,
@@ -27,8 +28,8 @@ export default function StorageSpaceFormStep({ onSubmit, isLoading }: StorageSpa
     } = useForm<StorageSpaceFormData>({
         resolver: zodResolver(storageSpaceSchema),
         defaultValues: {
-            name: '',
-            temperature_type: 'dry',
+            name: defaultValues?.name ?? '',
+            temperature_type: defaultValues?.temperature_type ?? 'dry',
         },
         mode: 'onChange',
     });

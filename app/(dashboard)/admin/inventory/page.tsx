@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useLocations } from '@/lib/hooks/queries/useLocations';
+import { useState } from 'react';
 import { useInventoryByLocation } from '@/lib/hooks/queries/useInventory';
 import { useItems } from '@/lib/hooks/queries/useItems';
 import InventoryMatrix from '@/components/admin/inventory/InventoryMatrix';
@@ -10,43 +9,23 @@ import MobileSheet from '@/components/admin/shared/MobileSheet';
 import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import { useLocationWithDetails } from '@/lib/hooks/queries/useLocations';
 import { useAdminStore } from '@/lib/stores/adminStore';
-import FilterDropdown from '@/components/admin/shared/FilterDropdown';
-import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
-// import { useInventorySubscription } from '@/lib/supabase/subscriptions';
 
 export default function InventoryPage() {
-    const { selectedLocationId, setSelectedLocationId } = useAdminStore();
-    const { data: locations } = useLocations();
+    const { selectedLocationId } = useAdminStore();
     const { data: locationDetails, isLoading: locationLoading } = useLocationWithDetails(selectedLocationId);
     const { data: inventory, isLoading: inventoryLoading } = useInventoryByLocation(selectedLocationId);
     const { data: items } = useItems();
-
-    // Real-time subscription
-    // useInventorySubscription(selectedLocationId);
 
     const [updatingCell, setUpdatingCell] = useState<{
         itemId: string;
         storageSpaceId: string | null;
     } | null>(null);
 
-    const selectedLocation = locations?.find((loc) => loc.id === selectedLocationId);
-
-    // Auto-select first location when locations are available and none is selected
-    useEffect(() => {
-        if (!selectedLocationId && locations && locations.length > 0) {
-            setSelectedLocationId(locations[0].id);
-        }
-    }, [selectedLocationId, locations, setSelectedLocationId]);
-
     const getCurrentQuantity = (itemId: string, storageSpaceId: string | null) => {
         const inv = inventory?.find(
             (i: any) => i.item_id === itemId && i.storage_space_id === storageSpaceId
         );
         return inv?.current_quantity || 0;
-    };
-
-    const handleCellClick = (itemId: string, storageSpaceId: string | null) => {
-        setUpdatingCell({ itemId, storageSpaceId });
     };
 
     if (locationLoading || inventoryLoading) {
@@ -60,48 +39,19 @@ export default function InventoryPage() {
 
     return (
         <div className="space-y-6">
-            {/* Location Selector - Always visible */}
-            <div>
-                <FilterDropdown
-                    label="Location"
-                    options={
-                        locations?.map((loc) => ({
-                            value: loc.id,
-                            label: loc.name,
-                        })) || []
-                    }
-                    value={selectedLocationId}
-                    onChange={(value) => setSelectedLocationId(value)}
-                />
-            </div>
-
-            {/* Show message if no locations exist */}
-            {(!locations || locations.length === 0) && (
+            {!selectedLocationId ? (
                 <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-zinc-200">
-                    <p className="text-zinc-500">No locations available. Please create a location to view inventory.</p>
+                    <p className="text-zinc-500">Select a location from the sidebar to view inventory.</p>
                 </div>
-            )}
-
-            {/* Show message if location is selected but no details */}
-            {selectedLocationId && !locationDetails && (
+            ) : !locationDetails ? (
                 <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-zinc-200">
                     <p className="text-zinc-500">Loading location details...</p>
                 </div>
-            )}
-
-            {/* Show message if no location is selected but locations exist */}
-            {!selectedLocationId && locations && locations.length > 0 && (
-                <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-zinc-200">
-                    <p className="text-zinc-500">Please select a location to view inventory</p>
-                </div>
-            )}
-
-            {/* Inventory Matrix - Only show when location is selected and details are loaded */}
-            {selectedLocationId && locationDetails && (
+            ) : (
                 <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
                     <div className="p-4 border-b border-zinc-200">
                         <h2 className="text-lg font-semibold text-zinc-900">
-                            {selectedLocation?.name} - Inventory Matrix
+                            {locationDetails.name} - Inventory Matrix
                         </h2>
                     </div>
                     <div className="p-4">
@@ -110,7 +60,7 @@ export default function InventoryPage() {
                                 items={items}
                                 storageSpaces={locationDetails.storage_spaces}
                                 inventory={inventory || []}
-                                onCellClick={handleCellClick}
+                                onCellClick={(itemId, storageSpaceId) => setUpdatingCell({ itemId, storageSpaceId })}
                             />
                         ) : (
                             <div className="text-center py-12 text-zinc-500">
@@ -121,7 +71,6 @@ export default function InventoryPage() {
                 </div>
             )}
 
-            {/* Update Quantity Modal */}
             {updatingCell && selectedLocationId && (
                 <MobileSheet
                     isOpen={!!updatingCell}
@@ -144,4 +93,3 @@ export default function InventoryPage() {
         </div>
     );
 }
-

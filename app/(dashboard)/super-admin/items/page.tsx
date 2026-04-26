@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from 'react';
-import { useItems } from '@/lib/hooks/queries/useItems';
+import { BulkMarkupModal } from '@/app/(dashboard)/super-admin/items/components/BulkMarkupModal';
+import { useSuperAdminItems } from '@/lib/hooks/queries/useItems';
 import ItemGrid from '@/components/admin/items/ItemGrid';
 import SearchBar from '@/components/admin/shared/SearchBar';
 import FilterDropdown from '@/components/admin/shared/FilterDropdown';
@@ -22,12 +23,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAdminStore } from '@/lib/stores/adminStore';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
-import { useDeleteItem, useBulkUpdateItems, useBulkDeleteItems } from '@/lib/hooks/queries/useItems';
+import { useSuperAdminDeleteItem, useSuperAdminBulkUpdateItems, useSuperAdminBulkDeleteItems } from '@/lib/hooks/queries/useItems';
 import toast from 'react-hot-toast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useSearchItems } from '@/lib/hooks/queries/useItems';
 import { useCategories } from '@/lib/hooks/queries/useCategories';
-import ItemForm from '@/components/admin/items/ItemForm';
+import ItemFormModal from '@/app/(dashboard)/super-admin/items/components/ItemFormModal';
 
 export default function ItemsPage() {
     const [showAddForm, setShowAddForm] = useState(false);
@@ -37,33 +38,29 @@ export default function ItemsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
-    const [bulkUpdateField, setBulkUpdateField] = useState<'min_quantity' | 'category' | 'unit' | 'all'>('all');
+    const [bulkUpdateField, setBulkUpdateField] = useState<'min_quantity' | 'category' | 'unit' | 'price' | 'warehouse' | 'all'>('all');
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+    const [bulkMarkupOpen, setBulkMarkupOpen] = useState(false);
     const debouncedSearch = useDebounce(searchQuery, 300);
     const { viewMode, setViewMode } = useAdminStore();
 
-    const { data: allItems, isLoading: allItemsLoading } = useItems();
+    const { data: allItems, isLoading: allItemsLoading } = useSuperAdminItems();
     const { data: categories, isLoading: categoriesLoading } = useCategories();
     const { data: searchResults, isLoading: searchLoading } = useSearchItems(debouncedSearch);
 
-    const deleteMutation = useDeleteItem();
-    const bulkUpdateMutation = useBulkUpdateItems();
-    const bulkDeleteMutation = useBulkDeleteItems();
+    const deleteMutation = useSuperAdminDeleteItem();
+    const bulkUpdateMutation = useSuperAdminBulkUpdateItems();
+    const bulkDeleteMutation = useSuperAdminBulkDeleteItems();
 
     const isLoading = allItemsLoading || categoriesLoading || searchLoading;
 
-    let items = allItems || [];
-    // Filter by category if selected
-    if (categoryFilter && items.length > 0) {
+    let items = (debouncedSearch ? searchResults : allItems) || [];
+    if (categoryFilter) {
         items = items.filter((item: any) => {
-            // Handle category as object (from join) or category_id
             const itemCategoryId = item.category_id
                 || (typeof item.category === 'object' && item.category !== null ? item.category.id : null);
-            return itemCategoryId?.toString() === categoryFilter;
+            return itemCategoryId?.toString() === categoryFilter?.toString();
         });
-    }
-    if (debouncedSearch) {
-        items = searchResults || [];
     }
 
     const handleFormSuccess = () => {
@@ -181,10 +178,19 @@ export default function ItemsPage() {
                     setBulkUpdateField('unit');
                     setShowBulkUpdateModal(true);
                 }}
+                onUpdatePrice={() => {
+                    setBulkUpdateField('price');
+                    setShowBulkUpdateModal(true);
+                }}
+                onUpdateWarehouse={() => {
+                    setBulkUpdateField('warehouse');
+                    setShowBulkUpdateModal(true);
+                }}
                 onBulkUpdate={() => {
                     setBulkUpdateField('all');
                     setShowBulkUpdateModal(true);
                 }}
+                onApplyMarkup={() => setBulkMarkupOpen(true)}
                 onDelete={() => setShowBulkDeleteDialog(true)}
                 onClearSelection={() => setSelectedItems(new Set())}
                 isLoading={bulkUpdateMutation.isPending || bulkDeleteMutation.isPending}
@@ -223,7 +229,7 @@ export default function ItemsPage() {
                 onClose={handleFormCancel}
                 title={editingItem ? 'Edit Item' : 'Add Item'}
             >
-                <ItemForm
+                <ItemFormModal
                     item={editingItem}
                     onSuccess={handleFormSuccess}
                     onCancel={handleFormCancel}
@@ -247,6 +253,21 @@ export default function ItemsPage() {
                     />
                 </MobileSheet>
             )}
+
+            {/* Bulk Markup Modal */}
+            <BulkMarkupModal
+                open={bulkMarkupOpen}
+                onClose={() => setBulkMarkupOpen(false)}
+                selectedItems={(allItems ?? [])
+                    .filter((item: any) => selectedItems.has(item.id))
+                    .map((item: any) => ({
+                        id: Number(item.id),
+                        name: item.name,
+                        is_warehouse_item: item.is_warehouse_item ?? false,
+                        current_unit_cost: item.current_unit_cost ?? null,
+                        item_warehouse_pricing: item.item_warehouse_pricing ?? null,
+                    }))}
+            />
 
             {/* Bulk Delete Confirmation Dialog */}
             <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>

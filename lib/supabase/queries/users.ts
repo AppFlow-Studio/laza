@@ -99,13 +99,37 @@ export async function getUserLocationAssignments(userId: string) {
 
 export async function getPendingInvitations(organizationId: string) {
     const supabase = createServiceRoleClient();
-    const { data, error } = await supabase
+
+    const { userId } = await auth();
+    if (!userId) return [];
+
+    const { data: caller } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+    let query = supabase
         .from('org_invites')
         .select('*')
         .eq('organization_id', organizationId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
+    // Admin: scope to invitations assigned to their locations
+    if (caller?.role === 'admin') {
+        const { data: assignments } = await supabase
+            .from('user_location_assignments')
+            .select('location_id')
+            .eq('user_id', userId);
+
+        const assignedIds = assignments?.map((a: any) => a.location_id) ?? [];
+        if (assignedIds.length > 0) {
+            query = query.in('assigned_location_id', assignedIds);
+        }
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     return data as OrgInvite[];
 }

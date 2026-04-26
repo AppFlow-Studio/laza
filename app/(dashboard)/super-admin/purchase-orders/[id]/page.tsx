@@ -10,10 +10,13 @@ import {
     CheckCircle2, XCircle, Clock, Anchor,
     FileText, DollarSign, Calendar, Hash,
     Boxes, AlertCircle, Pencil, PackageCheck, Warehouse,
+    Layers, ChevronRight,
 } from "lucide-react";
 import { usePurchaseOrder, useUpdatePurchaseOrderStatus, useDeletePurchaseOrder } from "@/lib/hooks/queries/usePurchaseOrders";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import toast from "react-hot-toast";
+import { usePallets } from "@/lib/hooks/queries/usePallets";
+import { format } from "date-fns";
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -130,6 +133,10 @@ export default function PurchaseOrderDetailPage({
 
     const { data: po, isLoading } = usePurchaseOrder(id);
     const deletePO = useDeletePurchaseOrder();
+    const { data: pallets = [] } = usePallets(
+        po?.warehouse?.id,
+        { purchaseOrderId: id }
+    );
 
     async function handleDelete() {
         if (!confirm("Delete this purchase order? This cannot be undone.")) return;
@@ -151,8 +158,6 @@ export default function PurchaseOrderDetailPage({
             </div>
         );
     }
-    console.log(po)
-
     if (!po) {
         return (
             <div className="text-center py-16">
@@ -186,8 +191,6 @@ export default function PurchaseOrderDetailPage({
 
 
     const displayItems = freeTextItems.length > 0 ? freeTextItems : [];
-
-    console.log(displayItems)
 
     return (
         <div className="space-y-6 max-w-6xl">
@@ -341,6 +344,46 @@ export default function PurchaseOrderDetailPage({
                     </div>
                 );
             })()}
+
+            {/* Pallets — only shown when received and pallets exist */}
+            {status === "received" && pallets.length > 0 && (
+                <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-zinc-100 flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-zinc-400" />
+                        <h2 className="text-sm font-semibold text-zinc-700">Pallets</h2>
+                        <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-zinc-100 text-zinc-500 text-xs">
+                            {pallets.length}
+                        </span>
+                    </div>
+                    <div className="divide-y divide-zinc-100">
+                        {pallets.map((pallet) => (
+                            <Link
+                                key={pallet.id}
+                                href={`/super-admin/warehouse/${po.warehouse.id}/pallets/${pallet.id}`}
+                                className="flex items-center justify-between px-6 py-3 hover:bg-zinc-50 transition-colors group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 group-hover:bg-indigo-100 transition-colors">
+                                        <Layers className="h-4 w-4 text-zinc-400 group-hover:text-indigo-500 transition-colors" />
+                                    </div>
+                                    <div>
+                                        <p className="font-mono text-sm font-semibold text-zinc-900">
+                                            {pallet.pallet_label}
+                                        </p>
+                                        <p className="text-xs text-zinc-400">
+                                            {pallet.total_boxes ?? 0} boxes
+                                            {pallet.received_at
+                                                ? ` · received ${format(new Date(pallet.received_at), "MMM d, yyyy")}`
+                                                : ""}
+                                        </p>
+                                    </div>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-zinc-300 group-hover:text-indigo-400 transition-colors" />
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Danger zone — only for draft */}
             {status === "draft" && (

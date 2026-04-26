@@ -91,6 +91,7 @@ export async function updateQuantity({
         storage_space_id: storageSpaceId,
         current_quantity: newQuantity,
         last_updated: new Date().toISOString(),
+        ...(organizationId ? { organization_id: organizationId } : {}),
     };
 
     // Include min_quantity_override if provided
@@ -256,7 +257,7 @@ export async function getAlerts(filters?: {
     return enrichedAlerts;
 }
 
-export async function getLowStockItems(groupBy: 'location' | 'item' = 'location') {
+export async function getLowStockItems(organizationId: string, groupBy: 'location' | 'item' = 'location') {
     const supabase = await createServerSupabaseClient();
 
     // Query item_locations with effective min quantity calculation
@@ -268,6 +269,7 @@ export async function getLowStockItems(groupBy: 'location' | 'item' = 'location'
             locations (*),
             storage_spaces (*)
         `)
+        .eq('organization_id', organizationId)
         .not('storage_space_id', 'is', null);
 
     if (error) throw error;
@@ -456,6 +458,7 @@ export async function bulkUpdateInventory(
             storage_space_id: itemLoc.storageSpaceId,
             current_quantity: newQuantity,
             last_updated: new Date().toISOString(),
+            ...(organizationId ? { organization_id: organizationId } : {}),
         };
 
         if (itemLoc.minQuantityOverride !== undefined) {

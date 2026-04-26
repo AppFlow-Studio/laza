@@ -193,7 +193,7 @@ export type Database = {
           {
             foreignKeyName: "daily_summary_preferences_organization_id_fkey"
             columns: ["organization_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
@@ -519,6 +519,55 @@ export type Database = {
           },
         ]
       }
+      item_warehouse_pricing: {
+        Row: {
+          created_at: string
+          currency: string
+          item_id: number
+          updated_at: string
+          updated_by: string
+          warehouse_transfer_price: number
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          item_id: number
+          updated_at?: string
+          updated_by: string
+          warehouse_transfer_price: number
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          item_id?: number
+          updated_at?: string
+          updated_by?: string
+          warehouse_transfer_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_warehouse_pricing_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "item_box_totals"
+            referencedColumns: ["item_id"]
+          },
+          {
+            foreignKeyName: "item_warehouse_pricing_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_warehouse_pricing_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       items: {
         Row: {
           barcode_text: string | null
@@ -529,6 +578,7 @@ export type Database = {
           created_at: string
           current_unit_cost: number | null
           id: number
+          is_warehouse_item: boolean
           min_quantity: number | null
           name: string | null
           organization_id: string | null
@@ -546,6 +596,7 @@ export type Database = {
           created_at?: string
           current_unit_cost?: number | null
           id?: number
+          is_warehouse_item?: boolean
           min_quantity?: number | null
           name?: string | null
           organization_id?: string | null
@@ -563,6 +614,7 @@ export type Database = {
           created_at?: string
           current_unit_cost?: number | null
           id?: number
+          is_warehouse_item?: boolean
           min_quantity?: number | null
           name?: string | null
           organization_id?: string | null
@@ -1010,7 +1062,7 @@ export type Database = {
           {
             foreignKeyName: "notification_preferences_organization_id_fkey"
             columns: ["organization_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
@@ -1200,6 +1252,7 @@ export type Database = {
           requesting_location_id: string
           status: string
           submitted_at: string | null
+          title: string | null
           updated_at: string
           warehouse_location_id: string
         }
@@ -1221,6 +1274,7 @@ export type Database = {
           requesting_location_id: string
           status?: string
           submitted_at?: string | null
+          title?: string | null
           updated_at?: string
           warehouse_location_id: string
         }
@@ -1242,6 +1296,7 @@ export type Database = {
           requesting_location_id?: string
           status?: string
           submitted_at?: string | null
+          title?: string | null
           updated_at?: string
           warehouse_location_id?: string
         }
@@ -2180,6 +2235,7 @@ export type Database = {
       }
       users: {
         Row: {
+          assigned_location_id: string | null
           avatar_url: string | null
           created_at: string
           email: string | null
@@ -2192,6 +2248,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          assigned_location_id?: string | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
@@ -2204,6 +2261,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          assigned_location_id?: string | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
@@ -2215,7 +2273,15 @@ export type Database = {
           role?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_assigned_location_id_fkey"
+            columns: ["assigned_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       warehouse_expense_rates: {
         Row: {
@@ -2726,24 +2792,15 @@ export type Database = {
         }
         Returns: Json
       }
-      fulfill_order_ticket:
-        | {
-            Args: {
-              p_admin_user_id: string
-              p_allow_partial: boolean
-              p_delivery_type: string
-              p_ticket_id: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_admin_user_id: string
-              p_delivery_type?: string
-              p_ticket_id: string
-            }
-            Returns: Json
-          }
+      fulfill_order_ticket: {
+        Args: {
+          p_admin_user_id: string
+          p_allow_partial: boolean
+          p_delivery_type: string
+          p_ticket_id: string
+        }
+        Returns: Json
+      }
       fulfill_order_ticket_manual: {
         Args: {
           p_admin_user_id: string
@@ -3088,3 +3145,5 @@ export const Constants = {
     Enums: {},
   },
 } as const
+A new version of Supabase CLI is available: v2.90.0 (currently installed v2.75.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

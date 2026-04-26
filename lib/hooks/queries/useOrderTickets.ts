@@ -18,6 +18,7 @@ import {
 	getRemainderTicketsAction,
 	getAutoApprovedTicketsAction,
 	getTicketsWithDiscrepanciesAction,
+	getTicketItemCostsAction,
 } from "@/lib/supabase/actions/orderTicketActions";
 import {
 	createTicket,
@@ -30,6 +31,7 @@ import {
 	type ReceivedItem,
 } from "@/lib/supabase/queries/orderTickets";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
+import { checkWarehouseLowStockAfterFulfillment } from "@/lib/supabase/actions/warehouseLowStockActions";
 
 // ─── Query Key Factory ────────────────────────────────────────────────────────
 
@@ -80,6 +82,17 @@ export function useAllTickets(orgId: string | undefined, filters?: TicketFilters
 		queryFn:   () => getAllTicketsAction(orgId!, filters),
 		enabled:   !!orgId,
 		staleTime: 30_000,
+	});
+}
+
+// ─── useTicketItemCosts — super admin only ────────────────────────────────────
+
+export function useTicketItemCosts(itemIds: number[], enabled: boolean) {
+	return useQuery({
+		queryKey:  ["ticket-item-costs", itemIds],
+		queryFn:   () => getTicketItemCostsAction(itemIds),
+		enabled:   enabled && itemIds.length > 0,
+		staleTime: 5 * 60_000,
 	});
 }
 
@@ -173,12 +186,18 @@ export function useFulfillTicket() {
 				process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
 			);
 
+			// 4-param overload: fulfill_order_ticket(uuid, text, boolean, text)
+			// The old 3-param overload (uuid, text, text DEFAULT 'company') was dropped in
+			// migration 20260419_drop_fulfill_order_ticket_3param.sql (FIX-A3).
 			const { data, error } = await supabase.rpc("fulfill_order_ticket", {
 				p_ticket_id:     ticketId,
 				p_admin_user_id: adminUserId,
 				p_allow_partial: allowPartial,
 				p_delivery_type: deliveryType,
 			});
+
+			console.log(data, error)
+			console.log(adminUserId)
 
 			if (error) throw error;
 			return data as {
@@ -192,13 +211,21 @@ export function useFulfillTicket() {
 				}>;
 			};
 		},
-		onSuccess: (_data, variables) => {
+		onSuccess: (data, variables) => {
 			queryClient.invalidateQueries({ queryKey: ticketKeys.detail(variables.ticketId) });
 			queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
 			queryClient.invalidateQueries({ queryKey: ticketKeys.all });
 			queryClient.invalidateQueries({ queryKey: ["pallets"] });
 			queryClient.invalidateQueries({ queryKey: ["warehouse", "inventory"] });
 			queryClient.invalidateQueries({ queryKey: ["alerts"] });
+
+			// Fire-and-forget: check warehouse low stock for each fulfilled item.
+			// Errors are logged inside the action and never surface to the user.
+			const fulfilledItemIds = data.items_fulfilled.map((i) => i.item_id);
+
+			checkWarehouseLowStockAfterFulfillment(variables.ticketId, fulfilledItemIds).catch(
+				(err) => console.error("[warehouseLowStock] Unexpected error:", err),
+			);
 		},
 	});
 }

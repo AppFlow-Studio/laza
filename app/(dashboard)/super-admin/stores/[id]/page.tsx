@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import { useLocationWithDetails } from "@/lib/hooks/queries/useLocations";
 import { useEmployeesByLocation } from "@/lib/hooks/queries/useEmployees";
 import { useAlerts, useInventoryLogs } from "@/lib/hooks/queries/useInventory";
+import { useDeleteStorageSpace } from "@/lib/hooks/queries/useStorageSpace";
+import toast from "react-hot-toast";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import {
     ArrowLeft,
@@ -17,19 +19,36 @@ import {
     Snowflake,
     ArrowDownRight,
     ArrowUpRight,
+    Plus,
+    Bell,
+    Trash2,
 } from "lucide-react";
+import { LocationNotificationPreferences } from "@/components/location-notification-preferences";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import SearchBar from "@/components/admin/shared/SearchBar";
 import { Tables } from "@/lib/supabase/types";
+import MobileSheet from "@/components/admin/shared/MobileSheet";
+import StorageSetupWizard from "@/components/admin/locations/StorageSetupWizard";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type StorageSpace = Tables<"storage_spaces">;
 
 const TABS = [
-    { key: "stock", label: "In-Store Stock", icon: Package },
-    { key: "employees", label: "Employees", icon: Users },
-    { key: "audit", label: "Audit Logs", icon: Clock },
+    { key: "stock",          label: "In-Store Stock",  icon: Package },
+    { key: "employees",      label: "Employees",       icon: Users },
+    { key: "audit",          label: "Audit Logs",      icon: Clock },
+    { key: "notifications",  label: "Notifications",   icon: Bell },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -45,6 +64,9 @@ export default function SuperAdminStoreDetailPage() {
     const { data: logs } = useInventoryLogs({ locationId, limit: 100 });
 
     const [activeTab, setActiveTab] = useState<TabKey>("stock");
+    const [showStorageSetup, setShowStorageSetup] = useState(false);
+    const [pendingDelete, setPendingDelete] = useState<StorageSpace | null>(null);
+    const deleteStorageSpace = useDeleteStorageSpace();
 
     const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
 
@@ -191,6 +213,17 @@ export default function SuperAdminStoreDetailPage() {
 
                 {/* ── Stock tab ── */}
                 {activeTab === "stock" && (
+                    <div className="space-y-4">
+                    <div className="flex justify-end">
+                        <Button
+                            size="sm"
+                            onClick={() => setShowStorageSetup(true)}
+                            className="flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Add Storage
+                        </Button>
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                         {!location.storage_spaces?.length ? (
                             <div className="col-span-2 flex flex-col items-center justify-center py-16 text-center">
@@ -206,12 +239,12 @@ export default function SuperAdminStoreDetailPage() {
                             location.storage_spaces.map((space: any) => (
                                 <div
                                     key={space.id}
+                                    className="relative group bg-white border border-gray-200 rounded-xl p-4 cursor-pointer hover:border-indigo-300 hover:shadow-sm transition-all"
                                     onClick={() =>
                                         router.push(
                                             `/super-admin/stores/${locationId}/storage-spaces/${space.id}`,
                                         )
                                     }
-                                    className="bg-white border border-gray-200 rounded-xl p-4 cursor-pointer hover:border-indigo-300 hover:shadow-sm transition-all"
                                 >
                                     <div
                                         className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${
@@ -264,9 +297,19 @@ export default function SuperAdminStoreDetailPage() {
                                               ? "🌡 Refrigerated"
                                               : "☀ Dry"}
                                     </span>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPendingDelete(space);
+                                        }}
+                                        className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
                                 </div>
                             ))
                         )}
+                    </div>
                     </div>
                 )}
 
@@ -327,6 +370,11 @@ export default function SuperAdminStoreDetailPage() {
                             </p>
                         )}
                     </div>
+                )}
+
+                {/* ── Notifications tab ── */}
+                {activeTab === "notifications" && (
+                    <LocationNotificationPreferences locationId={locationId} />
                 )}
 
                 {/* ── Audit logs tab ── */}
@@ -403,6 +451,52 @@ export default function SuperAdminStoreDetailPage() {
                     </div>
                 )}
             </div>
+
+            <AlertDialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete storage space?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <strong>{pendingDelete?.name}</strong> will be permanently deleted along with all its inventory records. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                if (!pendingDelete) return;
+                                const name = pendingDelete.name;
+                                deleteStorageSpace.mutate(pendingDelete.id, {
+                                    onSuccess: () => {
+                                        setPendingDelete(null);
+                                        toast.success(`"${name}" storage space deleted successfully`);
+                                    },
+                                });
+                            }}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                            disabled={deleteStorageSpace.isPending}
+                        >
+                            {deleteStorageSpace.isPending ? "Deleting..." : "Delete"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Storage Setup Wizard */}
+            <MobileSheet
+                isOpen={showStorageSetup}
+                onClose={() => setShowStorageSetup(false)}
+                title="Setup Storage Space"
+                snapPoints={[0.7, 0.95]}
+            >
+                <StorageSetupWizard
+                    locationId={locationId}
+                    onComplete={() => {
+                        setShowStorageSetup(false);
+                    }}
+                    onClose={() => setShowStorageSetup(false)}
+                />
+            </MobileSheet>
         </div>
     );
 }

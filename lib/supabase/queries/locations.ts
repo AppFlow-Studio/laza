@@ -36,7 +36,7 @@ export async function getAllLocations(organizationId: string) {
     if (!data) return [];
 
     const callerRole = caller?.role;
-
+    console.log(callerRole)
     // Super admin sees everything
     if (callerRole === 'super_admin') return data as Location[];
 
@@ -49,6 +49,7 @@ export async function getAllLocations(organizationId: string) {
 
         const assignedIds = assignments?.map((a: any) => a.location_id) ?? [];
 
+        console.log(data, assignedIds)
         // No assignments = unscoped admin, sees all
         if (assignedIds.length === 0) return data as Location[];
 
@@ -70,8 +71,41 @@ export async function getAllLocations(organizationId: string) {
     return [];
 }
 
+async function assertLocationAccess(supabase: any, userId: string, locationId: string) {
+    const { data: caller } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+    if (caller?.role === 'super_admin') return; // full access
+
+    if (caller?.role === 'admin') {
+        const { data: assignments } = await supabase
+            .from('user_location_assignments')
+            .select('location_id')
+            .eq('user_id', userId);
+
+        const assignedIds = assignments?.map((a: any) => a.location_id) ?? [];
+        if (assignedIds.length > 0 && !assignedIds.includes(locationId)) {
+            throw new Error('Unauthorized: location not assigned to this admin');
+        }
+        return;
+    }
+
+    throw new Error('Unauthorized');
+}
+
 export async function getLocationById(id: string) {
-    const supabase = await createServerSupabaseClient();
+    const { auth } = await import('@clerk/nextjs/server');
+    const { createServiceRoleClient } = await import('../server');
+
+    const { userId } = await auth();
+    if (!userId) throw new Error('Unauthorized');
+
+    const supabase = createServiceRoleClient();
+    await assertLocationAccess(supabase, userId, id);
+
     const { data, error } = await supabase
         .from('locations')
         .select(
@@ -92,7 +126,15 @@ export async function getLocationById(id: string) {
 }
 
 export async function getLocationWithDetails(id: string) {
-    const supabase = await createServerSupabaseClient();
+    const { auth } = await import('@clerk/nextjs/server');
+    const { createServiceRoleClient } = await import('../server');
+
+    const { userId } = await auth();
+    if (!userId) throw new Error('Unauthorized');
+
+    const supabase = createServiceRoleClient();
+    await assertLocationAccess(supabase, userId, id);
+
     const { data: location, error: locationError } = await supabase
         .from('locations')
         .select(
@@ -145,6 +187,7 @@ export async function createLocation(location: {
     is_active?: boolean;
     latitude?: number | null;
     longitude?: number | null;
+    location_type?: string;
 }) {
     const { auth } = await import('@clerk/nextjs/server');
     const { userId } = await auth();
