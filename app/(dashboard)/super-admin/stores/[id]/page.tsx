@@ -32,6 +32,7 @@ import { Tables } from "@/lib/supabase/types";
 import MobileSheet from "@/components/admin/shared/MobileSheet";
 import StorageSetupWizard from "@/components/admin/locations/StorageSetupWizard";
 import StoreInventoryMatrix from "@/components/super-admin/stores/StoreInventoryMatrix";
+import NewCatalogItemsBanner from "@/components/super-admin/stores/NewCatalogItemsBanner";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -195,6 +196,13 @@ export default function SuperAdminStoreDetailPage() {
                     )}
                 </div>
             </div>
+            <NewCatalogItemsBanner
+                locationId={locationId}
+                storageSpaces={(location.storage_spaces ?? []).map((s: StorageSpace) => ({
+                    id: s.id,
+                    name: s.name ?? "",
+                }))}
+            />
             <div className="mt-6">
                 {/* Tab strip */}
                 <div className="flex gap-1 border-b border-gray-200 mb-6">
