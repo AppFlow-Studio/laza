@@ -157,17 +157,33 @@ export async function updateNotificationPreferences(
         return preferences as NotificationPreferences;
     }
 
-    // Original behaviour: update the org-wide row
-    const { data: preferences, error } = await supabase
+    // Org-wide row: try update first; if no row exists yet, create it
+    const { data: updated, error: updateError } = await supabase
         .from('notification_preferences')
         .update(updates)
         .eq('organization_id', organizationId)
         .is('location_id', null)
         .select()
+        .maybeSingle();
+
+    if (updateError) { console.log(updateError, 'error2'); throw updateError; }
+
+    if (updated) return updated as NotificationPreferences;
+
+    // No org-wide row existed — insert it with the requested fields as defaults
+    const { data: created, error: createError } = await supabase
+        .from('notification_preferences')
+        .insert({
+            organization_id: organizationId,
+            location_id: null,
+            primary_email: (updates as any).primary_email ?? '',
+            ...updates,
+        })
+        .select()
         .single();
 
-    if (error) { console.log(error, 'error2'); throw error; }
-    return preferences as NotificationPreferences;
+    if (createError) { console.log(createError, 'error2'); throw createError; }
+    return created as NotificationPreferences;
 }
 
 /**

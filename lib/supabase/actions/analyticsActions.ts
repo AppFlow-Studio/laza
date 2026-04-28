@@ -75,7 +75,12 @@ export async function getBurnRates(
 	return (data ?? []) as BurnRateRow[];
 }
 
-// ─── 4.2 — Reorder Alerts (calls RPC) ────────────────────────────────────────
+// ─── 4.2 — Reorder Alerts ────────────────────────────────────────────────────
+// Merges two sources:
+//   1. Burn-rate RPC: predictive alerts based on 90-day consumption history
+//   2. Active alerts table: threshold-crossing alerts that triggered emails
+// Items in source 1 take precedence (richer data). Items only in source 2
+// appear with avg_weekly_units=0 and weeks_remaining=null.
 
 export async function getReorderAlerts(
 	organizationId: string,
@@ -84,14 +89,101 @@ export async function getReorderAlerts(
 ): Promise<ReorderAlertRow[]> {
 	const supabase = createServiceRoleClient();
 
-	const { data, error } = await supabase.rpc("get_reorder_alerts", {
+	// ── 1. Burn-rate alerts (RPC) ────────────────────────────────────────────
+	const { data: rpcData, error: rpcError } = await supabase.rpc("get_reorder_alerts", {
 		p_organization_id: organizationId,
 		p_lead_time_days: leadTimeDays,
 		p_buffer_days: bufferDays,
 	});
 
-	if (error) throw error;
-	return (data ?? []) as ReorderAlertRow[];
+	if (rpcError) throw rpcError;
+	const burnRateAlerts = (rpcData ?? []) as ReorderAlertRow[];
+	const burnRateItemIds = new Set(burnRateAlerts.map((a) => a.item_id));
+
+	// ── 2. Threshold-based alerts from the alerts table ──────────────────────
+	const { data: activeAlerts, error: activeError } = await supabase
+		.from("alerts")
+		.select("id, item_id, location_id, items(id, name, sku)")
+		.eq("organization_id", organizationId)
+		.eq("alert_type", "low_stock")
+		.is("resolved_at", null);
+
+	if (activeError) throw activeError;
+
+	// Only process items not already covered by the burn-rate RPC
+	const newAlerts = (activeAlerts ?? []).filter(
+		(a: any) => a.item_id != null && !burnRateItemIds.has(a.item_id),
+	);
+
+	if (newAlerts.length === 0) return burnRateAlerts;
+
+	const newItemIds = [...new Set(newAlerts.map((a: any) => a.item_id as number))];
+	const newLocationIds = [...new Set(newAlerts.map((a: any) => a.location_id as string).filter(Boolean))];
+
+	// Current warehouse stock: sum total_pieces from warehouse_inventory_overview
+	const { data: stockRows } = await supabase
+		.from("warehouse_inventory_overview")
+		.select("item_id, warehouse_location_id, total_pieces, pallet_status")
+		.in("item_id", newItemIds)
+		.in("warehouse_location_id", newLocationIds)
+		.neq("pallet_status", "retired");
+
+	const stockMap = new Map<number, number>();
+	for (const row of stockRows ?? []) {
+		if (row.item_id == null) continue;
+		stockMap.set(row.item_id, (stockMap.get(row.item_id) ?? 0) + (row.total_pieces ?? 0));
+	}
+
+	// Thresholds
+	const { data: thresholdRows } = await supabase
+		.from("low_stock_thresholds")
+		.select("item_id, low_threshold, critical_threshold")
+		.eq("organization_id", organizationId)
+		.eq("is_active", true)
+		.in("item_id", newItemIds);
+
+	const threshMap = new Map<number, { low: number; critical: number | null }>();
+	for (const t of thresholdRows ?? []) {
+		if (t.item_id == null) continue;
+		// Location-specific rows overwrite org-wide; simple last-write wins here
+		// since we already filtered to the relevant org
+		threshMap.set(t.item_id, { low: t.low_threshold, critical: t.critical_threshold ?? null });
+	}
+
+	// Deduplicate by item_id (alerts table may have multiple rows per item)
+	const seenItems = new Set<number>();
+	const thresholdAlerts: ReorderAlertRow[] = [];
+
+	for (const alert of newAlerts) {
+		const itemId = alert.item_id as number;
+		if (seenItems.has(itemId)) continue;
+		seenItems.add(itemId);
+
+		const stock = stockMap.get(itemId) ?? 0;
+		const thresh = threshMap.get(itemId);
+		const item = alert.items as any;
+
+		let urgency: "critical" | "warning" | "watch" = "watch";
+		if (stock <= 0) {
+			urgency = "critical";
+		} else if (thresh?.critical != null && stock <= thresh.critical) {
+			urgency = "critical";
+		} else if (thresh != null && stock < thresh.low) {
+			urgency = "warning";
+		}
+
+		thresholdAlerts.push({
+			item_id: itemId,
+			item_name: item?.name ?? "Unknown",
+			item_sku: item?.sku ?? null,
+			avg_weekly_units: 0,
+			current_warehouse_stock: stock,
+			weeks_remaining: null,
+			urgency,
+		});
+	}
+
+	return [...burnRateAlerts, ...thresholdAlerts];
 }
 
 // ─── 4.3a — Store Order History ───────────────────────────────────────────────
