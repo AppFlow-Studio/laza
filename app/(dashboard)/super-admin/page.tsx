@@ -260,27 +260,7 @@ function ReorderAlertsPreview({ orgId }: { orgId: string }) {
                                             ).toLocaleString()}
                                         </p>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-xs text-gray-400">
-                                            Weeks left
-                                        </p>
-                                        <p
-                                            className={`text-sm font-bold ${
-                                                alert.urgency === "critical"
-                                                    ? "text-red-600"
-                                                    : alert.urgency ===
-                                                        "warning"
-                                                      ? "text-orange-600"
-                                                      : "text-yellow-600"
-                                            }`}
-                                        >
-                                            {alert.weeks_remaining != null
-                                                ? Number(
-                                                      alert.weeks_remaining,
-                                                  ).toFixed(1)
-                                                : "0"}
-                                        </p>
-                                    </div>
+
                                 </div>
                             </div>
                         ))}

@@ -679,8 +679,7 @@ export default function SuperAdminTicketDetailPage() {
     } = useTicket(ticketId);
     const ticket = rawTicket as Ticket | undefined;
 
-    const warehouseLocationId =
-        warehouseLocation?.id ?? ticket?.warehouse_location_id ?? "";
+    const warehouseLocationId = ticket?.warehouse_location_id ?? "";
     const {
         data: warehouseStock,
         isLoading: stockLoading,
