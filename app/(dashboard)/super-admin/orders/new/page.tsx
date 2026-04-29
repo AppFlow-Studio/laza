@@ -932,36 +932,36 @@ export default function NewOrderPage() {
                 </div>
 
                 {/* ── RIGHT: Order summary ── */}
-                <div className="w-72 flex flex-col flex-shrink-0 bg-gray-50/50">
+                <div className="w-[420px] flex flex-col flex-shrink-0 bg-gray-50/50 border-l border-gray-100">
                     {/* Stats */}
-                    <div className="px-4 pt-4 pb-3 border-b border-gray-100 bg-white flex-shrink-0">
-                        <div className="flex items-center gap-2 mb-3">
+                    <div className="px-5 pt-5 pb-4 border-b border-gray-100 bg-white flex-shrink-0">
+                        <div className="flex items-center gap-2 mb-4">
                             <ShoppingCart
-                                size={14}
+                                size={15}
                                 className="text-indigo-500"
                             />
-                            <span className="text-sm font-bold text-gray-900">
+                            <span className="text-base font-bold text-gray-900">
                                 Order summary
                             </span>
                             {hasItems && (
                                 <span className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
-                                    {totalItems}
+                                    {totalItems} item{totalItems !== 1 ? "s" : ""}
                                 </span>
                             )}
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-3">
                             {[
                                 { val: totalItems, label: "Line items" },
                                 { val: totalBoxes, label: "Total boxes" },
                             ].map(({ val, label }) => (
                                 <div
                                     key={label}
-                                    className="bg-gray-100 rounded-lg px-3 py-2"
+                                    className="bg-gray-100 rounded-xl px-4 py-3"
                                 >
-                                    <div className="text-lg font-bold text-gray-900 tracking-tight">
+                                    <div className="text-2xl font-bold text-gray-900 tracking-tight">
                                         {val}
                                     </div>
-                                    <div className="text-[10px] text-gray-400 mt-0.5">
+                                    <div className="text-xs text-gray-400 mt-0.5">
                                         {label}
                                     </div>
                                 </div>
@@ -970,22 +970,22 @@ export default function NewOrderPage() {
                     </div>
 
                     {/* Cart items */}
-                    <div className="flex-1 overflow-y-auto px-3 py-3">
+                    <div className="flex-1 overflow-y-auto px-5 py-4">
                         {!hasItems ? (
-                            <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                            <div className="flex flex-col items-center justify-center h-full text-center py-10">
                                 <ShoppingCart
-                                    size={24}
-                                    className="text-gray-200 mb-2"
+                                    size={28}
+                                    className="text-gray-200 mb-3"
                                 />
-                                <p className="text-xs font-medium text-gray-400">
+                                <p className="text-sm font-medium text-gray-400">
                                     No items added yet
                                 </p>
-                                <p className="text-[11px] text-gray-300 mt-1">
+                                <p className="text-xs text-gray-300 mt-1">
                                     Browse the catalog and add box quantities
                                 </p>
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-1.5">
+                            <div className="flex flex-col gap-2">
                                 {cartEntries.map((entry) => (
                                     <CartRow
                                         key={entry.item.id}
@@ -999,52 +999,62 @@ export default function NewOrderPage() {
                         )}
                     </div>
 
-                    {/* Delivery + notes + actions */}
-                    <div className="px-3 pb-4 pt-3 border-t border-gray-100 bg-white flex-shrink-0 flex flex-col gap-3">
+                    {/* Delivery + title + notes + actions */}
+                    <div className="px-5 pb-5 pt-4 border-t border-gray-100 bg-white flex-shrink-0 flex flex-col gap-4">
                         <DeliveryTypeSelector
                             value={deliveryType}
                             onChange={setDeliveryType}
                         />
 
-                        <div>
-                            <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
-                                Order Title
-                                <span className="font-normal text-gray-300 ml-1">
-                                    (optional)
-                                </span>
-                            </label>
-                            <input
-                                type="text"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder="e.g. Nutella for Bay Ridge…"
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                            />
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                    Order Title{" "}
+                                    <span className="font-normal text-gray-300">
+                                        (optional)
+                                    </span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    placeholder="e.g. Nutella restock…"
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                    Notes{" "}
+                                    <span className="font-normal text-gray-300">
+                                        (optional)
+                                    </span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    placeholder="e.g. Prioritize Nutella…"
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                            </div>
                         </div>
 
-                        <div>
-                            <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
-                                Notes{" "}
-                                <span className="font-normal text-gray-300">
-                                    (optional)
-                                </span>
-                            </label>
-                            <textarea
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                                rows={2}
-                                placeholder="e.g. Please prioritize Nutella…"
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                            />
-                        </div>
-
-                        <div className="flex flex-col gap-2">
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleDraft}
+                                disabled={
+                                    !hasItems || isSubmitting || missingContext
+                                }
+                                className="flex-1 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 text-sm font-semibold transition-all"
+                            >
+                                Save Draft
+                            </button>
                             <button
                                 onClick={handleSubmit}
                                 disabled={
                                     !hasItems || isSubmitting || missingContext
                                 }
-                                className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all hover:enabled:-translate-y-px hover:enabled:shadow-[0_4px_12px_rgba(99,102,241,.3)] flex items-center justify-center gap-2"
+                                className="flex-[2] py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all hover:enabled:-translate-y-px hover:enabled:shadow-[0_4px_12px_rgba(99,102,241,.3)] flex items-center justify-center gap-2"
                             >
                                 {isSubmitting && (
                                     <Loader2
@@ -1053,15 +1063,6 @@ export default function NewOrderPage() {
                                     />
                                 )}
                                 Submit Order
-                            </button>
-                            <button
-                                onClick={handleDraft}
-                                disabled={
-                                    !hasItems || isSubmitting || missingContext
-                                }
-                                className="w-full py-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 text-sm font-semibold transition-all"
-                            >
-                                Save as Draft
                             </button>
                         </div>
 
