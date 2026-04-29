@@ -1,180 +1,108 @@
 # E2E Test Flows Design
 
 **Date:** 2026-04-29  
-**Scope:** Manual, role-by-role test scenarios for local verification  
-**Roles covered:** Public (no login), Employee, Admin, Super Admin  
-**Coverage:** Happy path + negative/edge cases per section
+**Scope:** Manual, cross-role end-to-end journeys for local verification  
+**Roles involved:** Super Admin, Admin, Employee  
+**Coverage:** 5 business flows, happy path + negative/edge cases per flow
 
 ---
 
-## Section 1 — Public / Storefront (No Login)
+## Flow 1 — Item & Catalog Setup
 
-### Happy Path
+**Roles:** Super Admin
 
-- Land on `/` → hero section loads, nav links (Menu, About, Catering, Join Us) are all clickable
-- Browse `/menu` → items render correctly, filter by category → only matching items shown
-- Add item to cart → cart count updates in nav → adjust quantity up/down → remove item → cart empties
-- Proceed to `/checkout` → fill in all required fields → submit order → confirmation message shown
-- Visit `/about` → page loads without errors
-- Visit `/catering` → page loads without errors
-- Visit `/join-us` → page loads without errors
-- Visit `/privacy-policy` → page loads without errors
-- Visit `/terms-conditions` → page loads without errors
+**Steps:**
+1. Log in as Super Admin → land on `/super-admin`
+2. Navigate to `/super-admin/categories`
+3. Create a new category (e.g. "Cakes") → save → verify it appears in the list
+4. Navigate to `/super-admin/items`
+5. Create a new item → assign it to the "Cakes" category → fill in all required fields → save → verify it appears in the catalog
+6. Select 2+ items in the list → open bulk markup → apply a markup percentage → confirm → verify prices updated on the selected items
+7. Navigate back to `/super-admin/categories` → edit the "Cakes" category name → save → verify change reflected
 
-### Negative Cases
-
-- Navigate to `/admin` without being logged in → redirected to `/sign-in`
-- Navigate to `/employee` without being logged in → redirected to `/sign-in`
-- Navigate to `/super-admin` without being logged in → redirected to `/sign-in`
-- Go to `/checkout` with an empty cart → placing order is blocked (no items to submit)
-
----
-
-## Section 2 — Employee Role (`/employee/*`)
-
-### Happy Path
-
-- Land on `/employee` → dashboard overview loads with relevant data
-- Navigate to `/employee/activity` → activity log entries render, can browse/filter
-- Navigate to `/employee/profile` → profile information renders, edit fields and save → changes persist
-- Navigate to `/employee/storage-spaces` → list of assigned storage spaces loads
-- Click into a storage space → `/employee/storage-spaces/[id]` → detail view loads, inventory items shown
-
-### Negative Cases
-
-- Manually navigate to `/admin/*` → 403 Unauthorized
-- Manually navigate to `/super-admin/*` → 403 Unauthorized
-- Edit profile with missing required fields → form shows validation error, does not save
-
----
-
-## Section 3 — Admin Role (`/admin/*`)
-
-### Happy Path
-
-**Dashboard**
-- Land on `/admin` → overview dashboard loads with stats and summaries
-
-**Inventory**
-- Navigate to `/admin/inventory` → inventory list loads
-- Filter by location → correct items shown for selected location
-
-**Items**
-- Navigate to `/admin/items` → items list loads
-- Create new item → fill all required fields → save → item appears in list
-- Edit existing item → change fields → save → changes reflected in list
-- Delete item → confirm deletion → item removed from list
-
-**Categories**
-- Navigate to `/admin/categories` → categories list loads
-- Create new category → save → appears in list
-- Edit existing category → save → changes reflected
-- Delete category → confirm → removed from list
-
-**Orders**
-- Navigate to `/admin/orders` → orders list loads
-- Create new order at `/admin/orders/new` → add items → submit → new order appears in list
-- Click into an order → `/admin/orders/[id]` → order detail loads with correct data
-
-**Storage Spaces**
-- Navigate to `/admin/storage-spaces` → list loads
-- Click into a storage space → detail view loads with inventory breakdown
-
-**Users**
-- Navigate to `/admin/users` → users list loads with roles visible
-
-**Notification Settings**
-- Navigate to `/admin/settings/notifications` → current preferences load
-- Toggle a setting → save → refresh page → setting persists
-
-### Negative Cases
-
-- Create item with missing required fields → validation error shown, item not saved
-- Create order with no items added → submit is blocked or shows error
-- Manually navigate to `/super-admin/*` → 403 Unauthorized
-
----
-
-## Section 4 — Super Admin Role (`/super-admin/*`)
-
-### Happy Path
-
-**Dashboard**
-- Land on `/super-admin` → overview dashboard loads with cross-location stats
-
-**Locations**
-- Navigate to `/super-admin/locations` → list of all locations loads
-- Create new location at `/super-admin/locations/new` → fill fields → save → appears in list
-- Click into a location → `/super-admin/locations/[id]` → detail loads, storage spaces listed
-- Click into a storage space from location detail → storage space detail loads with inventory
-
-**Stores**
-- Navigate to `/super-admin/stores` → stores list loads
-- Create new store at `/super-admin/stores/new` → fill fields → save → appears in list
-- Click into a store → detail loads showing catalog items and storage spaces
-- Click into a storage space from store detail → storage space detail loads
-
-**Items / Catalog**
-- Navigate to `/super-admin/items` → full catalog loads
-- Create new item → fill fields → save → appears in list
-- Edit existing item → save → changes reflected
-- Select multiple items → apply bulk markup → prices updated across all selected items
-
-**Categories**
-- Navigate to `/super-admin/categories` → list loads
-- Create, edit, delete category → changes reflected after each action
-
-**Inventory**
-- Navigate to `/super-admin/inventory` → inventory across all locations loads
-- Filter by location → correct subset shown
-
-**Purchase Orders**
-- Navigate to `/super-admin/purchase-orders` → list loads
-- Create new PO at `/super-admin/purchase-orders/new` → add items with quantities → submit → appears in list
-- Click into a PO → `/super-admin/purchase-orders/[id]` → detail loads correctly
-- Receive a PO at `/super-admin/purchase-orders/[id]/receive` → mark items as received → inventory updates accordingly
-
-**Orders**
-- Navigate to `/super-admin/orders` → orders list loads
-- Create new order at `/super-admin/orders/new` → add items → submit → appears in list
-- Click into an order → order detail loads correctly
-
-**Warehouse**
-- Navigate to `/super-admin/warehouse` → warehouse list loads
-- Create new warehouse at `/super-admin/warehouse/new` → save → appears in list
-- Click into a warehouse → `/super-admin/warehouse/[id]` → detail page loads
-- Navigate to pallets within warehouse → pallet list loads
-- Click into a pallet → pallet detail loads with items
-- Go to `/super-admin/warehouse/[id]/pallets/reorganize` → reorder pallets → save → changes reflected
-- Create a warehouse PO → add items → submit → appears in warehouse PO list
-- Receive a warehouse PO → mark items received → pallet/inventory updates
-
-**Warehouse Expenses**
-- Navigate to `/super-admin/warehouse/expenses` → expenses list loads
-- Add a new expense entry → save → appears in list
-
-**Warehouse Employees**
-- Navigate to `/super-admin/warehouse/employees` → employee list for warehouse loads
-
-**Warehouse Thresholds**
-- Navigate to `/super-admin/warehouse/thresholds` → thresholds list loads
-- Set or edit a threshold for an item → save → persists on refresh
-
-**Users**
-- Navigate to `/super-admin/users` → all org users load with roles visible
-
-**Analytics**
-- Navigate to `/super-admin/analytics` → overview report loads with charts and data
-- Navigate to `/super-admin/analytics/costs` → cost breakdown report loads
-- Navigate to `/super-admin/analytics/distribution` → distribution report loads
-
-**Notification Settings**
-- Navigate to `/super-admin/settings/notifications` → preferences load
-- Toggle a setting → save → refresh page → setting persists
-
-### Negative Cases
-
-- Create a purchase order with no items → submit is blocked or shows validation error
-- Attempt to receive more units than the ordered quantity on a PO → error shown or quantity capped at ordered amount
-- Create a warehouse with missing required fields → validation error shown, not saved
+**Negative Cases:**
+- Create an item with missing required fields → validation error shown, item not saved
 - Apply bulk markup with no items selected → action is disabled or shows a warning
+- Create a category with a duplicate name → error shown or handled gracefully
+
+---
+
+## Flow 2 — Warehouse Restocking (PO → Receive → Inventory)
+
+**Roles:** Super Admin
+
+**Steps:**
+1. Log in as Super Admin → navigate to `/super-admin/warehouse`
+2. Create a new warehouse if none exists → save → verify it appears in the list
+3. Navigate into the warehouse → go to Purchase Orders → create a new warehouse PO
+4. Add items with quantities → submit → verify PO appears in the warehouse PO list
+5. Open the PO → navigate to the receive page → mark all items as received → confirm
+6. Navigate to `/super-admin/warehouse/[id]/pallets` → verify items now appear in pallets/warehouse inventory
+7. Navigate to `/super-admin/inventory` → verify stock levels updated for the relevant items
+
+**Negative Cases:**
+- Create a warehouse PO with no items → submit is blocked or shows validation error
+- Attempt to receive more units than the ordered quantity → error shown or quantity capped
+- Create a warehouse with missing required fields → validation error, not saved
+
+---
+
+## Flow 3 — Store Order & Fulfillment (Super Admin → Admin)
+
+**Roles:** Super Admin, Admin
+
+**Steps:**
+1. Log in as Super Admin → navigate to `/super-admin/orders/new`
+2. Create a new order targeting a store/location → add items from inventory → submit → verify order appears in `/super-admin/orders`
+3. Log out → log in as Admin
+4. Navigate to `/admin/orders` → verify the new order appears in the list
+5. Open the order → review items and quantities
+6. Accept / process the order → confirm
+7. Navigate to `/admin/inventory` → verify store inventory updated to reflect the received items
+8. Log back in as Super Admin → `/super-admin/orders/[id]` → verify order status updated correctly
+
+**Negative Cases:**
+- Admin tries to create an order with no items → submit is blocked
+- Super Admin creates an order for a location with insufficient warehouse stock → error or warning shown
+
+---
+
+## Flow 4 — New Location Onboarding (Super Admin → Admin → Employee)
+
+**Roles:** Super Admin, Admin, Employee
+
+**Steps:**
+1. Log in as Super Admin → navigate to `/super-admin/locations/new`
+2. Create a new location → fill all required fields → save → verify it appears in `/super-admin/locations`
+3. Click into the new location → navigate to its storage spaces → create a new storage space → save → verify it appears
+4. Log out → log in as Admin
+5. Navigate to `/admin/storage-spaces` → verify the new storage space is visible
+6. Click into it → verify detail view loads (may be empty inventory at this point)
+7. Log out → log in as Employee
+8. Navigate to `/employee/storage-spaces` → verify the new storage space is listed
+9. Click into it → verify detail view loads correctly
+
+**Negative Cases:**
+- Create a location with missing required fields → validation error, not saved
+- Employee navigates to `/admin/*` → 403 Unauthorized
+- Admin navigates to `/super-admin/*` → 403 Unauthorized
+
+---
+
+## Flow 5 — Threshold Setup & Analytics Check
+
+**Roles:** Super Admin
+
+**Steps:**
+1. Log in as Super Admin → navigate to `/super-admin/warehouse/thresholds`
+2. Set a low-stock threshold for an existing item (e.g. alert when below 10 units) → save → refresh page → verify threshold persists
+3. Edit the threshold value → save → verify the updated value persists
+4. Navigate to `/super-admin/analytics` → verify overview report loads with charts and data
+5. Navigate to `/super-admin/analytics/costs` → verify cost breakdown report loads
+6. Navigate to `/super-admin/analytics/distribution` → verify distribution report loads with data
+7. Navigate to `/super-admin/warehouse/expenses` → add a new expense entry → save → verify it appears in the list
+8. Return to `/super-admin/analytics/costs` → verify the new expense is reflected in the cost data
+
+**Negative Cases:**
+- Set a threshold with a negative or zero value → validation error or blocked
+- Analytics pages load with no data available → empty state shown (no crash)
