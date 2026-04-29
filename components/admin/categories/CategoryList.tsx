@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Package, ChevronDown } from "lucide-react";
+import { Package, ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 
@@ -24,9 +24,11 @@ interface Category {
 interface CategoryListProps {
     categories: Category[];
     isLoading?: boolean;
+    onEdit?: (category: Category) => void;
+    onDelete?: (category: Category) => void;
 }
 
-export default function CategoryList({ categories, isLoading }: CategoryListProps) {
+export default function CategoryList({ categories, isLoading, onEdit, onDelete }: CategoryListProps) {
     const [openId, setOpenId] = useState<string | null>(null);
 
     if (isLoading) {
@@ -92,12 +94,30 @@ export default function CategoryList({ categories, isLoading }: CategoryListProp
                                 )}
                             </div>
 
-                            <ChevronDown
-                                className={cn(
-                                    "w-5 h-5 text-zinc-400 transition-transform duration-300",
-                                    isOpen && "rotate-180",
+                            <div className="flex items-center gap-1">
+                                {onEdit && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onEdit(category); }}
+                                        className="p-1.5 rounded-lg text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                    >
+                                        <Pencil className="w-4 h-4" />
+                                    </button>
                                 )}
-                            />
+                                {onDelete && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onDelete(category); }}
+                                        className="p-1.5 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                )}
+                                <ChevronDown
+                                    className={cn(
+                                        "w-5 h-5 text-zinc-400 transition-transform duration-300",
+                                        isOpen && "rotate-180",
+                                    )}
+                                />
+                            </div>
                         </div>
 
                         <AnimatePresence initial={false}>
