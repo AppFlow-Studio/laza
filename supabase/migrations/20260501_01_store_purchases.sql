@@ -124,9 +124,10 @@ CREATE POLICY "Admin read own org purchases" ON public.store_purchases
   FOR SELECT TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM public.users u
+      SELECT 1 FROM public.members m
+      JOIN public.users u ON u.id = m.user_id
       WHERE u.id = get_my_claim('sub')
-        AND u.organization_id = store_purchases.org_id
+        AND m.organization_id = store_purchases.org_id
         AND u.role = 'admin'
     )
   );
@@ -135,9 +136,10 @@ CREATE POLICY "Admin insert own org purchases" ON public.store_purchases
   FOR INSERT TO authenticated
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM public.users u
+      SELECT 1 FROM public.members m
+      JOIN public.users u ON u.id = m.user_id
       WHERE u.id = get_my_claim('sub')
-        AND u.organization_id = store_purchases.org_id
+        AND m.organization_id = store_purchases.org_id
         AND u.role = 'admin'
     )
   );
@@ -147,9 +149,10 @@ CREATE POLICY "Admin read own org purchase items" ON public.store_purchase_items
   USING (
     EXISTS (
       SELECT 1 FROM public.store_purchases sp
-      JOIN public.users u ON u.id = get_my_claim('sub')
+      JOIN public.members m ON m.organization_id = sp.org_id
+      JOIN public.users u ON u.id = m.user_id
       WHERE sp.id = store_purchase_items.purchase_id
-        AND sp.org_id = u.organization_id
+        AND u.id = get_my_claim('sub')
         AND u.role = 'admin'
     )
   );
@@ -159,9 +162,10 @@ CREATE POLICY "Admin insert own org purchase items" ON public.store_purchase_ite
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.store_purchases sp
-      JOIN public.users u ON u.id = get_my_claim('sub')
+      JOIN public.members m ON m.organization_id = sp.org_id
+      JOIN public.users u ON u.id = m.user_id
       WHERE sp.id = store_purchase_items.purchase_id
-        AND sp.org_id = u.organization_id
+        AND u.id = get_my_claim('sub')
         AND u.role = 'admin'
     )
   );

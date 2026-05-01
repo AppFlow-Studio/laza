@@ -124,9 +124,10 @@ CREATE POLICY "Admin read org requests" ON public.inventory_update_requests
   FOR SELECT TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM public.users u
+      SELECT 1 FROM public.members m
+      JOIN public.users u ON u.id = m.user_id
       WHERE u.id = get_my_claim('sub')
-        AND u.organization_id = inventory_update_requests.org_id
+        AND m.organization_id = inventory_update_requests.org_id
         AND u.role = 'admin'
     )
   );
@@ -136,11 +137,12 @@ CREATE POLICY "Employee insert requests" ON public.inventory_update_requests
   FOR INSERT TO authenticated
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM public.users u
+      SELECT 1 FROM public.members m
+      JOIN public.users u ON u.id = m.user_id
       WHERE u.id = get_my_claim('sub')
-        AND u.organization_id = inventory_update_requests.org_id
+        AND m.organization_id = inventory_update_requests.org_id
+        AND inventory_update_requests.requested_by = u.id
     )
-    AND requested_by = get_my_claim('sub')
   );
 
 -- Employees can read their own requests
