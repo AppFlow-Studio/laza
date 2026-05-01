@@ -48,8 +48,8 @@ DECLARE
   v_qty         NUMERIC;
   v_unit_cost   NUMERIC;
   v_total_cost  NUMERIC := 0;
-  v_prev_qty    NUMERIC;
-  v_new_qty     NUMERIC;
+  v_prev_qty    double precision;
+  v_new_qty     double precision;
 BEGIN
   -- Sum total cost from items array
   SELECT COALESCE(SUM((e->>'quantity')::numeric * (e->>'unit_cost')::numeric), 0)
@@ -78,7 +78,7 @@ BEGIN
     INTO v_prev_qty
     FROM public.item_locations
     WHERE item_id    = v_item_id
-      AND location_id = p_location_id::text
+      AND location_id = p_location_id
       AND storage_space_id IS NULL;
 
     IF NOT FOUND THEN v_prev_qty := 0; END IF;
@@ -89,14 +89,14 @@ BEGIN
     SET current_quantity = v_new_qty,
         last_updated     = NOW()
     WHERE item_id        = v_item_id
-      AND location_id    = p_location_id::text
+      AND location_id    = p_location_id
       AND storage_space_id IS NULL;
 
     IF NOT FOUND THEN
       INSERT INTO public.item_locations
         (item_id, location_id, storage_space_id, current_quantity, organization_id, last_updated)
       VALUES
-        (v_item_id, p_location_id::text, NULL, v_new_qty, p_org_id, NOW());
+        (v_item_id, p_location_id, NULL, v_new_qty, p_org_id, NOW());
     END IF;
 
     -- Audit log
@@ -105,7 +105,7 @@ BEGIN
        previous_quantity, new_quantity, quantity_change,
        user_id, notes, organization_id)
     VALUES
-      (v_item_id, p_location_id::text, NULL, 'received',
+      (v_item_id, p_location_id, NULL, 'received',
        v_prev_qty, v_new_qty, v_qty,
        p_purchased_by, 'Store purchase ' || v_purchase_id::text, p_org_id);
   END LOOP;
@@ -123,15 +123,23 @@ ALTER TABLE public.store_purchase_items ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admin read own org purchases" ON public.store_purchases
   FOR SELECT TO authenticated
   USING (
-    org_id = (SELECT organization_id FROM public.users WHERE id = get_my_claim('sub'))
-    AND (SELECT role FROM public.users WHERE id = get_my_claim('sub')) = 'admin'
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = get_my_claim('sub')
+        AND u.organization_id = store_purchases.org_id
+        AND u.role = 'admin'
+    )
   );
 
 CREATE POLICY "Admin insert own org purchases" ON public.store_purchases
   FOR INSERT TO authenticated
   WITH CHECK (
-    org_id = (SELECT organization_id FROM public.users WHERE id = get_my_claim('sub'))
-    AND (SELECT role FROM public.users WHERE id = get_my_claim('sub')) = 'admin'
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = get_my_claim('sub')
+        AND u.organization_id = store_purchases.org_id
+        AND u.role = 'admin'
+    )
   );
 
 CREATE POLICY "Admin read own org purchase items" ON public.store_purchase_items
