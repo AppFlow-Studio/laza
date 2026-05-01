@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useOrganization, useUser } from "@clerk/nextjs";
 import { useAdminStore } from "@/lib/stores/adminStore";
+import { useLocationWithDetails } from "@/lib/hooks/queries/useLocations";
 import { useCreateStorePurchase } from "@/lib/hooks/queries/useStorePurchases";
 import { useItems } from "@/lib/hooks/queries/useItems";
 import { Button } from "@/components/ui/button";
@@ -17,9 +18,10 @@ import toast from "react-hot-toast";
 import { format } from "date-fns";
 
 const lineItemSchema = z.object({
-  itemId:   z.number().min(1, "Select an item"),
-  quantity: z.number().positive("Must be > 0"),
-  unitCost: z.number().min(0, "Must be ≥ 0"),
+  itemId:         z.number().min(1, "Select an item"),
+  quantity:       z.number().positive("Must be > 0"),
+  unitCost:       z.number().min(0, "Must be ≥ 0"),
+  storageSpaceId: z.string().nullable().optional(),
 });
 
 const formSchema = z.object({
@@ -40,6 +42,8 @@ export default function NewPurchaseForm() {
   const { organization } = useOrganization();
   const { user } = useUser();
   const { selectedLocationId } = useAdminStore();
+  const { data: location } = useLocationWithDetails(selectedLocationId);
+  const storageSpaces = location?.storage_spaces ?? [];
   const { data: catalogItems } = useItems();
   const createMutation = useCreateStorePurchase();
 
@@ -56,7 +60,7 @@ export default function NewPurchaseForm() {
       purchasedAt: format(new Date(), "yyyy-MM-dd"),
       supplierName: "",
       notes: "",
-      items: [{ itemId: 0, quantity: 1, unitCost: 0 }],
+      items: [{ itemId: 0, quantity: 1, unitCost: 0, storageSpaceId: null }],
     },
   });
 
@@ -82,9 +86,10 @@ export default function NewPurchaseForm() {
         supplierName: data.supplierName || null,
         notes:        data.notes || null,
         items:        data.items.map((i) => ({
-          itemId:   i.itemId,
-          quantity: i.quantity,
-          unitCost: i.unitCost,
+          itemId:         i.itemId,
+          quantity:       i.quantity,
+          unitCost:       i.unitCost,
+          storageSpaceId: i.storageSpaceId ?? null,
         })),
       });
       toast.success("Purchase recorded and inventory updated");
@@ -146,7 +151,7 @@ export default function NewPurchaseForm() {
           {fields.map((field, index) => {
             const lineTotal = (watchedItems[index]?.quantity || 0) * (watchedItems[index]?.unitCost || 0);
             return (
-              <div key={field.id} className="grid grid-cols-[1fr_100px_120px_80px_32px] gap-2 items-start">
+              <div key={field.id} className="grid grid-cols-[1fr_160px_100px_120px_80px_32px] gap-2 items-start">
                 {/* Item select */}
                 <div>
                   {index === 0 && <Label className="text-xs text-zinc-500 mb-1 block">Item</Label>}
@@ -163,6 +168,29 @@ export default function NewPurchaseForm() {
                         {(catalogItems ?? []).map((item) => (
                           <option key={item.id} value={item.id}>
                             {item.name ?? ""}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  />
+                </div>
+
+                {/* Storage space select */}
+                <div>
+                  {index === 0 && <Label className="text-xs text-zinc-500 mb-1 block">Storage Space</Label>}
+                  <Controller
+                    control={control}
+                    name={`items.${index}.storageSpaceId`}
+                    render={({ field }) => (
+                      <select
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                        className="w-full border border-input rounded-md px-3 py-2 text-sm"
+                      >
+                        <option value="">Unassigned</option>
+                        {storageSpaces.map((ss) => (
+                          <option key={ss.id} value={ss.id}>
+                            {ss.name ?? ss.id}
                           </option>
                         ))}
                       </select>
@@ -224,7 +252,7 @@ export default function NewPurchaseForm() {
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => append({ itemId: 0, quantity: 1, unitCost: 0 })}
+          onClick={() => append({ itemId: 0, quantity: 1, unitCost: 0, storageSpaceId: null })}
         >
           <Plus className="h-4 w-4 mr-2" />
           Add item

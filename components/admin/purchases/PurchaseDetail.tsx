@@ -38,6 +38,8 @@ export default function PurchaseDetail({ id }: Props) {
     quantity: number;
     unit_cost: number;
     line_total: number;
+    storage_space_id: string | null;
+    storage_spaces: { id: string; name: string | null } | null;
     items: { name: string | null; unit_of_measure: string | null; sku?: string | null } | null;
   }
   const lineItems: PurchaseLineItem[] = ((purchase as any).store_purchase_items ?? []) as PurchaseLineItem[];
@@ -88,6 +90,7 @@ export default function PurchaseDetail({ id }: Props) {
           <thead>
             <tr className="border-b border-zinc-100 text-xs text-zinc-500 uppercase tracking-wide">
               <th className="px-6 py-3 text-left">Item</th>
+              <th className="px-6 py-3 text-left">Storage Space</th>
               <th className="px-6 py-3 text-right">Qty</th>
               <th className="px-6 py-3 text-right">Unit Cost</th>
               <th className="px-6 py-3 text-right">Total</th>
@@ -104,6 +107,9 @@ export default function PurchaseDetail({ id }: Props) {
                     </span>
                   )}
                 </td>
+                <td className="px-6 py-3 text-zinc-600 text-sm">
+                  {lineItem.storage_spaces?.name ?? "—"}
+                </td>
                 <td className="px-6 py-3 text-right text-zinc-700">{lineItem.quantity}</td>
                 <td className="px-6 py-3 text-right text-zinc-700">
                   {formatCurrency(lineItem.unit_cost)}
@@ -116,7 +122,7 @@ export default function PurchaseDetail({ id }: Props) {
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-zinc-200 bg-zinc-50">
-              <td colSpan={3} className="px-6 py-3 text-right text-sm font-semibold text-zinc-700">
+              <td colSpan={4} className="px-6 py-3 text-right text-sm font-semibold text-zinc-700">
                 Total
               </td>
               <td className="px-6 py-3 text-right text-base font-bold text-zinc-900">
