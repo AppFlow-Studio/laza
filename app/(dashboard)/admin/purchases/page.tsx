@@ -21,16 +21,17 @@ export default function PurchasesPage() {
   const { data: purchases, isLoading } = useStorePurchases();
   const [search, setSearch] = useState("");
 
-  const now = new Date();
-  const monthStart = startOfMonth(now);
-  const monthEnd = endOfMonth(now);
+  const { monthStart, monthEnd } = useMemo(() => {
+    const now = new Date();
+    return { monthStart: startOfMonth(now), monthEnd: endOfMonth(now) };
+  }, []);
 
   const monthPurchases = useMemo(
     () =>
       (purchases ?? []).filter((p) =>
         isWithinInterval(parseISO(p.purchased_at), { start: monthStart, end: monthEnd })
       ),
-    [purchases]
+    [purchases, monthStart, monthEnd]
   );
 
   const totalSpentThisMonth = monthPurchases.reduce((sum, p) => sum + p.total_cost, 0);

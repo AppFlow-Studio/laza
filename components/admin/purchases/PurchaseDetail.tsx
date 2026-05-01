@@ -33,7 +33,14 @@ export default function PurchaseDetail({ id }: Props) {
     );
   }
 
-  const lineItems = (purchase as any).store_purchase_items ?? [];
+  interface PurchaseLineItem {
+    id: string;
+    quantity: number;
+    unit_cost: number;
+    line_total: number;
+    items: { name: string | null; unit_of_measure: string | null; sku?: string | null } | null;
+  }
+  const lineItems: PurchaseLineItem[] = ((purchase as any).store_purchase_items ?? []) as PurchaseLineItem[];
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -87,7 +94,7 @@ export default function PurchaseDetail({ id }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100">
-            {lineItems.map((lineItem: any) => (
+            {lineItems.map((lineItem) => (
               <tr key={lineItem.id} className="hover:bg-zinc-50">
                 <td className="px-6 py-3 font-medium text-zinc-900">
                   {lineItem.items?.name ?? "—"}

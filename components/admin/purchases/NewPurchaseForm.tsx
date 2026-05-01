@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useOrganization, useUser } from "@clerk/nextjs";
@@ -30,6 +30,10 @@ const formSchema = z.object({
 });
 
 type FormData = z.infer<typeof formSchema>;
+
+function formatCurrency(v: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v);
+}
 
 export default function NewPurchaseForm() {
   const router = useRouter();
@@ -63,9 +67,6 @@ export default function NewPurchaseForm() {
     (sum, i) => sum + (i.quantity || 0) * (i.unitCost || 0),
     0
   );
-
-  const formatCurrency = (v: number): string =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v);
 
   const onSubmit = async (data: FormData) => {
     if (!organization?.id || !user?.id || !selectedLocationId) {
@@ -149,20 +150,24 @@ export default function NewPurchaseForm() {
                 {/* Item select */}
                 <div>
                   {index === 0 && <Label className="text-xs text-zinc-500 mb-1 block">Item</Label>}
-                  <select
-                    className={`w-full h-9 px-3 py-1.5 border rounded-md text-sm bg-white ${
-                      errors.items?.[index]?.itemId ? "border-red-400" : "border-zinc-200"
-                    }`}
-                    onChange={(e) => setValue(`items.${index}.itemId`, Number(e.target.value))}
-                    defaultValue={watchedItems[index]?.itemId ? String(watchedItems[index].itemId) : ""}
-                  >
-                    <option value="">Select item…</option>
-                    {(catalogItems ?? []).map((item) => (
-                      <option key={item.id} value={String(item.id)}>
-                        {item.name ?? ""}
-                      </option>
-                    ))}
-                  </select>
+                  <Controller
+                    control={control}
+                    name={`items.${index}.itemId`}
+                    render={({ field }) => (
+                      <select
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        className={`w-full border rounded-md px-3 py-2 text-sm ${errors.items?.[index]?.itemId ? "border-red-400" : "border-input"}`}
+                      >
+                        <option value="">Select item…</option>
+                        {(catalogItems ?? []).map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name ?? ""}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  />
                 </div>
 
                 {/* Quantity */}
