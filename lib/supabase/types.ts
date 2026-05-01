@@ -2081,6 +2081,7 @@ export type Database = {
           line_total: number
           purchase_id: string
           quantity: number
+          storage_space_id: string | null
           unit_cost: number
         }
         Insert: {
@@ -2088,6 +2089,7 @@ export type Database = {
           item_id: number
           purchase_id: string
           quantity: number
+          storage_space_id?: string | null
           unit_cost: number
         }
         Update: {
@@ -2095,6 +2097,7 @@ export type Database = {
           item_id?: number
           purchase_id?: string
           quantity?: number
+          storage_space_id?: string | null
           unit_cost?: number
         }
         Relationships: [
