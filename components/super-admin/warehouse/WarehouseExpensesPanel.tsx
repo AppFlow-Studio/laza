@@ -1,9 +1,7 @@
 "use client";
 
-// components/super-admin/warehouse/WarehouseExpensesPanel.tsx
-// Extracted from app/(dashboard)/super-admin/warehouse/expenses/page.tsx
-
 import { useState, useMemo, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import {
@@ -35,6 +33,29 @@ import { updateWarehouseExpenseTitleAction } from "@/lib/supabase/actions/wareho
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { RentHistoryTable } from "@/components/super-admin/warehouse/RentHistoryTable";
 import { getFriendlyErrorMessage } from "@/lib/utils/errorMessages";
+
+// ─── Animation variants ───────────────────────────────────────────────────────
+
+const fadeIn = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { duration: 0.18 } },
+    exit: { opacity: 0, transition: { duration: 0.15 } },
+};
+
+const slideUp = {
+    hidden: { opacity: 0, y: 8 },
+    show: (i: number) => ({
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.28, delay: i * 0.06, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] },
+    }),
+};
+
+const modalSlide = {
+    hidden: { opacity: 0, scale: 0.97, y: 12 },
+    show: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] } },
+    exit: { opacity: 0, scale: 0.97, y: 8, transition: { duration: 0.16 } },
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -70,48 +91,20 @@ const EXPENSE_TYPES: {
     },
 ];
 
-const TYPE_COLORS: Record<ExpenseType, string> = {
-    pallet_delivery: "bg-blue-100 text-blue-700",
-    container_unload: "bg-purple-100 text-purple-700",
-    delivery: "bg-orange-100 text-orange-700",
-    pallet_rent: "bg-green-100 text-green-700",
-    other: "bg-gray-100 text-gray-700",
+const TYPE_ACCENT: Record<ExpenseType, { dot: string; bar: string; icon: string; iconBg: string; chip: string }> = {
+    pallet_delivery: { dot: "bg-blue-500", bar: "bg-blue-500", icon: "text-blue-600", iconBg: "bg-blue-50", chip: "bg-blue-50 text-blue-700" },
+    container_unload: { dot: "bg-violet-500", bar: "bg-violet-500", icon: "text-violet-600", iconBg: "bg-violet-50", chip: "bg-violet-50 text-violet-700" },
+    delivery: { dot: "bg-orange-500", bar: "bg-orange-500", icon: "text-orange-600", iconBg: "bg-orange-50", chip: "bg-orange-50 text-orange-700" },
+    pallet_rent: { dot: "bg-emerald-500", bar: "bg-emerald-500", icon: "text-emerald-600", iconBg: "bg-emerald-50", chip: "bg-emerald-50 text-emerald-700" },
+    other: { dot: "bg-gray-400", bar: "bg-gray-400", icon: "text-gray-500", iconBg: "bg-gray-100", chip: "bg-gray-100 text-gray-600" },
 };
 
-const TYPE_CARD_STYLES: Record<
-    ExpenseType,
-    { bg: string; border: string; text: string; icon: string }
-> = {
-    pallet_delivery: {
-        bg: "bg-blue-50",
-        border: "border-blue-200",
-        text: "text-blue-900",
-        icon: "text-blue-500",
-    },
-    container_unload: {
-        bg: "bg-purple-50",
-        border: "border-purple-200",
-        text: "text-purple-900",
-        icon: "text-purple-500",
-    },
-    delivery: {
-        bg: "bg-orange-50",
-        border: "border-orange-200",
-        text: "text-orange-900",
-        icon: "text-orange-500",
-    },
-    pallet_rent: {
-        bg: "bg-green-50",
-        border: "border-green-200",
-        text: "text-green-900",
-        icon: "text-green-500",
-    },
-    other: {
-        bg: "bg-gray-50",
-        border: "border-gray-200",
-        text: "text-gray-900",
-        icon: "text-gray-500",
-    },
+const TYPE_COLORS: Record<ExpenseType, string> = {
+    pallet_delivery: "bg-blue-50 text-blue-700",
+    container_unload: "bg-violet-50 text-violet-700",
+    delivery: "bg-orange-50 text-orange-700",
+    pallet_rent: "bg-emerald-50 text-emerald-700",
+    other: "bg-gray-100 text-gray-600",
 };
 
 // ─── Inline hooks ─────────────────────────────────────────────────────────────
@@ -221,44 +214,47 @@ function SummaryCard({
     type,
     amount,
     count,
+    index,
 }: {
     type: ExpenseType;
     amount: number;
     count: number;
+    index: number;
 }) {
     const config = EXPENSE_TYPES.find((t) => t.value === type)!;
-    const style = TYPE_CARD_STYLES[type];
+    const accent = TYPE_ACCENT[type];
     return (
-        <div
-            className={`rounded-xl border ${style.border} ${style.bg} p-4 flex flex-col gap-2`}
+        <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: index * 0.08 }}
+            className="bg-white rounded-xl shadow-sm p-5 border border-zinc-200"
         >
-            <div className={`flex items-center gap-2 ${style.icon}`}>
-                {config.icon}
-                <span className={`text-sm font-medium ${style.text}`}>
-                    {config.label}
-                </span>
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-sm text-zinc-600 mb-1">{config.label}</p>
+                    <p className="text-2xl font-bold text-zinc-900">
+                        ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-zinc-400 mt-1">
+                        {count} {count === 1 ? "entry" : "entries"} this month
+                    </p>
+                </div>
+                <div className={`p-3 rounded-lg ${accent.iconBg} ${accent.icon}`}>
+                    {config.icon}
+                </div>
             </div>
-            <p className={`text-2xl font-bold ${style.text}`}>
-                $
-                {amount.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                })}
-            </p>
-            <p className="text-xs text-gray-500">
-                {count} {count === 1 ? "entry" : "entries"} this month
-            </p>
-        </div>
+        </motion.div>
     );
 }
 
 function ExpenseTypeBadge({ type }: { type: ExpenseType }) {
     const config = EXPENSE_TYPES.find((t) => t.value === type);
+    const accent = TYPE_ACCENT[type] ?? TYPE_ACCENT.other;
+    const color = TYPE_COLORS[type] ?? TYPE_COLORS.other;
     return (
-        <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${TYPE_COLORS[type]}`}
-        >
-            {config?.icon}
+        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium ${color}`}>
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${accent.dot}`} />
             {config?.label ?? type}
         </span>
     );
@@ -457,8 +453,20 @@ function AddExpenseForm({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <motion.div
+            variants={fadeIn}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+        >
+            <motion.div
+                variants={modalSlide}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            >
                 <div className="flex items-center justify-between p-5 border-b border-gray-100">
                     <h2 className="text-lg font-semibold text-gray-900">
                         Record Expense
@@ -700,8 +708,8 @@ function AddExpenseForm({
                         {isPending ? "Saving…" : "Record Expense"}
                     </button>
                 </div>
-            </div>
-        </div>
+            </motion.div>
+        </motion.div>
     );
 }
 
@@ -760,8 +768,20 @@ function ManageRatesPanel({
     );
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <motion.div
+            variants={fadeIn}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+        >
+            <motion.div
+                variants={modalSlide}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+            >
                 <div className="flex items-center justify-between p-5 border-b border-gray-100">
                     <div>
                         <h2 className="text-lg font-semibold text-gray-900">
@@ -778,16 +798,23 @@ function ManageRatesPanel({
                         <X className="w-5 h-5 text-gray-500" />
                     </button>
                 </div>
-                <div className="p-5 space-y-4">
-                    {editableTypes.map((type) => {
+                <div className="p-5 space-y-3">
+                    {editableTypes.map((type, i) => {
                         const rate = rates.find(
                             (r) => r.expense_type === type.value,
                         );
+                        const originalRate = rate?.default_rate ?? 0;
+                        const currentEdited = parseFloat(editedRates[type.value] ?? "");
+                        const hasChanged = !isNaN(currentEdited) && currentEdited !== originalRate;
                         const isSaved = savedTypes.has(type.value);
                         return (
-                            <div
+                            <motion.div
                                 key={type.value}
-                                className="flex items-center gap-3"
+                                custom={i}
+                                variants={slideUp}
+                                initial="hidden"
+                                animate="show"
+                                className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100"
                             >
                                 <div
                                     className={`p-2 rounded-lg ${TYPE_COLORS[type.value]}`}
@@ -798,11 +825,20 @@ function ManageRatesPanel({
                                     <p className="text-sm font-medium text-gray-800">
                                         {type.label}
                                     </p>
-                                    <p className="text-xs text-gray-500">
-                                        {rate?.rate_unit === "per_pallet"
-                                            ? "per pallet"
-                                            : (rate?.rate_unit ?? "per pallet")}
-                                    </p>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                        <p className="text-xs text-gray-400">
+                                            {rate?.rate_unit === "per_pallet"
+                                                ? "per pallet"
+                                                : (rate?.rate_unit ?? "per pallet")}
+                                        </p>
+                                        {hasChanged && (
+                                            <span className="flex items-center gap-1 text-xs text-gray-400">
+                                                <span className="font-mono text-gray-500">${originalRate.toFixed(2)}</span>
+                                                <span>→</span>
+                                                <span className="font-mono font-semibold text-indigo-600">${currentEdited.toFixed(2)}</span>
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <div className="relative">
@@ -823,7 +859,7 @@ function ManageRatesPanel({
                                                         e.target.value,
                                                 }))
                                             }
-                                            className="w-24 pl-6 pr-2 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-right"
+                                            className="w-24 pl-6 pr-2 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-right bg-white"
                                         />
                                     </div>
                                     <button
@@ -833,8 +869,14 @@ function ManageRatesPanel({
                                                 type.value as ExpenseType,
                                             )
                                         }
-                                        disabled={isPending}
-                                        className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${isSaved ? "bg-green-100 text-green-700" : "bg-indigo-600 text-white hover:bg-indigo-700"}`}
+                                        disabled={isPending || !hasChanged}
+                                        className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                                            isSaved
+                                                ? "bg-green-100 text-green-700"
+                                                : hasChanged
+                                                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                                                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                        }`}
                                     >
                                         {isSaved ? (
                                             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -843,7 +885,7 @@ function ManageRatesPanel({
                                         )}
                                     </button>
                                 </div>
-                            </div>
+                            </motion.div>
                         );
                     })}
                 </div>
@@ -856,8 +898,8 @@ function ManageRatesPanel({
                         Done
                     </button>
                 </div>
-            </div>
-        </div>
+            </motion.div>
+        </motion.div>
     );
 }
 
@@ -904,35 +946,32 @@ export function WarehouseExpensesPanel({
     }, [expenses, filterType]);
 
     return (
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
+                    <h1 className="text-2xl font-semibold text-zinc-900">
                         Warehouse Expenses
                     </h1>
-                    <p className="text-sm text-gray-500 mt-0.5">
+                    <p className="text-sm text-zinc-600 mt-1">
                         {format(new Date(), "MMMM yyyy")} · Total:{" "}
-                        <span className="font-semibold text-gray-800">
-                            $
-                            {totalThisMonth.toLocaleString("en-US", {
-                                minimumFractionDigits: 2,
-                            })}
+                        <span className="font-semibold text-zinc-800">
+                            ${totalThisMonth.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                         </span>
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                     <button
                         type="button"
                         onClick={() => setShowManageRates(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-200 bg-white text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
                     >
-                        <Settings2 className="w-4 h-4" /> Manage Rates
+                        <Settings2 className="w-4 h-4" /> Rates
                     </button>
                     <button
                         type="button"
                         onClick={() => setShowAddForm(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]"
                     >
                         <Plus className="w-4 h-4" /> Add Expense
                     </button>
@@ -940,180 +979,172 @@ export function WarehouseExpensesPanel({
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-                {summaryByType.map((s) => (
-                    <SummaryCard key={s.type} {...s} />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {summaryByType.map((s, i) => (
+                    <SummaryCard key={s.type} {...s} index={i} />
                 ))}
             </div>
 
             {/* Expense List */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-10">
+            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
                 {/* Filter bar */}
-                <div className="flex items-center gap-2 p-4 border-b border-gray-100 overflow-x-auto">
+                <div className="flex items-center gap-1.5 px-4 py-3 border-b border-zinc-100 overflow-x-auto">
                     <button
                         type="button"
                         onClick={() => setFilterType("all")}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterType === "all" ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"}`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                            filterType === "all"
+                                ? "bg-indigo-600 text-white shadow-sm"
+                                : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
+                        }`}
                     >
                         All
                     </button>
-                    {EXPENSE_TYPES.map((t) => (
-                        <button
-                            key={t.value}
-                            type="button"
-                            onClick={() =>
-                                setFilterType(
-                                    filterType === t.value ? "all" : t.value,
-                                )
-                            }
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterType === t.value ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"}`}
-                        >
-                            {t.icon}
-                            {t.label}
-                        </button>
-                    ))}
+                    {EXPENSE_TYPES.map((t) => {
+                        const accent = TYPE_ACCENT[t.value] ?? TYPE_ACCENT.other;
+                        const active = filterType === t.value;
+                        return (
+                            <button
+                                key={t.value}
+                                type="button"
+                                onClick={() => setFilterType(filterType === t.value ? "all" : t.value)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                                    active
+                                        ? "bg-indigo-600 text-white shadow-sm"
+                                        : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
+                                }`}
+                            >
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-white" : accent.dot}`} />
+                                {t.label}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {expensesLoading ? (
-                    <div className="p-8 text-center text-gray-400 text-sm">
-                        Loading expenses…
+                    <div>
+                        {Array.from({ length: 3 }).map((_, i) => (
+                            <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-zinc-100 last:border-0">
+                                <div className="w-9 h-9 rounded-lg bg-zinc-100 animate-pulse" />
+                                <div className="flex-1 space-y-2">
+                                    <div className="h-3.5 w-40 bg-zinc-100 rounded animate-pulse" />
+                                    <div className="h-3 w-24 bg-zinc-100 rounded animate-pulse" />
+                                </div>
+                                <div className="h-4 w-16 bg-zinc-100 rounded animate-pulse" />
+                            </div>
+                        ))}
                     </div>
                 ) : filteredExpenses.length === 0 ? (
-                    <div className="p-12 text-center">
-                        <Warehouse className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                        <p className="text-gray-500 text-sm font-medium">
-                            No expenses recorded yet
-                        </p>
-                        <p className="text-gray-400 text-xs mt-1">
-                            Click "Add Expense" to record your first entry
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                        <div className="p-3 bg-zinc-100 rounded-lg mb-3">
+                            <Warehouse className="w-6 h-6 text-zinc-400" />
+                        </div>
+                        <p className="text-sm font-medium text-zinc-500">No expenses recorded</p>
+                        <p className="text-xs text-zinc-400 mt-1">
+                            Click <span className="font-medium text-zinc-600">Add Expense</span> to record your first entry
                         </p>
                     </div>
                 ) : (
-                    <div className="divide-y divide-gray-50">
-                        {filteredExpenses.map((expense) => (
-                            <div
-                                key={expense.id}
-                                className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors"
-                            >
-                                <div className="shrink-0 w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
-                                    {EXPENSE_TYPES.find(
-                                        (t) =>
-                                            t.value === expense.expense_type,
-                                    )?.icon ?? (
-                                        <MoreHorizontal className="w-4 h-4 text-gray-500" />
-                                    )}
-                                </div>
-
-                                <div className="flex-1 min-w-0">
-                                    {/* Inline title editor */}
-                                    <ExpenseTitleEditor
-                                        expense={expense}
-                                        organizationId={organizationId}
-                                    />
-
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <ExpenseTypeBadge
-                                            type={
-                                                expense.expense_type as ExpenseType
-                                            }
-                                        />
-                                        {expense.is_self_delivered && (
-                                            <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
-                                                Self-delivered
-                                            </span>
-                                        )}
+                    <div className="divide-y divide-zinc-100">
+                        {filteredExpenses.map((expense, i) => {
+                            const expType = expense.expense_type as ExpenseType;
+                            const accent = TYPE_ACCENT[expType] ?? TYPE_ACCENT.other;
+                            const expConfig = EXPENSE_TYPES.find((t) => t.value === expType);
+                            return (
+                                <motion.div
+                                    key={expense.id}
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.2, delay: Math.min(i, 8) * 0.04 }}
+                                    className="flex items-center gap-4 px-5 py-4 hover:bg-zinc-50 transition-colors"
+                                >
+                                    <div className={`shrink-0 p-2.5 rounded-lg ${accent.iconBg} ${accent.icon}`}>
+                                        {expConfig?.icon ?? <MoreHorizontal className="w-4 h-4" />}
                                     </div>
-                                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                                        <span>
-                                            {format(
-                                                new Date(expense.expense_date),
-                                                "MMM d, yyyy",
-                                            )}
-                                        </span>
-                                        {expense.pallet_count != null && (
-                                            <span>
-                                                {expense.pallet_count} pallets
-                                            </span>
-                                        )}
-                                        {expense.rate_per_pallet != null && (
-                                            <span>
-                                                @ ${expense.rate_per_pallet}
-                                                /pallet
-                                            </span>
-                                        )}
-                                        {expense.period_start &&
-                                            expense.period_end && (
-                                                <span>
-                                                    {format(
-                                                        new Date(
-                                                            expense.period_start,
-                                                        ),
-                                                        "MMM d",
-                                                    )}{" "}
-                                                    –{" "}
-                                                    {format(
-                                                        new Date(
-                                                            expense.period_end,
-                                                        ),
-                                                        "MMM d",
-                                                    )}
+
+                                    <div className="flex-1 min-w-0">
+                                        <ExpenseTitleEditor expense={expense} organizationId={organizationId} />
+                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                            <ExpenseTypeBadge type={expType} />
+                                            {expense.is_self_delivered && (
+                                                <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+                                                    Self-delivered
                                                 </span>
                                             )}
-                                    </div>
-                                    {expense.notes && (
-                                        <p className="text-xs text-gray-400 mt-0.5 truncate">
-                                            Note: {expense.notes}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="text-right shrink-0">
-                                    <p className="text-base font-semibold text-gray-900">
-                                        $
-                                        {Number(expense.amount).toLocaleString(
-                                            "en-US",
-                                            {
-                                                minimumFractionDigits: 2,
-                                            },
+                                            <span className="text-xs text-zinc-400">
+                                                {format(new Date(expense.expense_date), "MMM d, yyyy")}
+                                            </span>
+                                            {expense.pallet_count != null && (
+                                                <span className="text-xs text-zinc-400">
+                                                    · {expense.pallet_count} pallets
+                                                </span>
+                                            )}
+                                            {expense.rate_per_pallet != null && (
+                                                <span className="text-xs text-zinc-400">
+                                                    @ ${expense.rate_per_pallet}/pallet
+                                                </span>
+                                            )}
+                                            {expense.period_start && expense.period_end && (
+                                                <span className="text-xs text-zinc-400">
+                                                    {format(new Date(expense.period_start), "MMM d")} – {format(new Date(expense.period_end), "MMM d")}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {expense.notes && (
+                                            <p className="text-xs text-zinc-400 mt-0.5 truncate">
+                                                {expense.notes}
+                                            </p>
                                         )}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
+                                    </div>
+
+                                    <div className="text-right shrink-0">
+                                        <p className="text-sm font-semibold text-zinc-900 tabular-nums">
+                                            ${Number(expense.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
 
-            {/* ── Warehouse Rent History ── */}
-            <section className="mt-10 pt-8 border-t border-gray-200">
-                <div className="mb-5">
-                    <h2 className="text-lg font-semibold text-gray-900">
-                        Warehouse Rent History
-                    </h2>
-                    <p className="text-sm text-gray-500 mt-0.5">
-                        Monthly pallet rent snapshots
-                    </p>
+            {/* Warehouse Rent History */}
+            <div>
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 className="text-lg font-semibold text-zinc-900">
+                            Warehouse Rent History
+                        </h2>
+                        <p className="text-sm text-zinc-600 mt-0.5">
+                            Monthly pallet rent snapshots
+                        </p>
+                    </div>
                 </div>
                 <RentHistoryTable />
-            </section>
+            </div>
 
             {/* Modals */}
-            {showAddForm && rates && (
-                <AddExpenseForm
-                    organizationId={organizationId}
-                    warehouseLocationId={warehouseLocationId}
-                    rates={rates}
-                    onClose={() => setShowAddForm(false)}
-                />
-            )}
+            <AnimatePresence>
+                {showAddForm && rates && (
+                    <AddExpenseForm
+                        organizationId={organizationId}
+                        warehouseLocationId={warehouseLocationId}
+                        rates={rates}
+                        onClose={() => setShowAddForm(false)}
+                    />
+                )}
+            </AnimatePresence>
 
-            {showManageRates && (
-                <ManageRatesPanel
-                    organizationId={organizationId}
-                    rates={rates}
-                    onClose={() => setShowManageRates(false)}
-                />
-            )}
+            <AnimatePresence>
+                {showManageRates && (
+                    <ManageRatesPanel
+                        organizationId={organizationId}
+                        rates={rates}
+                        onClose={() => setShowManageRates(false)}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }

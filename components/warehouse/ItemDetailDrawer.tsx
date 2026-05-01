@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
 	useItemOverview,
 	useItemPalletStock,
@@ -256,127 +257,138 @@ function StockTab({ itemId }: { itemId: number }) {
 
 // ─── Shipment History Tab ─────────────────────────────────────────────────────
 
-function ShipmentRow({ record }: { record: ItemShipmentRecord }) {
+function ShipmentRow({ record, index }: { record: ItemShipmentRecord; index: number }) {
 	const [expanded, setExpanded] = useState(false);
 
 	return (
 		<>
-			<tr
-				className="hover:bg-gray-50/50 hover:cursor-pointer"
+			<motion.tr
+				custom={index}
+				initial={{ opacity: 0, y: 6 }}
+				animate={{ opacity: 1, y: 0, transition: { duration: 0.22, delay: index * 0.04, ease: [0.25, 0.1, 0.25, 1] } }}
+				className="hover:bg-gray-50/50 hover:cursor-pointer border-b border-gray-100 last:border-0"
 				onClick={() => setExpanded((v) => !v)}
 			>
 				<td className="px-3 py-3">
 					<div className="flex items-center gap-2">
-						<svg
-							className={`h-3 w-3 flex-shrink-0 text-zinc-500 transition-transform duration-150 ${
-								expanded ? "rotate-90" : ""
-							}`}
+						<motion.svg
+							animate={{ rotate: expanded ? 90 : 0 }}
+							transition={{ duration: 0.18 }}
+							className="h-3 w-3 flex-shrink-0 text-zinc-400"
 							viewBox="0 0 12 12"
 							fill="currentColor"
 						>
 							<path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-						</svg>
-						<span className="font-mono text-xs font-medium ">
+						</motion.svg>
+						<span className="font-mono text-xs font-medium text-gray-700">
               {record.po_number}
             </span>
 						{record.has_mixed_configs && (
-							<span className="rounded bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-amber-700/40">
+							<span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 ring-1 ring-amber-200">
                 MIXED
               </span>
 						)}
 					</div>
 				</td>
-				<td className="px-3 py-3 text-xs ">
+				<td className="px-3 py-3 text-xs text-gray-500">
 					{fmtDate(record.po_date)}
 				</td>
-				<td className="px-3 py-3 text-xs ">
+				<td className="px-3 py-3 text-xs text-gray-500">
 					{fmtDate(record.actual_arrival)}
 				</td>
-				<td className="px-3 py-3 text-right tabular-nums text-xs ">
+				<td className="px-3 py-3 text-right tabular-nums text-xs text-gray-700">
 					{fmt(record.po_line_total_boxes)}
 				</td>
-				<td className="px-3 py-3 text-right tabular-nums text-xs ">
+				<td className="px-3 py-3 text-right tabular-nums text-xs text-gray-700">
 					{fmt(record.config_pieces_per_box)}
 				</td>
-				<td className="px-3 py-3 text-right tabular-nums text-xs font-medium ">
+				<td className="px-3 py-3 text-right tabular-nums text-xs font-semibold text-gray-900">
 					{fmt(record.config_total_pieces)}
 				</td>
-			</tr>
-			{expanded && (
-				<tr className="border-b ">
-					<td colSpan={6} className="px-8 py-3">
-						<div className="flex flex-col gap-1">
-							<p className="mb-2 text-[11px] font-semibold uppercase tracking-wider  ">
-								Box Configuration Breakdown
-							</p>
-							<div className="overflow-hidden rounded border ">
-								<table className="min-w-full divide-y divide-gray-100">
-									<thead>
-									<tr className="bg-gray-50 px-4 py-3 text-xs uppercase tracking-wider ">
-										<th className="px-3 py-1.5 text-left text-[10px]  uppercase tracking-wider ">
-											Pcs / Box
-										</th>
-										<th className="px-3 py-1.5 text-right text-[10px] uppercase tracking-wider ">
-											Boxes
-										</th>
-										<th className="px-3 py-1.5 text-right text-[10px]  uppercase tracking-wider ">
-											Total Pcs
-										</th>
-										<th className="px-3 py-1.5 text-left text-[10px]  tracking-wider ">
-											Notes
-										</th>
-									</tr>
-									</thead>
-									<tbody className="divide-y divide-gray-50">
-									{record.box_configs && record.box_configs.length > 0 ? (
-										record.box_configs.map((cfg, i) => (
-											<tr
-												key={i}
-												className="transition-colors hover:bg-indigo-50/40 text-xs"
-											>
-												<td className="px-3 py-2 tabular-nums text-xs">
-													{fmt(cfg.pieces_per_box)}
+			</motion.tr>
+			<AnimatePresence initial={false}>
+				{expanded && (
+					<motion.tr
+						key="expanded"
+						initial={{ opacity: 0, height: 0 }}
+						animate={{ opacity: 1, height: "auto", transition: { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] } }}
+						exit={{ opacity: 0, height: 0, transition: { duration: 0.16 } }}
+						className="bg-gray-50/60"
+					>
+						<td colSpan={6} className="px-8 py-4">
+							<div className="flex flex-col gap-2">
+								<p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-1">
+									Box Configuration Breakdown
+								</p>
+								<div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+									<table className="min-w-full divide-y divide-gray-100">
+										<thead>
+										<tr className="bg-gray-50">
+											<th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+												Pcs / Box
+											</th>
+											<th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+												Boxes
+											</th>
+											<th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+												Total Pcs
+											</th>
+											<th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+												Notes
+											</th>
+										</tr>
+										</thead>
+										<tbody className="divide-y divide-gray-50">
+										{record.box_configs && record.box_configs.length > 0 ? (
+											record.box_configs.map((cfg, i) => (
+												<tr
+													key={i}
+													className="transition-colors hover:bg-indigo-50/40 text-xs"
+												>
+													<td className="px-3 py-2 tabular-nums text-xs text-gray-700">
+														{fmt(cfg.pieces_per_box)}
+													</td>
+													<td className="px-3 py-2 text-right tabular-nums text-xs text-gray-700">
+														{fmt(cfg.box_count)}
+													</td>
+													<td className="px-3 py-2 text-right text-xs text-gray-700">
+														{fmt(cfg.total_pieces)}
+													</td>
+													<td className="px-3 py-2 text-xs text-gray-500">
+														{cfg.notes ?? "—"}
+													</td>
+												</tr>
+											))
+										) : record.config_pieces_per_box != null ? (
+											<tr className="transition-colors hover:bg-indigo-50/40 text-xs">
+												<td className="px-3 py-2 tabular-nums text-xs text-gray-700">
+													{fmt(record.config_pieces_per_box)}
 												</td>
-												<td className="px-3 py-2 text-right tabular-nums text-xs">
-													{fmt(cfg.box_count)}
+												<td className="px-3 py-2 text-right tabular-nums text-xs text-gray-700">
+													{fmt(record.config_box_count)}
 												</td>
-												<td className="px-3 py-2 text-right text-xs">
-													{fmt(cfg.total_pieces)}
+												<td className="px-3 py-2 text-right text-xs text-gray-700">
+													{fmt(record.config_total_pieces)}
 												</td>
-												<td className="px-3 py-2 text-xs">
-													{cfg.notes ?? "—"}
+												<td className="px-3 py-2 text-xs text-gray-500">
+													{record.config_notes ?? "—"}
 												</td>
 											</tr>
-										))
-									) : record.config_pieces_per_box != null ? (
-										<tr className="transition-colors hover:bg-indigo-50/40 text-xs">
-											<td className="px-3 py-2 tabular-nums text-xs">
-												{fmt(record.config_pieces_per_box)}
-											</td>
-											<td className="px-3 py-2 text-right tabular-nums text-xs">
-												{fmt(record.config_box_count)}
-											</td>
-											<td className="px-3 py-2 text-right text-xs">
-												{fmt(record.config_total_pieces)}
-											</td>
-											<td className="px-3 py-2 text-xs">
-												{record.config_notes ?? "—"}
-											</td>
-										</tr>
-									) : (
-										<tr>
-											<td colSpan={4} className="px-3 py-3 text-xs text-amber-600 italic">
-												Mixed/Unknown box size — enter manually
-											</td>
-										</tr>
-									)}
-									</tbody>
-								</table>
+										) : (
+											<tr>
+												<td colSpan={4} className="px-3 py-3 text-xs text-amber-600 italic">
+													Mixed/Unknown box size — enter manually
+												</td>
+											</tr>
+										)}
+										</tbody>
+									</table>
+								</div>
 							</div>
-						</div>
-					</td>
-				</tr>
-			)}
+						</td>
+					</motion.tr>
+				)}
+			</AnimatePresence>
 		</>
 	);
 }
@@ -384,7 +396,6 @@ function ShipmentRow({ record }: { record: ItemShipmentRecord }) {
 function ShipmentsTab({ itemId }: { itemId: number }) {
 	const { data: shipments = [], isLoading } = useItemShipmentHistory(itemId);
 	const { data: totals } = useItemBoxTotals(itemId);
-	console.log(shipments)
 
 	if (isLoading) return <TabSkeleton rows={4} />;
 	if (shipments.length === 0)
@@ -392,71 +403,45 @@ function ShipmentsTab({ itemId }: { itemId: number }) {
 
 	return (
 		<div className="flex flex-col gap-4 p-6">
-			{/* Running weighted average banner */}
 			{totals && (
-				<div className="flex items-center justify-between rounded-lg">
-					<div className=" flex items-center justify-between gap-4">
-						<div className="flex flex-col bg-white rounded-xl shadow-sm border border-zinc-200   px-4 py-3">
-              <span className="text-[12px] font-medium uppercase tracking-wider  ">
-                Weighted Avg
-              </span>
-							<span className="text-lg font-semibold tabular-nums ">
-                {fmt(totals.weighted_avg_per_box, 1)}{" "}
-								<span className="text-sm font-normal text-zinc-400">
-                  pcs/box
-                </span>
-              </span>
-						</div>
-						<div className="flex flex-col bg-white rounded-xl shadow-sm border border-zinc-200  px-4 py-3">
-              <span className="text-[12px] font-medium uppercase tracking-wider  ">
-                Total Received
-              </span>
-							<span className="text-lg font-semibold tabular-nums ">
-                {fmt(totals.total_boxes_received)}{" "}
-								<span className="text-sm font-normal text-zinc-400">boxes</span>
-              </span>
-						</div>
-						<div className="flex flex-col bg-white rounded-xl shadow-sm border border-zinc-200  px-4 py-3">
-              <span className="text-[12px] font-medium uppercase tracking-wider  ">
-                Shipments
-              </span>
-							<span className="text-lg font-semibold tabular-nums ">
-                {totals.shipment_count}
-              </span>
-						</div>
-					</div>
+				<div className="grid grid-cols-3 gap-3">
+					{[
+						{ label: "Weighted Avg", value: `${fmt(totals.weighted_avg_per_box, 1)} pcs/box` },
+						{ label: "Total Received", value: `${fmt(totals.total_boxes_received)} boxes` },
+						{ label: "Shipments", value: String(totals.shipment_count) },
+					].map((s, i) => (
+						<motion.div
+							key={s.label}
+							initial={{ opacity: 0, y: 6 }}
+							animate={{ opacity: 1, y: 0, transition: { duration: 0.22, delay: i * 0.06 } }}
+							className="flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3"
+						>
+							<span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+								{s.label}
+							</span>
+							<span className="text-lg font-semibold tabular-nums text-gray-900 mt-0.5">
+								{s.value}
+							</span>
+						</motion.div>
+					))}
 				</div>
 			)}
 
-			{/* Shipment table */}
 			<div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-
-				<table className="min-w-full divide-y divide-gray-50">
-					<thead className="bg-gray-50">
+				<table className="min-w-full">
+					<thead className="bg-gray-50 border-b border-gray-100">
 					<tr>
-						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
-							PO #
-						</th>
-						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
-							PO Date
-						</th>
-						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
-							Arrived
-						</th>
-						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">
-							Boxes
-						</th>
-						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">
-							Pcs/Box
-						</th>
-						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">
-							Total Pcs
-						</th>
+						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">PO #</th>
+						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">PO Date</th>
+						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Arrived</th>
+						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Boxes</th>
+						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Pcs/Box</th>
+						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Total Pcs</th>
 					</tr>
 					</thead>
-					<tbody className="divide-y divide-gray-50">
+					<tbody>
 					{shipments.map((s, i) => (
-						<ShipmentRow key={`${s.po_number}-${i}`} record={s} />
+						<ShipmentRow key={`${s.po_number}-${i}`} record={s} index={i} />
 					))}
 					</tbody>
 				</table>
@@ -507,12 +492,16 @@ function CostTooltip({
 
 function CostHistoryTab({ itemId }: { itemId: number }) {
 	const { data: history = [], isLoading } = useItemCostHistory(itemId);
+	const [chartKey, setChartKey] = useState(0);
+
+	useEffect(() => {
+		setChartKey((k) => k + 1);
+	}, [itemId]);
 
 	if (isLoading) return <TabSkeleton rows={5} />;
 	if (history.length === 0)
 		return <EmptyState message="No cost history found for this item." />;
 
-	// Build chart data — each point is one cost-change event
 	const chartData = history.map((r) => ({
 		date: fmtDateShort(r.effective_date),
 		unit_price_before: r.unit_price_before ?? undefined,
@@ -522,7 +511,6 @@ function CostHistoryTab({ itemId }: { itemId: number }) {
 		rawDate: r.effective_date,
 	}));
 
-	// Summary stats
 	const latest = history[history.length - 1];
 	const earliest = history[0];
 	const totalChange =
@@ -532,7 +520,6 @@ function CostHistoryTab({ itemId }: { itemId: number }) {
 	const isUp = totalChange != null && totalChange > 0;
 	const isDown = totalChange != null && totalChange < 0;
 
-	// Y-axis domain with a little padding
 	const allValues = history.flatMap((r) =>
 		[r.unit_price_before, r.unit_cost_after].filter((v): v is number => v != null)
 	);
@@ -540,52 +527,42 @@ function CostHistoryTab({ itemId }: { itemId: number }) {
 	const maxY = Math.ceil(Math.max(...allValues) * 1.05 * 100) / 100;
 
 	return (
-		<div className="flex flex-col gap-5 p-6">
-			{/* Summary stat cards */}
-			<div className="flex gap-3">
-				<div className="flex flex-col bg-white rounded-xl shadow-sm border border-zinc-200 px-4 py-3 flex-1">
-					<span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-						Current Cost
-					</span>
-					<span className="text-xl font-semibold tabular-nums text-gray-900">
-						${latest.unit_cost_after.toFixed(2)}
-					</span>
-				</div>
-				<div className="flex flex-col bg-white rounded-xl shadow-sm border border-zinc-200 px-4 py-3 flex-1">
-					<span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-						Changes
-					</span>
-					<span className="text-xl font-semibold tabular-nums text-gray-900">
-						{history.length}
-					</span>
-				</div>
-				{totalChange != null && (
-					<div className="flex flex-col bg-white rounded-xl shadow-sm border border-zinc-200 px-4 py-3 flex-1">
+		<motion.div
+			initial={{ opacity: 0, x: 12 }}
+			animate={{ opacity: 1, x: 0, transition: { duration: 0.24, ease: [0.25, 0.1, 0.25, 1] } }}
+			className="flex flex-col gap-5 p-6"
+		>
+			<div className="grid grid-cols-3 gap-3">
+				{[
+					{ label: "Current Cost", value: `$${latest.unit_cost_after.toFixed(2)}`, color: "text-gray-900" },
+					{ label: "Changes", value: String(history.length), color: "text-gray-900" },
+					...(totalChange != null
+						? [{ label: "Net Change", value: `${isUp ? "+" : ""}$${totalChange.toFixed(2)}`, color: isUp ? "text-red-500" : isDown ? "text-emerald-500" : "text-gray-900" }]
+						: []),
+				].map((s, i) => (
+					<motion.div
+						key={s.label}
+						initial={{ opacity: 0, y: 6 }}
+						animate={{ opacity: 1, y: 0, transition: { duration: 0.22, delay: i * 0.06 } }}
+						className="flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3"
+					>
 						<span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-							Net Change
+							{s.label}
 						</span>
-						<span
-							className={`text-xl font-semibold tabular-nums ${
-								isUp
-									? "text-red-500"
-									: isDown
-										? "text-emerald-500"
-										: "text-gray-900"
-							}`}
-						>
-							{isUp ? "+" : ""}${totalChange.toFixed(2)}
+						<span className={`text-xl font-semibold tabular-nums mt-0.5 ${s.color}`}>
+							{s.value}
 						</span>
-					</div>
-				)}
+					</motion.div>
+				))}
 			</div>
 
-			{/* Line chart */}
 			<div className="rounded-xl border border-gray-200 bg-white shadow-sm px-4 pt-4 pb-2">
 				<p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
 					Unit Cost Over Time
 				</p>
 				<ResponsiveContainer width="100%" height={200}>
 					<LineChart
+						key={chartKey}
 						data={chartData}
 						margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
 					>
@@ -605,7 +582,6 @@ function CostHistoryTab({ itemId }: { itemId: number }) {
 							width={52}
 						/>
 						<Tooltip content={<CostTooltip />} />
-						{/* "Before" line — dashed, gray */}
 						<Line
 							type="monotone"
 							dataKey="unit_price_before"
@@ -615,8 +591,10 @@ function CostHistoryTab({ itemId }: { itemId: number }) {
 							strokeDasharray="4 3"
 							dot={false}
 							connectNulls
+							isAnimationActive
+							animationDuration={1000}
+							animationEasing="ease-out"
 						/>
-						{/* "After" line — solid, blue */}
 						<Line
 							type="monotone"
 							dataKey="unit_cost_after"
@@ -626,10 +604,12 @@ function CostHistoryTab({ itemId }: { itemId: number }) {
 							dot={{ r: 3, fill: "#2563eb", strokeWidth: 0 }}
 							activeDot={{ r: 5, fill: "#2563eb" }}
 							connectNulls
+							isAnimationActive
+							animationDuration={1000}
+							animationEasing="ease-out"
 						/>
 					</LineChart>
 				</ResponsiveContainer>
-				{/* Legend */}
 				<div className="mt-1 flex items-center gap-4 justify-end">
 					<div className="flex items-center gap-1.5">
 						<span className="inline-block h-px w-5 border-t-2 border-dashed border-gray-300" />
@@ -642,30 +622,19 @@ function CostHistoryTab({ itemId }: { itemId: number }) {
 				</div>
 			</div>
 
-			{/* Change log table */}
 			<div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
 				<table className="min-w-full divide-y divide-gray-100">
 					<thead className="bg-gray-50">
 					<tr>
-						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
-							Date
-						</th>
-						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
-							PO #
-						</th>
-						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">
-							Before
-						</th>
-						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">
-							After
-						</th>
-						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">
-							Δ
-						</th>
+						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Date</th>
+						<th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">PO #</th>
+						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Before</th>
+						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">After</th>
+						<th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Δ</th>
 					</tr>
 					</thead>
 					<tbody className="divide-y divide-gray-50">
-					{[...history].reverse().map((r) => {
+					{[...history].reverse().map((r, i) => {
 						const delta =
 							r.unit_price_before != null
 								? r.unit_cost_after - r.unit_price_before
@@ -674,7 +643,12 @@ function CostHistoryTab({ itemId }: { itemId: number }) {
 						const deltaDown = delta != null && delta < 0;
 
 						return (
-							<tr key={r.id} className="hover:bg-gray-50/50">
+							<motion.tr
+								key={r.id}
+								initial={{ opacity: 0, y: 4 }}
+								animate={{ opacity: 1, y: 0, transition: { duration: 0.2, delay: i * 0.04 } }}
+								className="hover:bg-gray-50/50"
+							>
 								<td className="px-4 py-2.5 text-xs text-gray-600">
 									{fmtDate(r.effective_date)}
 								</td>
@@ -682,33 +656,21 @@ function CostHistoryTab({ itemId }: { itemId: number }) {
 									{r.po_number ?? "—"}
 								</td>
 								<td className="px-4 py-2.5 text-right tabular-nums text-xs text-gray-400">
-									{r.unit_price_before != null
-										? `$${r.unit_price_before.toFixed(2)}`
-										: "—"}
+									{r.unit_price_before != null ? `$${r.unit_price_before.toFixed(2)}` : "—"}
 								</td>
 								<td className="px-4 py-2.5 text-right tabular-nums text-xs font-semibold text-gray-800">
 									${r.unit_cost_after.toFixed(2)}
 								</td>
-								<td
-									className={`px-4 py-2.5 text-right tabular-nums text-xs font-medium ${
-										deltaUp
-											? "text-red-500"
-											: deltaDown
-												? "text-emerald-500"
-												: "text-gray-400"
-									}`}
-								>
-									{delta != null
-										? `${deltaUp ? "+" : ""}$${delta.toFixed(2)}`
-										: "—"}
+								<td className={`px-4 py-2.5 text-right tabular-nums text-xs font-medium ${deltaUp ? "text-red-500" : deltaDown ? "text-emerald-500" : "text-gray-400"}`}>
+									{delta != null ? `${deltaUp ? "+" : ""}$${delta.toFixed(2)}` : "—"}
 								</td>
-							</tr>
+							</motion.tr>
 						);
 					})}
 					</tbody>
 				</table>
 			</div>
-		</div>
+		</motion.div>
 	);
 }
 
@@ -944,12 +906,7 @@ export function ItemDetailDrawer({
 									 onClose,
 								 }: ItemDetailDrawerProps) {
 	const [activeTab, setActiveTab] = useState<Tab>("overview");
-	const { data: overview } = useItemOverview(
-		open ? itemId : null,
-		warehouseLocationId
-	);
-
-	console.log(overview)
+	const { data: overview } = useItemOverview(itemId, warehouseLocationId);
 
 	// Reset to overview tab when item changes
 	useEffect(() => {
@@ -975,111 +932,120 @@ export function ItemDetailDrawer({
 	];
 
 	return (
-		<>
-			{/* Backdrop */}
-			<div
-				className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-200 ${
-					open ? "opacity-100" : "pointer-events-none opacity-0"
-				}`}
-				onClick={onClose}
-				aria-hidden="true"
-			/>
-
-			{/* Drawer panel */}
-			<div
-				role="dialog"
-				aria-modal="true"
-				aria-label="Item detail"
-				className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-xl flex-col bg-white shadow-2xl ring-1 ring-white transition-transform duration-300 ease-out ${
-					open ? "translate-x-0" : "translate-x-full"
-				}`}
-			>
-				{/* Header */}
-				<div className="flex flex-shrink-0 items-start justify-between border-b border-zinc-300 px-6 py-5">
-					<div className="flex flex-col gap-0.5 pr-8">
-						{overview ? (
-							<>
-								<h2 className="text-base font-semibold leading-tight ">
-									{overview.item_name}
-								</h2>
-								{overview.sku && (
-									<p className="font-mono text-xs  ">
-										{overview.sku}
-									</p>
-								)}
-							</>
-						) : (
-							<div className="flex flex-col gap-1.5">
-								<div className="h-4 w-36 animate-pulse rounded " />
-								<div className="h-3 w-20 animate-pulse rounded " />
-							</div>
-						)}
-					</div>
-					<button
+		<AnimatePresence>
+			{open && (
+				<>
+					{/* Backdrop */}
+					<motion.div
+						key="backdrop"
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1, transition: { duration: 0.2 } }}
+						exit={{ opacity: 0, transition: { duration: 0.18 } }}
+						className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
 						onClick={onClose}
-						className="flex h-8 w-8 items-center justify-center rounded-md   transition-colors  cursor-pointer"
-						aria-label="Close drawer"
+						aria-hidden="true"
+					/>
+
+					{/* Drawer panel */}
+					<motion.div
+						key="drawer"
+						initial={{ x: "100%" }}
+						animate={{ x: 0, transition: { type: "spring", damping: 25, stiffness: 300 } }}
+						exit={{ x: "100%", transition: { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] } }}
+						role="dialog"
+						aria-modal="true"
+						aria-label="Item detail"
+						className="fixed right-0 top-0 z-50 flex h-full w-full max-w-xl flex-col bg-white shadow-2xl"
 					>
-						<svg
-							className="h-4 w-4"
-							viewBox="0 0 16 16"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="1.5"
-						>
-							<path
-								strokeLinecap="round"
-								d="M3 3l10 10M13 3L3 13"
-							/>
-						</svg>
-					</button>
-				</div>
+						{/* Header */}
+						<div className="flex flex-shrink-0 items-start justify-between border-b border-gray-200 px-6 py-5">
+							<div className="flex flex-col gap-0.5 pr-8">
+								{overview ? (
+									<>
+										<h2 className="text-base font-semibold leading-tight text-gray-900">
+											{overview.item_name}
+										</h2>
+										{overview.sku && (
+											<p className="font-mono text-xs text-gray-400">
+												{overview.sku}
+											</p>
+										)}
+									</>
+								) : (
+									<div className="flex flex-col gap-1.5">
+										<div className="h-4 w-36 animate-pulse rounded bg-gray-100" />
+										<div className="h-3 w-20 animate-pulse rounded bg-gray-100" />
+									</div>
+								)}
+							</div>
+							<button
+								onClick={onClose}
+								className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+								aria-label="Close drawer"
+							>
+								<svg
+									className="h-4 w-4"
+									viewBox="0 0 16 16"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="1.5"
+								>
+									<path strokeLinecap="round" d="M3 3l10 10M13 3L3 13" />
+								</svg>
+							</button>
+						</div>
 
-				{/* Tab bar */}
-				<div className="flex flex-shrink-0 border-b border-zinc-300 px-6">
-					{tabs.map((tab) => (
-						<button
-							key={tab.id}
-							onClick={() => setActiveTab(tab.id)}
-							className={`relative py-3 pr-5 text-sm font-medium transition-colors ${
-								activeTab === tab.id
-									? "text-blue-600"
-									: "  hover:text-blue-600"
-							}`}
-						>
-							{tab.label}
-							{activeTab === tab.id && (
-								<span className="absolute bottom-0 left-0 right-5 h-0.5 rounded-full bg-blue-600" />
-							)}
-						</button>
-					))}
-				</div>
+						{/* Tab bar */}
+						<div className="flex flex-shrink-0 border-b border-gray-200 px-6 overflow-x-auto">
+							{tabs.map((tab) => (
+								<button
+									key={tab.id}
+									onClick={() => setActiveTab(tab.id)}
+									className={`relative py-3 pr-5 text-sm font-medium whitespace-nowrap transition-colors ${
+										activeTab === tab.id
+											? "text-indigo-600"
+											: "text-gray-500 hover:text-gray-800"
+									}`}
+								>
+									{tab.label}
+									{activeTab === tab.id && (
+										<motion.span
+											layoutId="tab-indicator"
+											className="absolute bottom-0 left-0 right-5 h-0.5 rounded-full bg-indigo-600"
+										/>
+									)}
+								</button>
+							))}
+						</div>
 
-				{/* Tab content — scrollable */}
-				<div className="flex-1 overflow-y-auto">
-					{itemId && open && (
-						<>
-							{activeTab === "overview" && (
-								<OverviewTab
-									itemId={itemId}
-									warehouseLocationId={warehouseLocationId}
-								/>
+						{/* Tab content — scrollable */}
+						<div className="flex-1 overflow-y-auto">
+							{itemId && (
+								<AnimatePresence mode="wait">
+									<motion.div
+										key={activeTab}
+										initial={{ opacity: 0, x: 8 }}
+										animate={{ opacity: 1, x: 0, transition: { duration: 0.2 } }}
+										exit={{ opacity: 0, x: -8, transition: { duration: 0.15 } }}
+									>
+										{activeTab === "overview" && (
+											<OverviewTab
+												itemId={itemId}
+												warehouseLocationId={warehouseLocationId}
+											/>
+										)}
+										{activeTab === "stock" && <StockTab itemId={itemId} />}
+										{activeTab === "shipments" && <ShipmentsTab itemId={itemId} />}
+										{activeTab === "cost" && <CostHistoryTab itemId={itemId} />}
+										{activeTab === "price" && <PriceHistoryTab itemId={itemId} />}
+									</motion.div>
+								</AnimatePresence>
 							)}
-							{activeTab === "stock" && <StockTab itemId={itemId} />}
-							{activeTab === "shipments" && (
-								<ShipmentsTab itemId={itemId} />
-							)}
-							{activeTab === "cost" && (
-								<CostHistoryTab itemId={itemId} />
-							)}
-							{activeTab === "price" && (
-								<PriceHistoryTab itemId={itemId} />
-							)}
-						</>
-					)}
-				</div>
-			</div>
-		</>
+						</div>
+					</motion.div>
+				</>
+			)}
+		</AnimatePresence>
 	);
 }
 

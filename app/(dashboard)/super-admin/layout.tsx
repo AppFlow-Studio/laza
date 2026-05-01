@@ -25,6 +25,7 @@ import {
     LineChart,
     CircleDollarSign,
     ChartColumn,
+    ScanLine,
 } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
@@ -65,12 +66,7 @@ const navigation = [
     },
     { name: "Orders", href: "/super-admin/orders", icon: StretchHorizontal },
     { name: "Users", href: "/super-admin/users", icon: Users },
-    // { name: "Inventory", href: "/super-admin/inventory", icon: BarChart3 },
-    // {
-    //     name: "Settings",
-    //     href: "/super-admin/settings/notifications",
-    //     icon: Settings,
-    // },
+    { name: "Settings", href: "/super-admin/settings/notifications", icon: Settings },
 ];
 
 const warehouseChildren = [
@@ -89,6 +85,11 @@ const warehouseChildren = [
         name: "Pallets",
         href: "/super-admin/warehouse/pallets",
         icon: ArrowsUpFromLine,
+    },
+    {
+        name: "Invoices",
+        href: "/super-admin/warehouse/invoices",
+        icon: ScanLine,
     },
 ];
 
