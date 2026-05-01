@@ -6,6 +6,7 @@ export interface StorePurchaseItem {
   itemId: number;
   quantity: number;
   unitCost: number;
+  storageSpaceId?: string | null;
 }
 
 export interface CreateStorePurchaseInput {
@@ -28,9 +29,10 @@ export async function createStorePurchase(input: CreateStorePurchaseInput): Prom
     p_supplier_name: input.supplierName ?? null,
     p_notes:         input.notes ?? null,
     p_items: input.items.map((i) => ({
-      item_id:   i.itemId,
-      quantity:  i.quantity,
-      unit_cost: i.unitCost,
+      item_id:          i.itemId,
+      quantity:         i.quantity,
+      unit_cost:        i.unitCost,
+      storage_space_id: i.storageSpaceId ?? null,
     })),
   });
   if (error) throw error;
@@ -85,6 +87,8 @@ export async function getStorePurchaseById(id: string) {
         quantity,
         unit_cost,
         line_total,
+        storage_space_id,
+        storage_spaces ( id, name ),
         items ( id, name, unit_of_measure, sku )
       )
     `)
