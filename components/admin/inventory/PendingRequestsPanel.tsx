@@ -31,6 +31,8 @@ export default function PendingRequestsPanel() {
   const approveMutation = useApproveInventoryUpdateRequest();
   const rejectMutation  = useRejectInventoryUpdateRequest();
 
+  const isProcessing = approveMutation.isPending || rejectMutation.isPending;
+
   const reviewed = (allRequests ?? []).filter(
     (r) => r.status === "approved" || r.status === "rejected"
   );
@@ -65,6 +67,11 @@ export default function PendingRequestsPanel() {
       const message = err instanceof Error ? err.message : "Failed to reject";
       toast.error(message);
     }
+  };
+
+  const openReject = (id: string) => {
+    setRejectNote("");
+    setRejectingId(id);
   };
 
   return (
@@ -174,7 +181,7 @@ export default function PendingRequestsPanel() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            disabled={rejectMutation.isPending}
+                            disabled={isProcessing}
                             onClick={() => handleReject(req.id)}
                           >
                             Confirm Reject
@@ -194,7 +201,7 @@ export default function PendingRequestsPanel() {
                           size="sm"
                           variant="outline"
                           className="text-green-600 border-green-200 hover:bg-green-50"
-                          disabled={approveMutation.isPending}
+                          disabled={isProcessing}
                           onClick={() => handleApprove(req.id)}
                         >
                           <CheckCircle2 className="h-4 w-4 mr-1" />
@@ -204,7 +211,7 @@ export default function PendingRequestsPanel() {
                           size="sm"
                           variant="outline"
                           className="text-red-500 border-red-200 hover:bg-red-50"
-                          onClick={() => setRejectingId(req.id)}
+                          onClick={() => openReject(req.id)}
                         >
                           <XCircle className="h-4 w-4 mr-1" />
                           Reject
