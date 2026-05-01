@@ -62,7 +62,7 @@ export async function getStorePurchases(orgId: string, locationId: string) {
     .eq("location_id", locationId)
     .order("purchased_at", { ascending: false });
   if (error) throw error;
-  return data;
+  return data ?? [];
 }
 
 export async function getStorePurchaseById(id: string) {
