@@ -51,8 +51,8 @@ export default function QuantityUpdateModal({
     const { organization } = useOrganization();
     const requestMutation = useCreateInventoryUpdateRequest();
 
-    // Check if acting user is employee (role = 'member' in Clerk)
-    const isEmployee = (userInfo as any)?.members?.role === "member";
+    // Check if acting user is employee (role = 'employee' in users table)
+    const isEmployee = userInfo?.role === "employee";
 
     const { data: pendingRequests } = usePendingRequestForItem(
         itemId ? Number(itemId) : undefined,
