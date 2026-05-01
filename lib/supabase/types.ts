@@ -2115,6 +2115,13 @@ export type Database = {
             referencedRelation: "store_purchases"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "store_purchase_items_storage_space_id_fkey"
+            columns: ["storage_space_id"]
+            isOneToOne: false
+            referencedRelation: "storage_spaces"
+            referencedColumns: ["id"]
+          },
         ]
       }
       store_purchases: {
