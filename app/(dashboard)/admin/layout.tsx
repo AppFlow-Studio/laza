@@ -14,6 +14,7 @@ import {
     StretchHorizontal,
     Warehouse,
     Thermometer,
+    ShoppingBag,
 } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
@@ -50,9 +51,10 @@ import { ChevronDown } from "lucide-react";
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
 const navigation = [
-    { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
-    { name: "Orders", href: "/admin/orders", icon: StretchHorizontal },
-    { name: "Users", href: "/admin/users", icon: Users },
+    { name: "Dashboard",  href: "/admin",           icon: LayoutDashboard },
+    { name: "Orders",     href: "/admin/orders",     icon: StretchHorizontal },
+    { name: "Purchases",  href: "/admin/purchases",  icon: ShoppingBag },
+    { name: "Users",      href: "/admin/users",      icon: Users },
     { name: "Items", href: "/admin/items", icon: Package },
     { name: "Categories", href: "/admin/categories", icon: Tags },
     { name: "Inventory", href: "/admin/inventory", icon: BarChart3 },
