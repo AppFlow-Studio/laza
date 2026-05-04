@@ -178,6 +178,7 @@ export function useReceivePurchaseOrder() {
             if (organization?.id) {
                 qc.invalidateQueries({ queryKey: purchaseOrderKeys.all(organization.id) });
                 qc.invalidateQueries({ queryKey: purchaseOrderKeys.costs(organization.id) });
+                qc.invalidateQueries({ queryKey: purchaseOrderKeys.actionableCount(organization.id) });
             }
         },
     });
