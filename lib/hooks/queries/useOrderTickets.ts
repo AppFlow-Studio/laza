@@ -125,6 +125,7 @@ export function useSubmitTicket() {
 	  onSuccess: (_, ticketId) => {
 		queryClient.invalidateQueries({ queryKey: ticketKeys.detail(ticketId) });
 		queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
+		queryClient.invalidateQueries({ queryKey: ticketKeys.all });
 	  },
 	});
   }
