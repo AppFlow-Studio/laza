@@ -48,6 +48,9 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
+import { useActiveTicketCountForLocation } from "@/lib/hooks/queries/useOrderTickets";
+import { useInventoryUpdateRequests } from "@/lib/hooks/queries/useInventoryUpdateRequests";
+import { NavBadge } from "@/components/admin/shared/NavBadge";
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
 const navigation = [
@@ -201,6 +204,14 @@ export default function AdminLayout({
 }) {
     const pathname = usePathname();
     const { user } = useUser();
+    const { selectedLocationId } = useAdminStore();
+    const { data: orderCount }      = useActiveTicketCountForLocation(selectedLocationId ?? undefined);
+    const { data: pendingRequests } = useInventoryUpdateRequests("pending");
+
+    const badgeCounts: Record<string, number> = {
+        "/admin/orders":    orderCount ?? 0,
+        "/admin/purchases": pendingRequests?.length ?? 0,
+    };
 
     const currentNav = navigation.find(
         (item) =>
@@ -264,6 +275,7 @@ export default function AdminLayout({
                                                             <span>
                                                                 {item.name}
                                                             </span>
+                                                            <NavBadge count={badgeCounts[item.href] ?? 0} />
                                                         </Link>
                                                     </SidebarMenuButton>
                                                 </SidebarMenuItem>
