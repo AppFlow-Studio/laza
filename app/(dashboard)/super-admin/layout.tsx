@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useOrganization } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 import {
     LayoutDashboard,
@@ -50,6 +50,9 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { useActiveTicketCount } from "@/lib/hooks/queries/useOrderTickets";
+import { useActionablePOCount } from "@/lib/hooks/queries/usePurchaseOrders";
+import { NavBadge } from "@/components/admin/shared/NavBadge";
 
 // ---------------------------------------------------------------------------
 // Navigation config
@@ -216,6 +219,15 @@ export default function SuperAdminLayout({
 }) {
     const pathname = usePathname();
     const { user } = useUser();
+    const { organization } = useOrganization();
+    const orgId = organization?.id;
+    const { data: orderCount } = useActiveTicketCount(orgId);
+    const { data: poCount }    = useActionablePOCount(orgId);
+
+    const badgeCounts: Record<string, number> = {
+        "/super-admin/orders":          orderCount ?? 0,
+        "/super-admin/purchase-orders": poCount ?? 0,
+    };
 
     const currentNav =
         warehouseChildren.find(
@@ -339,6 +351,7 @@ export default function SuperAdminLayout({
                                                                 <span>
                                                                     {item.name}
                                                                 </span>
+                                                                <NavBadge count={badgeCounts[item.href] ?? 0} />
                                                             </Link>
                                                         </SidebarMenuButton>
                                                     </SidebarMenuItem>
