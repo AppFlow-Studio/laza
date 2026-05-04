@@ -19,6 +19,8 @@ import {
 	getAutoApprovedTicketsAction,
 	getTicketsWithDiscrepanciesAction,
 	getTicketItemCostsAction,
+	getActiveTicketCountForLocationAction,
+	getActiveTicketCountAction,
 } from "@/lib/supabase/actions/orderTicketActions";
 import {
 	createTicket,
@@ -36,15 +38,17 @@ import { checkWarehouseLowStockAfterFulfillment } from "@/lib/supabase/actions/w
 // ─── Query Key Factory ────────────────────────────────────────────────────────
 
 export const ticketKeys = {
-	all:            ["tickets"] as const,
-	lists:          ()                                             => [...ticketKeys.all, "list"] as const,
-	byLocation:     (locationId: string, filters?: TicketFilters) => [...ticketKeys.lists(), "location", locationId, filters] as const,
-	allTickets:     (orgId: string, filters?: TicketFilters)      => [...ticketKeys.lists(), "all", orgId, filters] as const,
-	detail:         (id: string)                                  => [...ticketKeys.all, "detail", id] as const,
-	pendingCount:   (orgId: string)                               => [...ticketKeys.all, "pending-count", orgId] as const,
-	remainder:      (parentId: string)                            => [...ticketKeys.all, "remainder", parentId] as const,
-	autoApproved:   (orgId: string, daysBack: number)             => [...ticketKeys.all, "auto-approved", orgId, daysBack] as const,
-	discrepancies:  (orgId: string)                               => [...ticketKeys.all, "discrepancies", orgId] as const,
+	all:                    ["tickets"] as const,
+	lists:                  ()                                             => [...ticketKeys.all, "list"] as const,
+	byLocation:             (locationId: string, filters?: TicketFilters) => [...ticketKeys.lists(), "location", locationId, filters] as const,
+	allTickets:             (orgId: string, filters?: TicketFilters)      => [...ticketKeys.lists(), "all", orgId, filters] as const,
+	detail:                 (id: string)                                  => [...ticketKeys.all, "detail", id] as const,
+	pendingCount:           (orgId: string)                               => [...ticketKeys.all, "pending-count", orgId] as const,
+	remainder:              (parentId: string)                            => [...ticketKeys.all, "remainder", parentId] as const,
+	autoApproved:           (orgId: string, daysBack: number)             => [...ticketKeys.all, "auto-approved", orgId, daysBack] as const,
+	discrepancies:          (orgId: string)                               => [...ticketKeys.all, "discrepancies", orgId] as const,
+	activeCountForLocation: (locationId: string)                          => [...ticketKeys.all, "active-count-location", locationId] as const,
+	activeCount:            (orgId: string)                               => [...ticketKeys.all, "active-count", orgId] as const,
 };
 
 // ─── useCreateTicket ──────────────────────────────────────────────────────────
@@ -321,5 +325,29 @@ export function useAutoApprovedTickets(orgId: string | undefined, daysBack = 30)
 		queryFn:   () => getAutoApprovedTicketsAction(orgId!, daysBack),
 		enabled:   !!orgId,
 		staleTime: 5 * 60_000,
+	});
+}
+
+// ─── useActiveTicketCountForLocation ─────────────────────────────────────────
+
+export function useActiveTicketCountForLocation(locationId: string | undefined) {
+	return useQuery({
+		queryKey:             ticketKeys.activeCountForLocation(locationId ?? ""),
+		queryFn:              () => getActiveTicketCountForLocationAction(locationId!),
+		enabled:              !!locationId,
+		staleTime:            30_000,
+		refetchOnWindowFocus: true,
+	});
+}
+
+// ─── useActiveTicketCount ─────────────────────────────────────────────────────
+
+export function useActiveTicketCount(orgId: string | undefined) {
+	return useQuery({
+		queryKey:             ticketKeys.activeCount(orgId ?? ""),
+		queryFn:              () => getActiveTicketCountAction(orgId!),
+		enabled:              !!orgId,
+		staleTime:            30_000,
+		refetchOnWindowFocus: true,
 	});
 }
