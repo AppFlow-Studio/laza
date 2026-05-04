@@ -879,3 +879,37 @@ export async function getTicketItemCosts(itemIds: number[]) {
     if (error || !data) return [];
     return data as { id: number; current_unit_cost: number | null }[];
 }
+
+// ─── getActiveTicketCountForLocation ─────────────────────────────────────────
+
+export async function getActiveTicketCountForLocation(
+    locationId: string,
+): Promise<number> {
+    const supabase = createServerSupabaseClient();
+
+    const { count, error } = await supabase
+        .from("order_tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("requesting_location_id", locationId)
+        .in("status", ["submitted", "processing", "fulfilled"]);
+
+    if (error) throw error;
+    return count ?? 0;
+}
+
+// ─── getActiveTicketCount ─────────────────────────────────────────────────────
+
+export async function getActiveTicketCount(
+    organizationId: string,
+): Promise<number> {
+    const supabase = createServerSupabaseClient();
+
+    const { count, error } = await supabase
+        .from("order_tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .in("status", ["submitted", "processing", "fulfilled"]);
+
+    if (error) throw error;
+    return count ?? 0;
+}
