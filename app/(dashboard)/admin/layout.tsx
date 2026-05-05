@@ -15,6 +15,7 @@ import {
     Warehouse,
     Thermometer,
     ShoppingBag,
+    Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
@@ -252,29 +253,110 @@ export default function AdminLayout({
 
                         {/* Nav items */}
                         <SidebarContent>
-                            <SidebarGroup className="group-data-[collapsible=icon]:px-2">
+                            {/* ── New Order CTA ── */}
+                            <div className="px-3 pt-2 pb-1 group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:pt-1">
+                                <Link
+                                    href="/admin/orders/new"
+                                    className="flex items-center justify-center gap-2 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2.5 transition-colors group-data-[collapsible=icon]:py-2 group-data-[collapsible=icon]:px-0"
+                                >
+                                    <Plus className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="group-data-[collapsible=icon]:hidden">New Order</span>
+                                </Link>
+                            </div>
+
+                            {/* ── Dashboard (standalone, no label) ── */}
+                            <SidebarGroup className="group-data-[collapsible=icon]:px-2 pt-2">
                                 <SidebarGroupContent>
                                     <SidebarMenu>
-                                        {navigation.map((item) => {
-                                            const isActive =
-                                                pathname === item.href ||
-                                                pathname?.startsWith(
-                                                    item.href + "/",
-                                                );
+                                        {[navigation[0]].map((item) => {
+                                            const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
                                             return (
-                                                <SidebarMenuItem
-                                                    key={item.name}
-                                                >
-                                                    <SidebarMenuButton
-                                                        asChild
-                                                        isActive={isActive}
-                                                        tooltip={item.name}
-                                                    >
+                                                <SidebarMenuItem key={item.name}>
+                                                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.name}>
                                                         <Link href={item.href}>
                                                             <item.icon className="h-4 w-4" />
-                                                            <span>
-                                                                {item.name}
-                                                            </span>
+                                                            <span>{item.name}</span>
+                                                            <NavBadge count={badgeCounts[item.href] ?? 0} />
+                                                        </Link>
+                                                    </SidebarMenuButton>
+                                                </SidebarMenuItem>
+                                            );
+                                        })}
+                                    </SidebarMenu>
+                                </SidebarGroupContent>
+                            </SidebarGroup>
+
+                            {/* ── OPERATIONS ── */}
+                            <SidebarGroup className="group-data-[collapsible=icon]:px-2 pt-1">
+                                <div className="px-3 pb-1 group-data-[collapsible=icon]:hidden">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                                        Operations
+                                    </span>
+                                </div>
+                                <SidebarGroupContent>
+                                    <SidebarMenu>
+                                        {[navigation[1], navigation[2]].map((item) => {
+                                            const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+                                            return (
+                                                <SidebarMenuItem key={item.name}>
+                                                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.name}>
+                                                        <Link href={item.href}>
+                                                            <item.icon className="h-4 w-4" />
+                                                            <span>{item.name}</span>
+                                                            <NavBadge count={badgeCounts[item.href] ?? 0} />
+                                                        </Link>
+                                                    </SidebarMenuButton>
+                                                </SidebarMenuItem>
+                                            );
+                                        })}
+                                    </SidebarMenu>
+                                </SidebarGroupContent>
+                            </SidebarGroup>
+
+                            {/* ── CATALOG ── */}
+                            <SidebarGroup className="group-data-[collapsible=icon]:px-2 pt-1">
+                                <div className="px-3 pb-1 group-data-[collapsible=icon]:hidden">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                                        Catalog
+                                    </span>
+                                </div>
+                                <SidebarGroupContent>
+                                    <SidebarMenu>
+                                        {[navigation[4], navigation[5], navigation[6]].map((item) => {
+                                            const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+                                            return (
+                                                <SidebarMenuItem key={item.name}>
+                                                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.name}>
+                                                        <Link href={item.href}>
+                                                            <item.icon className="h-4 w-4" />
+                                                            <span>{item.name}</span>
+                                                            <NavBadge count={badgeCounts[item.href] ?? 0} />
+                                                        </Link>
+                                                    </SidebarMenuButton>
+                                                </SidebarMenuItem>
+                                            );
+                                        })}
+                                    </SidebarMenu>
+                                </SidebarGroupContent>
+                            </SidebarGroup>
+
+                            {/* ── MANAGE ── */}
+                            <SidebarGroup className="group-data-[collapsible=icon]:px-2 pt-1">
+                                <div className="px-3 pb-1 group-data-[collapsible=icon]:hidden">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                                        Manage
+                                    </span>
+                                </div>
+                                <SidebarGroupContent>
+                                    <SidebarMenu>
+                                        {[navigation[3], navigation[7]].map((item) => {
+                                            const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+                                            return (
+                                                <SidebarMenuItem key={item.name}>
+                                                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.name}>
+                                                        <Link href={item.href}>
+                                                            <item.icon className="h-4 w-4" />
+                                                            <span>{item.name}</span>
                                                             <NavBadge count={badgeCounts[item.href] ?? 0} />
                                                         </Link>
                                                     </SidebarMenuButton>
