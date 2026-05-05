@@ -920,9 +920,13 @@ export default function WarehouseDetailPage({ params }: { params: Promise<{ id: 
                         >
                             <Icon className="w-4 h-4" />
                             {label}
-                            {count !== undefined && (
-                                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium ${activeTab === tabId ? "bg-indigo-100 text-indigo-600" : "bg-zinc-100 text-zinc-500"}`}>
-                                    {count}
+                            {count !== undefined && count > 0 && (
+                                <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
+                                    activeTab === tabId
+                                        ? "bg-indigo-600 text-white"
+                                        : "bg-zinc-200 text-zinc-600"
+                                }`}>
+                                    {count > 99 ? "99+" : count}
                                 </span>
                             )}
                         </button>
