@@ -341,7 +341,7 @@ const KANBAN_STATUSES: TicketStatus[] = ["draft", "submitted", "processing", "fu
 
 function KanbanView({ tickets, router }: { tickets: RawTicket[]; router: ReturnType<typeof useRouter> }) {
     return (
-        <div className="flex gap-3 overflow-x-auto pb-4">
+        <div className="flex gap-3 overflow-x-scroll pb-4">
             {KANBAN_STATUSES.map((status) => {
                 const group = tickets.filter((t) => t.status === status);
                 const { label, dot, accent } = STATUS_CONFIG[status];
@@ -456,7 +456,7 @@ export default function AdminOrdersPage() {
                             Orders
                         </h1>
                         <p className="text-xs text-gray-400 mt-1">
-                            Request inventory from the central warehouse
+                            Request inventory from the warehouse
                         </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -474,13 +474,6 @@ export default function AdminOrdersPage() {
                                 className={`w-8 h-8 flex items-center justify-center transition-colors ${viewMode === "list" ? "bg-indigo-600 text-white" : "bg-white text-gray-400 hover:bg-gray-50 hover:text-indigo-600"}`}
                             >
                                 <List size={14} />
-                            </button>
-                            <button
-                                onClick={() => setViewMode("status")}
-                                title="Status view"
-                                className={`w-8 h-8 flex items-center justify-center transition-colors ${viewMode === "status" ? "bg-indigo-600 text-white" : "bg-white text-gray-400 hover:bg-gray-50 hover:text-indigo-600"}`}
-                            >
-                                <Columns size={14} />
                             </button>
                         </div>
                         <Link

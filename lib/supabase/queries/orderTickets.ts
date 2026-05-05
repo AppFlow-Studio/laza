@@ -891,7 +891,7 @@ export async function getActiveTicketCountForLocation(
         .from("order_tickets")
         .select("id", { count: "exact", head: true })
         .eq("requesting_location_id", locationId)
-        .in("status", ["submitted", "processing", "fulfilled"]);
+        .in("status", ["fulfilled"]);
 
     if (error) throw error;
     return count ?? 0;
@@ -908,7 +908,7 @@ export async function getActiveTicketCount(
         .from("order_tickets")
         .select("id", { count: "exact", head: true })
         .eq("organization_id", organizationId)
-        .in("status", ["submitted", "processing", "fulfilled"]);
+        .in("status", ["submitted"]);
 
     if (error) throw error;
     return count ?? 0;
