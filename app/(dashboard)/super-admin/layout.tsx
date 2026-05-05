@@ -25,6 +25,7 @@ import {
     LineChart,
     CircleDollarSign,
     ChartColumn,
+    Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
@@ -273,29 +274,53 @@ export default function SuperAdminLayout({
                                     </span>
                                 </div>
                             </div>
+                            {/* New PO CTA */}
+                            <div className="px-2 pt-1 pb-1 group-data-[collapsible=icon]:px-0">
+                                <Link
+                                    href="/super-admin/purchase-orders/new"
+                                    className="flex items-center justify-center gap-2 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2.5 transition-colors group-data-[collapsible=icon]:py-2"
+                                >
+                                    <Plus className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="group-data-[collapsible=icon]:hidden">New PO</span>
+                                </Link>
+                            </div>
                         </SidebarHeader>
 
                         <SidebarContent>
-                            <SidebarGroup className="group-data-[collapsible=icon]:px-2">
+                            {/* ── OVERVIEW ── */}
+                            <SidebarGroup className="group-data-[collapsible=icon]:px-2 pt-2">
+                                <div className="px-3 pb-1 group-data-[collapsible=icon]:hidden">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Overview</span>
+                                </div>
                                 <SidebarGroupContent>
                                     <SidebarMenu>
-                                        {/* Dashboard */}
                                         <SidebarMenuItem>
-                                            <SidebarMenuButton
-                                                asChild
-                                                isActive={
-                                                    pathname === "/super-admin"
-                                                }
-                                                tooltip="Dashboard"
-                                            >
+                                            <SidebarMenuButton asChild isActive={pathname === "/super-admin"} tooltip="Dashboard">
                                                 <Link href="/super-admin">
                                                     <LayoutDashboard className="h-4 w-4" />
                                                     <span>Dashboard</span>
                                                 </Link>
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
+                                        <SidebarMenuItem>
+                                            <SidebarMenuButton asChild isActive={pathname?.startsWith("/super-admin/stores")} tooltip="All Stores">
+                                                <Link href="/super-admin/stores">
+                                                    <Store className="h-4 w-4" />
+                                                    <span>All Stores</span>
+                                                </Link>
+                                            </SidebarMenuButton>
+                                        </SidebarMenuItem>
+                                    </SidebarMenu>
+                                </SidebarGroupContent>
+                            </SidebarGroup>
 
-                                        {/* Warehouse */}
+                            {/* ── OPERATIONS ── */}
+                            <SidebarGroup className="group-data-[collapsible=icon]:px-2 pt-1">
+                                <div className="px-3 pb-1 group-data-[collapsible=icon]:hidden">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Operations</span>
+                                </div>
+                                <SidebarGroupContent>
+                                    <SidebarMenu>
                                         <CollapsibleNavGroup
                                             label="Warehouse"
                                             icon={Warehouse}
@@ -303,17 +328,33 @@ export default function SuperAdminLayout({
                                             children={warehouseChildren}
                                             pathname={pathname}
                                         />
+                                        {navigation
+                                            .filter((item) => item.name === "Purchase Orders" || item.name === "Orders" || item.name === "Users")
+                                            .map((item) => {
+                                                const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+                                                return (
+                                                    <SidebarMenuItem key={item.name}>
+                                                        <SidebarMenuButton asChild isActive={isActive} tooltip={item.name}>
+                                                            <Link href={item.href}>
+                                                                <item.icon className="h-4 w-4" />
+                                                                <span>{item.name}</span>
+                                                                <NavBadge count={badgeCounts[item.href] ?? 0} />
+                                                            </Link>
+                                                        </SidebarMenuButton>
+                                                    </SidebarMenuItem>
+                                                );
+                                            })}
+                                    </SidebarMenu>
+                                </SidebarGroupContent>
+                            </SidebarGroup>
 
-                                        {/* Analytics */}
-                                        <CollapsibleNavGroup
-                                            label="Analytics"
-                                            icon={LineChart}
-                                            basePath="/super-admin/analytics"
-                                            children={analyticsChildren}
-                                            pathname={pathname}
-                                        />
-
-                                        {/* Catalog */}
+                            {/* ── CATALOG ── */}
+                            <SidebarGroup className="group-data-[collapsible=icon]:px-2 pt-1">
+                                <div className="px-3 pb-1 group-data-[collapsible=icon]:hidden">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Catalog</span>
+                                </div>
+                                <SidebarGroupContent>
+                                    <SidebarMenu>
                                         <CollapsibleNavGroup
                                             label="Catalog"
                                             icon={Package}
@@ -322,41 +363,24 @@ export default function SuperAdminLayout({
                                             children={catalogChildren}
                                             pathname={pathname}
                                         />
+                                    </SidebarMenu>
+                                </SidebarGroupContent>
+                            </SidebarGroup>
 
-                                        {/* Rest of nav */}
-                                        {navigation
-                                            .filter(
-                                                (item) =>
-                                                    item.name !== "Dashboard",
-                                            )
-                                            .map((item) => {
-                                                const isActive =
-                                                    pathname === item.href ||
-                                                    pathname?.startsWith(
-                                                        item.href + "/",
-                                                    );
-                                                return (
-                                                    <SidebarMenuItem
-                                                        key={item.name}
-                                                    >
-                                                        <SidebarMenuButton
-                                                            asChild
-                                                            isActive={isActive}
-                                                            tooltip={item.name}
-                                                        >
-                                                            <Link
-                                                                href={item.href}
-                                                            >
-                                                                <item.icon className="h-4 w-4" />
-                                                                <span>
-                                                                    {item.name}
-                                                                </span>
-                                                                <NavBadge count={badgeCounts[item.href] ?? 0} />
-                                                            </Link>
-                                                        </SidebarMenuButton>
-                                                    </SidebarMenuItem>
-                                                );
-                                            })}
+                            {/* ── INSIGHTS ── */}
+                            <SidebarGroup className="group-data-[collapsible=icon]:px-2 pt-1">
+                                <div className="px-3 pb-1 group-data-[collapsible=icon]:hidden">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Insights</span>
+                                </div>
+                                <SidebarGroupContent>
+                                    <SidebarMenu>
+                                        <CollapsibleNavGroup
+                                            label="Analytics"
+                                            icon={LineChart}
+                                            basePath="/super-admin/analytics"
+                                            children={analyticsChildren}
+                                            pathname={pathname}
+                                        />
                                     </SidebarMenu>
                                 </SidebarGroupContent>
                             </SidebarGroup>
