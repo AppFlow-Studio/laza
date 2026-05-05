@@ -33,8 +33,8 @@ import {
     Store,
     MapPin,
     Warehouse,
-    ChevronDown,
 } from "lucide-react";
+import { ItemAddDialog } from "@/components/admin/orders/ItemAddDialog";
 import { toast } from "react-hot-toast";
 import { useOrganization } from "@clerk/nextjs";
 import { useWarehouseCatalog } from "@/lib/hooks/queries/useWarehouse";
@@ -62,20 +62,6 @@ type CartEntry = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function validateBoxQty(val: string | number): {
-    ok: boolean;
-    value?: number;
-    error?: string;
-} {
-    const n = Number(val);
-    if (val === "" || val === null || val === undefined)
-        return { ok: false, error: "Required" };
-    if (!Number.isInteger(n)) return { ok: false, error: "Whole boxes only" };
-    if (n < 1) return { ok: false, error: "Minimum 1 box" };
-    if (n > 999) return { ok: false, error: "Maximum 999 boxes" };
-    return { ok: true, value: n };
-}
-
 function effectivePiecesPerBox(
     item: WarehouseCatalogItem & { box_quantity: number },
     config: ShipmentBoxConfig | null,
@@ -96,135 +82,13 @@ function useItemShipmentConfigs(
         if (!itemId || !organizationId) return;
         setLoading(true);
         getItemShipmentHistory(itemId, organizationId)
-            .then((result) => {
-                console.log("shipment configs for item", itemId, result);
-                setConfigs(result);
-            })
+            .then((result) => setConfigs(result))
             .finally(() => setLoading(false));
     }, [itemId, organizationId]);
 
     return { configs, loading };
 }
 
-// ─── ShipmentConfigPicker ─────────────────────────────────────────────────────
-
-function ShipmentConfigPicker({
-    item,
-    organizationId,
-    selectedConfig,
-    hasError,
-    onSelect,
-}: {
-    item: WarehouseCatalogItem & { box_quantity: number };
-    organizationId: string;
-    selectedConfig: ShipmentBoxConfig | null;
-    hasError?: boolean;
-    onSelect: (config: ShipmentBoxConfig | null) => void;
-}) {
-    const { configs, loading } = useItemShipmentConfigs(
-        item.id,
-        organizationId,
-    );
-
-    if (loading) {
-        return (
-            <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-2 py-1">
-                <Loader2 size={9} className="animate-spin" /> Loading shipment
-                configs…
-            </div>
-        );
-    }
-
-    if (configs.length === 0) {
-        return (
-            <div className="flex items-center gap-1 mt-2 text-[10px] text-gray-400 py-1">
-                <Boxes size={9} className="text-gray-300" />
-                {item.box_quantity} {item.unit_of_measure}/box (default)
-            </div>
-        );
-    }
-
-    const tabs = configs.map((cfg) => ({
-        key: cfg.id,
-        label:
-            cfg.poNumber ??
-            (cfg.poDate
-                ? new Date(cfg.poDate).toLocaleDateString("en-US", {
-                      month: "short",
-                      year: "numeric",
-                  })
-                : `${cfg.piecesPerBox}/box`),
-        sub: `${cfg.piecesPerBox} ${item.unit_of_measure}/box`,
-        config: cfg,
-    }));
-
-    const activeKey = selectedConfig?.id ?? null;
-
-    return (
-        <div className="mt-2">
-            <p className="text-[10px] font-semibold text-gray-400 tracking-widest mb-1.5">
-                Box config
-            </p>
-            <div className="flex gap-1 flex-wrap">
-                {tabs.map((tab) => {
-                    const isActive = activeKey === tab.key;
-                    return (
-                        <button
-                            key={tab.key}
-                            type="button"
-                            onClick={() => onSelect(tab.config)}
-                            className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all ${
-                                isActive
-                                    ? "border-indigo-400 bg-indigo-50 text-indigo-700"
-                                    : hasError
-                                      ? "border-red-300 bg-red-50 hover:border-red-400"
-                                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
-                            }`}
-                        >
-                            <span
-                                className={`text-[11px] font-semibold leading-tight ${isActive ? "text-indigo-700" : "text-gray-700"}`}
-                            >
-                                {tab.label}
-                            </span>
-                            <span
-                                className={`text-[10px] mt-0.5 leading-tight ${isActive ? "text-indigo-500" : "text-gray-400"}`}
-                            >
-                                {tab.sub}
-                            </span>
-                            {isActive && (
-                                <div className="w-1 h-1 rounded-full bg-indigo-500 mt-1" />
-                            )}
-                        </button>
-                    );
-                })}
-            </div>
-
-            {hasError && (
-                <p className="mt-1.5 text-[11px] text-red-500 font-medium flex items-center gap-1">
-                    <AlertCircle size={10} /> Choose a box config to proceed
-                </p>
-            )}
-
-            {selectedConfig &&
-                (selectedConfig.supplierName || selectedConfig.poDate) && (
-                    <p className="text-[10px] text-gray-400 mt-1.5">
-                        {[
-                            selectedConfig.supplierName,
-                            selectedConfig.poDate &&
-                                new Date(
-                                    selectedConfig.poDate,
-                                ).toLocaleDateString("en-US", {
-                                    month: "short",
-                                    year: "numeric",
-                                }),
-                        ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                    </p>
-                )}
-        </div>
-    );
-}
 
 // ─── DeliveryTypeSelector ─────────────────────────────────────────────────────
 
@@ -332,68 +196,33 @@ function CatalogItemRow({
     onQtyChange: (itemId: number, boxes: number) => void;
     onConfigChange: (itemId: number, config: ShipmentBoxConfig | null) => void;
 }) {
-    const [configError, setConfigError] = useState(false);
-    const [inputVal, setInputVal] = useState(String(cartEntry?.boxes ?? 1));
-    const [error, setError] = useState<string | null>(null);
-    const [showConfigPicker, setShowConfigPicker] = useState(false);
-    const [localConfig, setLocalConfig] = useState<ShipmentBoxConfig | null>(
-        cartEntry?.selectedConfig ?? null,
-    );
-    const { configs: availableConfigs } = useItemShipmentConfigs(
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const { configs, loading: configsLoading } = useItemShipmentConfigs(
         item.id,
         organizationId,
     );
-    const requiresConfigSelection = availableConfigs.length > 0;
 
     const inCart = !!cartEntry;
-    const displayBoxes = parseInt(inputVal) || 1;
-    const ppb = effectivePiecesPerBox(item, localConfig);
+    const ppb = effectivePiecesPerBox(item, cartEntry?.selectedConfig ?? null);
 
-    useEffect(() => {
-        setLocalConfig(cartEntry?.selectedConfig ?? null);
-    }, [cartEntry?.selectedConfig]);
-
-    const handleInputChange = (val: string) => {
-        if (val.includes(".")) return;
-        setInputVal(val);
-        const v = validateBoxQty(val);
-        setError(v.ok ? null : (v.error ?? null));
-        if (v.ok && inCart) onQtyChange(item.id, v.value!);
-    };
-
-    const adjust = (delta: number) => {
-        const next = Math.max(1, Math.min(999, displayBoxes + delta));
-        setInputVal(String(next));
-        setError(null);
-        if (inCart) onQtyChange(item.id, next);
-    };
-
-    const handleAdd = () => {
-        const v = validateBoxQty(inputVal);
-        if (!v.ok) {
-            setError(v.error ?? null);
-            return;
+    const handleConfirm = (boxes: number, config: ShipmentBoxConfig | null) => {
+        if (inCart) {
+            onQtyChange(item.id, boxes);
+            onConfigChange(item.id, config);
+        } else {
+            onAdd(item, boxes, config);
         }
-        if (requiresConfigSelection && !localConfig) {
-            setConfigError(true);
-            setShowConfigPicker(true);
-            return;
-        }
-        setError(null);
-        setConfigError(false);
-        onAdd(item, v.value!, localConfig);
     };
 
     return (
-        <div
-            className={`flex flex-col p-3.5 rounded-xl border transition-all ${
-                inCart
-                    ? "border-indigo-300 bg-indigo-50/40"
-                    : "border-gray-200 bg-white hover:border-violet-200 hover:shadow-[0_1px_6px_rgba(99,102,241,0.07)]"
-            }`}
-        >
-            <div className="flex items-start gap-3">
-                {/* Item info */}
+        <>
+            <div
+                className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all ${
+                    inCart
+                        ? "border-indigo-300 bg-indigo-50/40"
+                        : "border-gray-200 bg-white hover:border-violet-200 hover:shadow-[0_1px_6px_rgba(99,102,241,0.07)]"
+                }`}
+            >
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold text-gray-900">
@@ -407,117 +236,44 @@ function CatalogItemRow({
                     </div>
                     {item.sku && (
                         <span
-                            style={{
-                                fontFamily: "var(--font-mono, monospace)",
-                            }}
+                            style={{ fontFamily: "var(--font-mono, monospace)" }}
                             className="text-[10px] text-gray-400 mt-0.5 block"
                         >
                             {item.sku}
                         </span>
                     )}
-
-                    <button
-                        onClick={() => setShowConfigPicker((p) => !p)}
-                        className={`flex items-center gap-1 mt-1.5 text-[11px] transition-colors group ${
-                            configError
-                                ? "text-red-500 hover:text-red-600"
-                                : "text-gray-500 hover:text-indigo-600"
-                        }`}
-                    >
-                        <Boxes
-                            size={10}
-                            className="text-gray-300 group-hover:text-indigo-400 flex-shrink-0"
-                        />
-                        <span>
-                            {ppb} {item.unit_of_measure}/box
-                            {localConfig && (
+                    {inCart && cartEntry && (
+                        <div className="mt-1 text-[11px] text-gray-500 flex items-center gap-1">
+                            <Boxes size={10} className="text-gray-300" />
+                            {cartEntry.boxes} box{cartEntry.boxes !== 1 ? "es" : ""} · {cartEntry.boxes * ppb} {item.unit_of_measure}
+                            {cartEntry.selectedConfig && (
                                 <span className="ml-1 text-indigo-500 font-semibold">
-                                    ·{" "}
-                                    {localConfig.poNumber ?? "Custom shipment"}
+                                    · {cartEntry.selectedConfig.poNumber ?? "Custom shipment"}
                                 </span>
                             )}
-                        </span>
-                        <ChevronDown
-                            size={10}
-                            className={`ml-0.5 transition-transform ${showConfigPicker ? "rotate-180" : ""}`}
-                        />
-                    </button>
-
-                    {showConfigPicker && (
-                        <ShipmentConfigPicker
-                            item={item}
-                            organizationId={organizationId}
-                            selectedConfig={localConfig}
-                            hasError={configError}
-                            onSelect={(cfg) => {
-                                setLocalConfig(cfg);
-                                setConfigError(false);
-                                onConfigChange(item.id, cfg);
-                                setShowConfigPicker(false);
-                            }}
-                        />
+                        </div>
                     )}
                 </div>
 
-                {/* Qty controls */}
                 <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                    <div className="flex items-center">
-                        <button
-                            onClick={() => adjust(-1)}
-                            className="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-l-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
-                        >
-                            −
-                        </button>
-                        <input
-                            type="number"
-                            min={1}
-                            max={999}
-                            step={1}
-                            value={inputVal}
-                            onChange={(e) => handleInputChange(e.target.value)}
-                            onKeyDown={(e) =>
-                                [".", "e", "E", "-", "+"].includes(e.key) &&
-                                e.preventDefault()
-                            }
-                            className={`w-10 h-7 border-y text-center text-xs font-semibold text-gray-900 outline-none transition-all ${
-                                error
-                                    ? "border-red-400 bg-red-50"
-                                    : "border-gray-200 bg-white focus:border-indigo-400"
-                            }`}
-                            style={
-                                {
-                                    MozAppearance: "textfield",
-                                    appearance: "textfield",
-                                } as React.CSSProperties
-                            }
-                        />
-                        <button
-                            onClick={() => adjust(1)}
-                            className="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-r-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
-                        >
-                            +
-                        </button>
-                        <span className="ml-2 text-[11px] text-gray-400 w-16">
-                            = {displayBoxes * ppb} {item.unit_of_measure}
-                        </span>
-                    </div>
-
-                    {error && (
-                        <div className="flex items-center gap-1 text-[10px] text-red-500">
-                            <AlertCircle size={9} /> {error}
-                        </div>
-                    )}
-
                     {inCart ? (
-                        <button
-                            onClick={() => onRemove(item.id)}
-                            className="text-[11px] font-semibold text-red-400 hover:text-red-600 flex items-center gap-1 transition-colors"
-                        >
-                            <X size={10} /> Remove
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setDialogOpen(true)}
+                                className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-lg transition-colors"
+                            >
+                                Edit
+                            </button>
+                            <button
+                                onClick={() => onRemove(item.id)}
+                                className="text-[11px] font-semibold text-red-400 hover:text-red-600 flex items-center gap-1 transition-colors"
+                            >
+                                <X size={10} /> Remove
+                            </button>
+                        </div>
                     ) : (
                         <button
-                            onClick={handleAdd}
+                            onClick={() => setDialogOpen(true)}
                             className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-lg transition-colors"
                         >
                             Add to order
@@ -525,7 +281,18 @@ function CatalogItemRow({
                     )}
                 </div>
             </div>
-        </div>
+
+            <ItemAddDialog
+                open={dialogOpen}
+                onOpenChange={setDialogOpen}
+                item={item}
+                initialBoxes={cartEntry?.boxes ?? 1}
+                initialConfig={cartEntry?.selectedConfig ?? null}
+                configs={configs}
+                configsLoading={configsLoading}
+                onConfirm={handleConfirm}
+            />
+        </>
     );
 }
 

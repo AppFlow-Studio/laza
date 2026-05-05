@@ -378,6 +378,89 @@ export type Database = {
           },
         ]
       }
+      inventory_update_requests: {
+        Row: {
+          action_type: string
+          created_at: string
+          id: string
+          item_id: number
+          location_id: string
+          new_quantity: number
+          notes: string | null
+          org_id: string
+          previous_quantity: number
+          requested_by: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          storage_space_id: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          id?: string
+          item_id: number
+          location_id: string
+          new_quantity: number
+          notes?: string | null
+          org_id: string
+          previous_quantity?: number
+          requested_by: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          storage_space_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          id?: string
+          item_id?: number
+          location_id?: string
+          new_quantity?: number
+          notes?: string | null
+          org_id?: string
+          previous_quantity?: number
+          requested_by?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          storage_space_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_update_requests_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_update_requests_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_update_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_update_requests_storage_space_id_fkey"
+            columns: ["storage_space_id"]
+            isOneToOne: false
+            referencedRelation: "storage_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       item_cost_history: {
         Row: {
           created_at: string
@@ -1991,6 +2074,107 @@ export type Database = {
           },
         ]
       }
+      store_purchase_items: {
+        Row: {
+          id: string
+          item_id: number
+          line_total: number
+          purchase_id: string
+          quantity: number
+          storage_space_id: string | null
+          unit_cost: number
+        }
+        Insert: {
+          id?: string
+          item_id: number
+          purchase_id: string
+          quantity: number
+          storage_space_id?: string | null
+          unit_cost: number
+        }
+        Update: {
+          id?: string
+          item_id?: number
+          purchase_id?: string
+          quantity?: number
+          storage_space_id?: string | null
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_purchase_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_purchase_items_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "store_purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_purchase_items_storage_space_id_fkey"
+            columns: ["storage_space_id"]
+            isOneToOne: false
+            referencedRelation: "storage_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_purchases: {
+        Row: {
+          created_at: string
+          id: string
+          location_id: string
+          notes: string | null
+          org_id: string
+          purchased_at: string
+          purchased_by: string
+          supplier_name: string | null
+          total_cost: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location_id: string
+          notes?: string | null
+          org_id: string
+          purchased_at: string
+          purchased_by: string
+          supplier_name?: string | null
+          total_cost?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location_id?: string
+          notes?: string | null
+          org_id?: string
+          purchased_at?: string
+          purchased_by?: string
+          supplier_name?: string | null
+          total_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_purchases_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_purchases_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_deliveries: {
         Row: {
           actual_cost: number | null
@@ -3145,5 +3329,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-A new version of Supabase CLI is available: v2.90.0 (currently installed v2.75.0)
-We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

@@ -32,6 +32,7 @@ import { Tables } from "@/lib/supabase/types";
 import MobileSheet from "@/components/admin/shared/MobileSheet";
 import StorageSetupWizard from "@/components/admin/locations/StorageSetupWizard";
 import StoreInventoryMatrix from "@/components/super-admin/stores/StoreInventoryMatrix";
+import { StoreActivityChart } from "@/components/super-admin/stores/StoreActivityChart";
 import NewCatalogItemsBanner from "@/components/super-admin/stores/NewCatalogItemsBanner";
 import {
     AlertDialog,
@@ -203,6 +204,55 @@ export default function SuperAdminStoreDetailPage() {
                     name: s.name ?? "",
                 }))}
             />
+
+            {/* Analytics section */}
+            <div className="space-y-4">
+                <h2 className="text-sm font-semibold text-gray-900">Store Analytics</h2>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white border border-gray-200 rounded-xl p-4">
+                        <p className="text-xs text-gray-500 mb-1">Storage Spaces</p>
+                        <p className="text-2xl font-bold text-gray-900">{location.storage_spaces?.length ?? 0}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Configured</p>
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-xl p-4">
+                        <p className="text-xs text-gray-500 mb-1">Employees</p>
+                        <p className="text-2xl font-bold text-gray-900">{employees?.length ?? 0}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Assigned</p>
+                    </div>
+                    <div className={`bg-white border rounded-xl p-4 ${activeAlertCount > 0 ? "border-red-200 bg-red-50" : "border-gray-200"}`}>
+                        <p className="text-xs text-gray-500 mb-1">Active Alerts</p>
+                        <p className={`text-2xl font-bold ${activeAlertCount > 0 ? "text-red-600" : "text-gray-900"}`}>
+                            {activeAlertCount}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Low stock</p>
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-xl p-4">
+                        <p className="text-xs text-gray-500 mb-1">Log Entries</p>
+                        <p className="text-2xl font-bold text-gray-900">{logs?.length ?? 0}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">All time</p>
+                    </div>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-xl p-5">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 className="text-sm font-semibold text-gray-900">Inventory Activity</h3>
+                            <p className="text-xs text-gray-400 mt-0.5">Stock movement — last 7 days</p>
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] text-gray-500">
+                            <span className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" /> Stock In
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Stock Out
+                            </span>
+                        </div>
+                    </div>
+                    <StoreActivityChart logs={logs ?? []} />
+                </div>
+            </div>
+
             <div className="mt-6">
                 {/* Tab strip */}
                 <div className="flex gap-1 border-b border-gray-200 mb-6">

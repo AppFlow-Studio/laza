@@ -54,6 +54,7 @@ import {
     isNetworkError,
 } from "@/lib/utils/errorMessages";
 import { useAdminStore } from "@/lib/stores/adminStore";
+import { ItemAddDialog } from "@/components/admin/orders/ItemAddDialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -336,220 +337,127 @@ function CatalogItemRow({
     onQtyChange: (itemId: number, boxes: number) => void;
     onConfigChange: (itemId: number, config: ShipmentBoxConfig | null) => void;
 }) {
-    const [configError, setConfigError] = useState(false);
-    const [inputVal, setInputVal] = useState(String(cartEntry?.boxes ?? 1));
-    const [error, setError] = useState<string | null>(null);
-    const [localConfig, setLocalConfig] = useState<ShipmentBoxConfig | null>(
-        cartEntry?.selectedConfig ?? null,
-    );
-    const [showConfigPicker, setShowConfigPicker] = useState(false);
+    const [dialogOpen, setDialogOpen] = useState(false);
 
-    const { configs: availableConfigs } = useItemShipmentConfigs(
+    const { configs, loading: configsLoading } = useItemShipmentConfigs(
         item.id,
         organizationId,
     );
-    const requiresConfigSelection = availableConfigs.length > 0;
 
-    const ppb = effectivePiecesPerBox(item, localConfig);
     const unitPrice = item.warehouse_transfer_price ?? null;
     const missingPrice = unitPrice == null;
     const pricePerBox = unitPrice != null && item.box_quantity != null
         ? unitPrice * item.box_quantity
         : null;
     const inCart = !!cartEntry;
-    const displayBoxes = parseInt(inputVal) || 1;
+    const ppb = effectivePiecesPerBox(item, cartEntry?.selectedConfig ?? null);
 
-    useEffect(() => {
-        setLocalConfig(cartEntry?.selectedConfig ?? null);
-    }, [cartEntry?.selectedConfig]);
-
-    const handleInputChange = (val: string) => {
-        if (val.includes(".")) return;
-        setInputVal(val);
-        const v = validateBoxQty(val);
-        setError(v.ok ? null : (v.error ?? null));
-        if (v.ok && inCart) onQtyChange(item.id, v.value!);
-    };
-
-    const adjust = (delta: number) => {
-        const next = Math.max(1, Math.min(999, displayBoxes + delta));
-        setInputVal(String(next));
-        setError(null);
-        if (inCart) onQtyChange(item.id, next);
-    };
-
-    const handleAdd = () => {
-        const v = validateBoxQty(inputVal);
-        if (!v.ok) {
-            setError(v.error ?? null);
-            return;
+    const handleConfirm = (boxes: number, config: ShipmentBoxConfig | null) => {
+        if (inCart) {
+            onQtyChange(item.id, boxes);
+            onConfigChange(item.id, config);
+        } else {
+            onAdd(item, boxes, config);
         }
-        if (requiresConfigSelection && !localConfig) {
-            setConfigError(true);
-            setShowConfigPicker(true);
-            return;
-        }
-        setError(null);
-        setConfigError(false);
-        onAdd(item, v.value!, localConfig);
     };
 
     return (
-        <div
-            className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-100 ${
-                missingPrice
-                    ? "border-gray-100 bg-gray-50 opacity-60 pointer-events-none"
-                    : inCart
-                      ? "border-indigo-300 bg-indigo-50/40"
-                      : "border-gray-200 bg-white hover:border-violet-200 hover:shadow-[0_1px_6px_rgba(99,102,241,0.07)]"
-            }`}
-        >
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-gray-900">
-                        {item.name}
-                    </span>
-                    {inCart && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded-full">
-                            <CheckCircle2 size={9} /> In order
+        <>
+            <div
+                className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-100 ${
+                    missingPrice
+                        ? "border-gray-100 bg-gray-50 opacity-60 pointer-events-none"
+                        : inCart
+                          ? "border-indigo-300 bg-indigo-50/40"
+                          : "border-gray-200 bg-white hover:border-violet-200 hover:shadow-[0_1px_6px_rgba(99,102,241,0.07)]"
+                }`}
+            >
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-gray-900">
+                            {item.name}
                         </span>
+                        {inCart && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded-full">
+                                <CheckCircle2 size={9} /> In order
+                            </span>
+                        )}
+                    </div>
+                    {item.sku && (
+                        <div className="mt-1">
+                            <span
+                                style={{ fontFamily: "var(--font-mono, monospace)" }}
+                                className="text-[10px] text-gray-400"
+                            >
+                                {item.sku}
+                            </span>
+                        </div>
+                    )}
+                    {missingPrice ? (
+                        <div className="mt-1 text-[11px] text-amber-600 font-medium flex items-center gap-1">
+                            <AlertCircle size={10} /> Price not yet set — ask super admin to enable ordering
+                        </div>
+                    ) : (
+                        <div className="mt-1 text-[11px] text-gray-500">
+                            {formatCurrency(unitPrice!)} / unit
+                            {pricePerBox != null && (
+                                <span className="ml-1 text-indigo-600 font-semibold">
+                                    · {formatCurrency(pricePerBox)} / box
+                                </span>
+                            )}
+                        </div>
+                    )}
+                    {inCart && cartEntry && (
+                        <div className="mt-1 text-[11px] text-gray-500 flex items-center gap-1">
+                            <Boxes size={10} className="text-gray-300" />
+                            {cartEntry.boxes} box{cartEntry.boxes !== 1 ? "es" : ""} · {cartEntry.boxes * ppb} {item.unit_of_measure}
+                            {cartEntry.selectedConfig && (
+                                <span className="ml-1 text-indigo-500 font-semibold">
+                                    · {cartEntry.selectedConfig.poNumber ?? "Custom shipment"}
+                                </span>
+                            )}
+                        </div>
                     )}
                 </div>
-                {item.sku && (
-                    <div className="mt-1">
-                        <span
-                            style={{
-                                fontFamily: "var(--font-mono, monospace)",
-                            }}
-                            className="text-[10px] text-gray-400"
+
+                <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    {inCart ? (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setDialogOpen(true)}
+                                className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-lg transition-colors"
+                            >
+                                Edit
+                            </button>
+                            <button
+                                onClick={() => onRemove(item.id)}
+                                className="text-[11px] font-semibold text-red-400 hover:text-red-600 flex items-center gap-1 transition-colors"
+                            >
+                                <X size={10} /> Remove
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => setDialogOpen(true)}
+                            className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-lg transition-colors"
                         >
-                            {item.sku}
-                        </span>
-                    </div>
-                )}
-                {missingPrice ? (
-                    <div className="mt-1 text-[11px] text-amber-600 font-medium flex items-center gap-1">
-                        <AlertCircle size={10} /> Price not yet set — ask super admin to enable ordering
-                    </div>
-                ) : (
-                    <div className="mt-1 text-[11px] text-gray-500">
-                        {formatCurrency(unitPrice!)} / unit
-                        {pricePerBox != null && (
-                            <span className="ml-1 text-indigo-600 font-semibold">
-                                · {formatCurrency(pricePerBox)} / box
-                            </span>
-                        )}
-                    </div>
-                )}
-
-                <button
-                    onClick={() => setShowConfigPicker((p) => !p)}
-                    className={`flex items-center gap-1 mt-1.5 text-[11px] transition-colors group ${
-                        configError
-                            ? "text-red-500 hover:text-red-600"
-                            : "text-gray-500 hover:text-indigo-600"
-                    }`}
-                >
-                    <Boxes
-                        size={10}
-                        className="text-gray-300 group-hover:text-indigo-400 flex-shrink-0"
-                    />
-                    <span>
-                        {ppb} {item.unit_of_measure}/box
-                        {localConfig && (
-                            <span className="ml-1 text-indigo-500 font-semibold">
-                                · {localConfig.poNumber ?? "Custom shipment"}
-                            </span>
-                        )}
-                    </span>
-                    <ChevronDown
-                        size={10}
-                        className={`ml-0.5 transition-transform ${showConfigPicker ? "rotate-180" : ""}`}
-                    />
-                </button>
-
-                {showConfigPicker && (
-                    <ShipmentConfigPicker
-                        item={item}
-                        organizationId={organizationId}
-                        selectedConfig={localConfig}
-                        hasError={configError}
-                        onSelect={(cfg) => {
-                            setLocalConfig(cfg);
-                            setConfigError(false);
-                            onConfigChange(item.id, cfg);
-                            setShowConfigPicker(false);
-                        }}
-                    />
-                )}
-            </div>
-
-            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                <div className="flex items-center">
-                    <button
-                        onClick={() => adjust(-1)}
-                        className="w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center border border-gray-200 rounded-l-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
-                    >
-                        −
-                    </button>
-                    <input
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        max={999}
-                        step={1}
-                        value={inputVal}
-                        onChange={(e) => handleInputChange(e.target.value)}
-                        onKeyDown={(e) => {
-                            if ([".", "e", "E", "-", "+"].includes(e.key))
-                                e.preventDefault();
-                        }}
-                        className={`w-12 h-10 sm:w-10 sm:h-7 border-y text-center text-sm sm:text-xs font-semibold text-gray-900 outline-none transition-all ${
-                            error
-                                ? "border-red-400 bg-red-50"
-                                : "border-gray-200 bg-white focus:border-indigo-400"
-                        }`}
-                        style={
-                            {
-                                MozAppearance: "textfield",
-                                appearance: "textfield",
-                            } as React.CSSProperties
-                        }
-                    />
-                    <button
-                        onClick={() => adjust(1)}
-                        className="w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center border border-gray-200 rounded-r-lg bg-white hover:bg-gray-50 hover:border-violet-300 hover:text-indigo-600 text-gray-500 text-sm font-medium transition-all"
-                    >
-                        +
-                    </button>
-                    <span className="ml-2 text-[11px] text-gray-400 w-16">
-                        = {displayBoxes * ppb} {item.unit_of_measure}
-                    </span>
+                            Add to order
+                        </button>
+                    )}
                 </div>
-
-                {error && (
-                    <div className="flex items-center gap-1 text-[10px] text-red-500">
-                        <AlertCircle size={9} /> {error}
-                    </div>
-                )}
-
-                {inCart ? (
-                    <button
-                        onClick={() => onRemove(item.id)}
-                        className="text-[11px] font-semibold text-red-400 hover:text-red-600 flex items-center gap-1 transition-colors"
-                    >
-                        <X size={10} /> Remove
-                    </button>
-                ) : (
-                    <button
-                        onClick={handleAdd}
-                        className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-lg transition-colors"
-                    >
-                        Add to order
-                    </button>
-                )}
             </div>
-        </div>
+
+            <ItemAddDialog
+                open={dialogOpen}
+                onOpenChange={setDialogOpen}
+                item={item}
+                initialBoxes={cartEntry?.boxes ?? 1}
+                initialConfig={cartEntry?.selectedConfig ?? null}
+                configs={configs}
+                configsLoading={configsLoading}
+                onConfirm={handleConfirm}
+            />
+        </>
     );
 }
 

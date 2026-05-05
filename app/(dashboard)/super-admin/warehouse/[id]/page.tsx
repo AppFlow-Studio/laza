@@ -920,11 +920,7 @@ export default function WarehouseDetailPage({ params }: { params: Promise<{ id: 
                         >
                             <Icon className="w-4 h-4" />
                             {label}
-                            {count !== undefined && (
-                                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium ${activeTab === tabId ? "bg-indigo-100 text-indigo-600" : "bg-zinc-100 text-zinc-500"}`}>
-                                    {count}
-                                </span>
-                            )}
+
                         </button>
                     ))}
                 </nav>
