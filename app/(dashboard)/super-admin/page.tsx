@@ -9,6 +9,8 @@ import { useAllTickets } from "@/lib/hooks/queries/useOrderTickets";
 import { useWarehouseStats } from "@/lib/hooks/queries/useWarehouse";
 import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
+import { OrdersStatusChart } from "@/components/super-admin/dashboard/OrdersStatusChart";
+import { OrdersTimelineChart } from "@/components/super-admin/dashboard/OrdersTimelineChart";
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
@@ -582,6 +584,22 @@ export default function SuperAdminDashboardPage() {
                     href="/super-admin/analytics"
                 />
             </div>
+
+            {/* Charts row */}
+            {!ticketsLoading && allTickets && allTickets.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white border border-gray-200 rounded-xl p-5">
+                        <h2 className="text-sm font-semibold text-gray-900 mb-1">Orders by Status</h2>
+                        <p className="text-xs text-gray-400 mb-3">Distribution across all time</p>
+                        <OrdersStatusChart tickets={allTickets} />
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-xl p-5">
+                        <h2 className="text-sm font-semibold text-gray-900 mb-1">Order Activity</h2>
+                        <p className="text-xs text-gray-400 mb-3">Last 7 days</p>
+                        <OrdersTimelineChart tickets={allTickets} />
+                    </div>
+                </div>
+            )}
 
             {/* NEW: Reorder alerts preview — only render if we have data or loading */}
             {orgId && <ReorderAlertsPreview orgId={orgId} />}
