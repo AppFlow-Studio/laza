@@ -123,6 +123,33 @@ export async function updateUser(input: UpdateUserInput) {
 
         if (error) throw error;
 
+        // Sync role change to Clerk so session claims reflect the new role immediately
+        if (input.role !== undefined) {
+            const clerk = await clerkClient();
+
+            // 1. Update publicMetadata.role — picked up by the JWT template → sessionClaims.o.rol
+            await clerk.users.updateUser(input.userId, {
+                publicMetadata: { role: input.role },
+            });
+
+            // 2. Update the Clerk org membership role (org:admin vs org:member)
+            //    Fetch organizationId from the members table since it's not in the input
+            const { data: member } = await supabase
+                .from('members')
+                .select('organization_id')
+                .eq('user_id', input.userId)
+                .single();
+
+            if (member?.organization_id) {
+                const clerkOrgRole = input.role === 'employee' ? 'org:member' : 'org:admin';
+                await clerk.organizations.updateOrganizationMembership({
+                    organizationId: member.organization_id,
+                    userId: input.userId,
+                    role: clerkOrgRole,
+                });
+            }
+        }
+
         // Clear all existing location assignments, then re-insert based on role
         const { error: deleteError } = await supabase
             .from('user_location_assignments')

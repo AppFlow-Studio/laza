@@ -679,8 +679,7 @@ export default function SuperAdminTicketDetailPage() {
     } = useTicket(ticketId);
     const ticket = rawTicket as Ticket | undefined;
 
-    const warehouseLocationId =
-        warehouseLocation?.id ?? ticket?.warehouse_location_id ?? "";
+    const warehouseLocationId = ticket?.warehouse_location_id ?? "";
     const {
         data: warehouseStock,
         isLoading: stockLoading,
@@ -903,261 +902,160 @@ export default function SuperAdminTicketDetailPage() {
             </div>
 
             {/* ── Body ── */}
-            <div className="px-6 py-5 grid grid-cols-[1fr_256px] gap-5 max-w-6xl">
-                {/* LEFT */}
-                <div className="flex flex-col gap-4">
-                    {/* Store / submitted by / delivery card */}
-                    <div className="grid grid-cols-3 gap-4 bg-white border border-gray-200 rounded-xl p-4">
-                        <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">
-                                Store
-                            </p>
-                            <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
-                                <MapPin
-                                    size={13}
-                                    className="text-gray-400 flex-shrink-0"
-                                />
-                                {ticket.requesting_location?.name ?? "—"}
-                            </div>
-                            <p className="text-xs text-gray-400 mt-0.5 ml-[18px]">
-                                {parseAddress(
-                                    ticket.requesting_location?.address,
-                                )}
-                            </p>
+            <div className="px-6 py-5 flex flex-col gap-4">
+
+                {/* Remainder-of banner */}
+                {ticket.parent_ticket_id && (
+                    <Link
+                        href={`/super-admin/orders/${ticket.parent_ticket_id}`}
+                        className="flex items-center gap-2.5 px-4 py-3 bg-violet-50 border border-violet-200 rounded-xl text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors"
+                    >
+                        <Package size={13} className="text-violet-400 flex-shrink-0" />
+                        <span>Remainder of order</span>
+                        <span
+                            className="text-violet-400 font-normal"
+                            style={{ fontFamily: "var(--font-mono, monospace)" }}
+                        >
+                            {shortId(ticket.parent_ticket_id)}
+                        </span>
+                        <span className="text-violet-400 font-normal">— auto-created for the unfulfilled portion</span>
+                        <ChevronRight size={13} className="ml-auto text-violet-300 flex-shrink-0" />
+                    </Link>
+                )}
+
+                {/* 4-col metadata card */}
+                <div className="grid grid-cols-4 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="bg-white px-5 py-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Store</p>
+                        <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
+                            <MapPin size={13} className="text-gray-400 flex-shrink-0" />
+                            {ticket.requesting_location?.name ?? "—"}
                         </div>
-                        <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">
-                                Submitted by
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[9px] font-bold text-indigo-700 flex-shrink-0">
-                                    {(ticket.requested_by ?? "?")
-                                        .slice(0, 2)
-                                        .toUpperCase()}
-                                </div>
-                                <div>
-                                    <p className="text-sm font-semibold text-gray-800">
-                                        Store Admin
-                                    </p>
-                                    <p className="text-xs text-gray-400">
-                                        {ticket.submitted_at
-                                            ? formatDate(ticket.submitted_at)
-                                            : "—"}
-                                    </p>
-                                </div>
+                        <p className="text-xs text-gray-400 mt-0.5 ml-[18px]">
+                            {parseAddress(ticket.requesting_location?.address)}
+                        </p>
+                    </div>
+                    <div className="bg-white px-5 py-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Submitted by</p>
+                        <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[9px] font-bold text-indigo-700 flex-shrink-0">
+                                {(ticket.requested_by ?? "?").slice(0, 2).toUpperCase()}
                             </div>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">
-                                Delivery
-                            </p>
-                            <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800">
-                                <Truck
-                                    size={13}
-                                    className="text-gray-400 flex-shrink-0"
-                                />
-                                {ticket.delivery_type === "self"
-                                    ? "Self-pickup"
-                                    : "Company delivery"}
-                            </div>
-                            {ticket.delivery_type !== "self" && (
-                                <p className="text-xs text-gray-400 mt-0.5 ml-[18px]">
-                                    Cost calculated at fulfillment
+                            <div>
+                                <p className="text-sm font-semibold text-gray-800">Store Admin</p>
+                                <p className="text-xs text-gray-400">
+                                    {ticket.submitted_at ? formatDate(ticket.submitted_at) : "—"}
                                 </p>
-                            )}
+                            </div>
                         </div>
                     </div>
-
-                    {isActionable && (
-                        <AvailabilityBanner
-                            allOk={allOk}
-                            allNone={allNone}
-                            partialCount={partialCount}
-                            isStale={isStaleData}
-                            onRefresh={handleRefresh}
-                            isRefreshing={isRefreshing}
-                        />
-                    )}
-
-                    <ItemsTable ticket={ticket} stockMap={stockMap} costMap={costMap} />
-
-                    {isActionable && (
-                        <p className="text-[11px] text-gray-400 leading-relaxed">
-                            ⚠ Warehouse stock shown above reflects quantities
-                            at page load ({new Date().toLocaleTimeString()}).
-                            The fulfillment RPC re-verifies stock at execution
-                            time.
-                        </p>
-                    )}
-
-                    {ticket.notes && (
-                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">
-                                Notes from store
-                            </p>
-                            <p className="text-sm text-gray-700 leading-relaxed">
-                                {ticket.notes}
-                            </p>
+                    <div className="bg-white px-5 py-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Delivery</p>
+                        <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800">
+                            <Truck size={13} className="text-gray-400 flex-shrink-0" />
+                            {ticket.delivery_type === "self" ? "Self-pickup" : "Company delivery"}
                         </div>
-                    )}
-
-                    <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
-                            Activity log
+                        {ticket.delivery_type !== "self" && (
+                            <p className="text-xs text-gray-400 mt-0.5 ml-[18px]">Cost calculated at fulfillment</p>
+                        )}
+                    </div>
+                    <div className="bg-white px-5 py-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Order summary</p>
+                        <div className="flex items-center gap-3">
+                            <div>
+                                <p className="text-lg font-bold text-gray-900 leading-none">{lines.length}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">items</p>
+                            </div>
+                            <div className="w-px h-8 bg-gray-200" />
+                            <div>
+                                <p className="text-lg font-bold text-gray-900 leading-none">{totalBoxes}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">boxes</p>
+                            </div>
+                        </div>
+                        <p
+                            className="text-[10px] text-gray-400 mt-2"
+                            style={{ fontFamily: "var(--font-mono, monospace)" }}
+                        >
+                            {shortId(ticket.id)}
                         </p>
-                        <ActivityLog logs={ticket.order_ticket_logs ?? []} />
                     </div>
                 </div>
 
-                {/* RIGHT: Sidebar */}
-                <div className="flex flex-col gap-3">
-                    <div className="bg-white border border-gray-200 rounded-xl p-4">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
-                            Order summary
-                        </p>
-                        <div className="flex flex-col divide-y divide-gray-50">
+                {/* Availability banner + stock chips (actionable only) */}
+                {isActionable && (
+                    <div className="flex items-stretch gap-3">
+                        <div className="flex-1">
+                            <AvailabilityBanner
+                                allOk={allOk}
+                                allNone={allNone}
+                                partialCount={partialCount}
+                                isStale={isStaleData}
+                                onRefresh={handleRefresh}
+                                isRefreshing={isRefreshing}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-200 rounded-xl flex-shrink-0">
                             {[
                                 {
-                                    key: "Ticket ID",
-                                    val: shortId(ticket.id),
-                                    mono: true,
-                                },
-                                { key: "Items", val: `${lines.length} items` },
-                                {
-                                    key: "Total boxes",
-                                    val: `${totalBoxes} boxes`,
+                                    label: "Available",
+                                    count: lines.filter((l) => getStockStatus(l, stockMap) === "ok").length,
+                                    chip: "bg-green-100 text-green-700",
                                 },
                                 {
-                                    key: "Submitted",
-                                    val: ticket.submitted_at
-                                        ? formatDateShort(ticket.submitted_at)
-                                        : "—",
+                                    label: "Partial",
+                                    count: lines.filter((l) => getStockStatus(l, stockMap) === "partial").length,
+                                    chip: "bg-amber-100 text-amber-700",
                                 },
                                 {
-                                    key: "Status",
-                                    val: STATUS_META[status]?.label ?? status,
+                                    label: "No stock",
+                                    count: lines.filter((l) => getStockStatus(l, stockMap) === "none").length,
+                                    chip: "bg-red-100 text-red-700",
                                 },
-                            ].map(({ key, val, mono }) => (
-                                <div
-                                    key={key}
-                                    className="flex justify-between items-center py-2 first:pt-0 last:pb-0"
-                                >
-                                    <span className="text-xs text-gray-400">
-                                        {key}
+                            ].map(({ label, count, chip }) => (
+                                <div key={label} className="flex flex-col items-center gap-1">
+                                    <span className={`text-sm font-bold px-2.5 py-0.5 rounded-full ${chip}`}>
+                                        {count}
                                     </span>
-                                    <span
-                                        className="text-xs font-semibold text-gray-800 text-right"
-                                        style={
-                                            mono
-                                                ? {
-                                                      fontFamily:
-                                                          "var(--font-mono, monospace)",
-                                                      fontSize: 11,
-                                                  }
-                                                : undefined
-                                        }
-                                    >
-                                        {val}
-                                    </span>
+                                    <span className="text-[10px] text-gray-400 whitespace-nowrap">{label}</span>
                                 </div>
                             ))}
+                            <button
+                                onClick={handleRefresh}
+                                disabled={isRefreshing}
+                                className="ml-2 text-[10px] text-gray-400 hover:text-indigo-600 flex flex-col items-center gap-1 transition-colors"
+                                title="Refresh warehouse stock"
+                            >
+                                <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
+                                <span>Refresh</span>
+                            </button>
                         </div>
                     </div>
+                )}
 
-                    {isActionable && (
-                        <div className="bg-white border border-gray-200 rounded-xl p-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                                    Stock summary
-                                </p>
-                                <button
-                                    onClick={handleRefresh}
-                                    disabled={isRefreshing}
-                                    className="text-[10px] text-gray-400 hover:text-indigo-600 flex items-center gap-1 transition-colors"
-                                    title="Refresh warehouse stock"
-                                >
-                                    <RefreshCw
-                                        size={10}
-                                        className={
-                                            isRefreshing ? "animate-spin" : ""
-                                        }
-                                    />{" "}
-                                    Refresh
-                                </button>
-                            </div>
-                            <div className="flex flex-col divide-y divide-gray-50">
-                                {[
-                                    {
-                                        key: "Available",
-                                        val: lines.filter(
-                                            (l) =>
-                                                getStockStatus(l, stockMap) ===
-                                                "ok",
-                                        ).length,
-                                        color: "text-green-600",
-                                    },
-                                    {
-                                        key: "Partial",
-                                        val: lines.filter(
-                                            (l) =>
-                                                getStockStatus(l, stockMap) ===
-                                                "partial",
-                                        ).length,
-                                        color: "text-amber-600",
-                                    },
-                                    {
-                                        key: "No stock",
-                                        val: lines.filter(
-                                            (l) =>
-                                                getStockStatus(l, stockMap) ===
-                                                "none",
-                                        ).length,
-                                        color: "text-red-600",
-                                    },
-                                ].map(({ key, val, color }) => (
-                                    <div
-                                        key={key}
-                                        className="flex justify-between items-center py-2 first:pt-0 last:pb-0"
-                                    >
-                                        <span
-                                            className={`text-xs font-medium ${color}`}
-                                        >
-                                            {key}
-                                        </span>
-                                        <span className="text-xs font-bold text-gray-800">
-                                            {val} item{val !== 1 ? "s" : ""}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                {/* Items table — full width */}
+                <ItemsTable ticket={ticket} stockMap={stockMap} costMap={costMap} />
 
-                    {ticket.parent_ticket_id && (
-                        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-violet-400 mb-2">
-                                Remainder of
-                            </p>
-                            <Link
-                                href={`/super-admin/orders/${ticket.parent_ticket_id}`}
-                                className="flex items-center gap-2 text-xs font-semibold text-violet-700 hover:text-violet-900 transition-colors"
-                            >
-                                <Package
-                                    size={12}
-                                    className="text-violet-400"
-                                />
-                                {shortId(ticket.parent_ticket_id)}
-                                <ChevronRight
-                                    size={11}
-                                    className="ml-auto text-violet-300"
-                                />
-                            </Link>
-                            <p className="text-[11px] text-violet-400 mt-1.5">
-                                This ticket was auto-created for the unfulfilled
-                                portion.
-                            </p>
-                        </div>
-                    )}
+                {isActionable && (
+                    <p className="text-[11px] text-gray-400 leading-relaxed">
+                        ⚠ Warehouse stock shown above reflects quantities at page load ({new Date().toLocaleTimeString()}).
+                        The fulfillment RPC re-verifies stock at execution time.
+                    </p>
+                )}
+
+                {ticket.notes && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">
+                            Notes from store
+                        </p>
+                        <p className="text-sm text-gray-700 leading-relaxed">{ticket.notes}</p>
+                    </div>
+                )}
+
+                <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
+                        Activity log
+                    </p>
+                    <ActivityLog logs={ticket.order_ticket_logs ?? []} />
                 </div>
             </div>
         </div>

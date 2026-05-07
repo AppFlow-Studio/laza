@@ -5,6 +5,7 @@ import { useInventoryByLocation } from '@/lib/hooks/queries/useInventory';
 import { useItems } from '@/lib/hooks/queries/useItems';
 import InventoryMatrix from '@/components/admin/inventory/InventoryMatrix';
 import QuantityUpdateModal from '@/components/admin/inventory/QuantityUpdateModal';
+import PendingRequestsPanel from '@/components/admin/inventory/PendingRequestsPanel';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
 import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import { useLocationWithDetails } from '@/lib/hooks/queries/useLocations';
@@ -48,27 +49,33 @@ export default function InventoryPage() {
                     <p className="text-zinc-500">Loading location details...</p>
                 </div>
             ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                    <div className="p-4 border-b border-zinc-200">
-                        <h2 className="text-lg font-semibold text-zinc-900">
-                            {locationDetails.name} - Inventory Matrix
-                        </h2>
+                <>
+                    <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
+                        <div className="p-4 border-b border-zinc-200">
+                            <h2 className="text-lg font-semibold text-zinc-900">
+                                {locationDetails.name} - Inventory Matrix
+                            </h2>
+                        </div>
+                        <div className="p-4">
+                            {locationDetails.storage_spaces && locationDetails.storage_spaces.length > 0 && items ? (
+                                <InventoryMatrix
+                                    items={items}
+                                    storageSpaces={locationDetails.storage_spaces}
+                                    inventory={inventory || []}
+                                    onCellClick={(itemId, storageSpaceId) => setUpdatingCell({ itemId, storageSpaceId })}
+                                />
+                            ) : (
+                                <div className="text-center py-12 text-zinc-500">
+                                    <p>No storage spaces configured for this location</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div className="p-4">
-                        {locationDetails.storage_spaces && locationDetails.storage_spaces.length > 0 && items ? (
-                            <InventoryMatrix
-                                items={items}
-                                storageSpaces={locationDetails.storage_spaces}
-                                inventory={inventory || []}
-                                onCellClick={(itemId, storageSpaceId) => setUpdatingCell({ itemId, storageSpaceId })}
-                            />
-                        ) : (
-                            <div className="text-center py-12 text-zinc-500">
-                                <p>No storage spaces configured for this location</p>
-                            </div>
-                        )}
+                    <div className="mt-8">
+                        <h3 className="text-base font-semibold text-zinc-900 mb-3">Employee Update Requests</h3>
+                        <PendingRequestsPanel />
                     </div>
-                </div>
+                </>
             )}
 
             {updatingCell && selectedLocationId && (

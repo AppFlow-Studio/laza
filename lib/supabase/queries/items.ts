@@ -246,3 +246,30 @@ export async function getSuperAdminItems(organizationId: string) {
     if (error) throw error;
     return data;
 }
+
+export async function getUnassignedItemsForLocation(
+    organizationId: string,
+    locationId: string
+): Promise<Pick<Item, 'id' | 'name' | 'sku' | 'category_id' | 'unit_of_measure' | 'min_quantity'>[]> {
+    const supabase = createServiceRoleClient();
+
+    const [{ data: allItems, error: itemsErr }, { data: assigned, error: assignedErr }] =
+        await Promise.all([
+            supabase
+                .from('items')
+                .select('id, name, sku, category_id, unit_of_measure, min_quantity')
+                .eq('organization_id', organizationId),
+            supabase
+                .from('item_locations')
+                .select('item_id')
+                .eq('location_id', locationId),
+        ]);
+
+    if (itemsErr) throw itemsErr;
+    if (assignedErr) throw assignedErr;
+
+    const assignedIds = new Set(
+        (assigned ?? []).map(r => r.item_id).filter((id): id is number => id !== null)
+    );
+    return (allItems ?? []).filter(item => !assignedIds.has(item.id));
+}

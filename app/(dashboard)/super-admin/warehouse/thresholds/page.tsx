@@ -2,11 +2,11 @@
 
 // app/(dashboard)/super-admin/warehouse/thresholds/page.tsx
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
 import toast from "react-hot-toast";
-import { Warehouse } from "lucide-react";
-import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
+import { Warehouse, ChevronDown } from "lucide-react";
+import { useWarehouses } from "@/lib/hooks/queries/useWarehouse";
 import {
     useNotificationPreferences,
     useUpdateNotificationPreferences,
@@ -28,19 +28,68 @@ function SectionSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
-// Alert email panel
+// Warehouse selector dropdown
 // ---------------------------------------------------------------------------
 
-function WarehouseAlertEmailPanel({ orgId }: { orgId: string }) {
-    const { data: prefs, isLoading } = useNotificationPreferences(orgId);
+interface WarehouseOption {
+    id: string;
+    name: string;
+}
+
+function WarehouseSelector({
+    warehouses,
+    selectedId,
+    onChange,
+}: {
+    warehouses: WarehouseOption[];
+    selectedId: string;
+    onChange: (id: string) => void;
+}) {
+    return (
+        <div className="relative w-full sm:w-72">
+            <select
+                value={selectedId}
+                onChange={(e) => onChange(e.target.value)}
+                className="w-full appearance-none rounded-lg border border-zinc-200 bg-white px-4 py-2.5 pr-10 text-sm font-medium text-zinc-900 shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            >
+                {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                        {w.name}
+                    </option>
+                ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Alert email panel — per warehouse location
+// ---------------------------------------------------------------------------
+
+function WarehouseAlertEmailPanel({
+    orgId,
+    warehouseId,
+}: {
+    orgId: string;
+    warehouseId: string;
+}) {
+    const { data: prefs, isLoading } = useNotificationPreferences(
+        orgId,
+        warehouseId,
+    );
     const updatePrefs = useUpdateNotificationPreferences();
 
-    const currentEmail: string =
-        (prefs?.secondary_emails as unknown as Record<string, string> | null)
-            ?.warehouse_alert_email ?? "";
+    const currentEmail = prefs?.primary_email ?? "";
 
     const [email, setEmail] = useState("");
     const [editing, setEditing] = useState(false);
+
+    // Reset form when warehouse changes
+    useEffect(() => {
+        setEditing(false);
+        setEmail("");
+    }, [warehouseId]);
 
     function handleEdit() {
         setEmail(currentEmail);
@@ -49,17 +98,11 @@ function WarehouseAlertEmailPanel({ orgId }: { orgId: string }) {
 
     async function handleSave() {
         if (!email.trim()) return;
-        const updated = {
-            ...((prefs?.secondary_emails as unknown as Record<
-                string,
-                string
-            >) ?? {}),
-            warehouse_alert_email: email.trim(),
-        };
         try {
             await updatePrefs.mutateAsync({
                 organizationId: orgId,
-                updates: { secondary_emails: updated as unknown as string[] },
+                locationId: warehouseId,
+                updates: { primary_email: email.trim() },
             });
             toast.success("Warehouse alert email updated");
             setEditing(false);
@@ -79,10 +122,8 @@ function WarehouseAlertEmailPanel({ orgId }: { orgId: string }) {
                 </h2>
             </div>
             <p className="mb-5 text-xs text-zinc-500 leading-relaxed">
-                Low-stock alerts triggered by warehouse inventory changes will
-                be sent to this address. Typically this is the Super Admin's
-                email. Store-level alert recipients are configured separately
-                under{" "}
+                Low-stock alerts triggered by this warehouse will be sent to
+                this address. Store-level recipients are configured under{" "}
                 <span className="font-medium text-zinc-700">
                     Admin Settings → Low Stock
                 </span>
@@ -94,7 +135,8 @@ function WarehouseAlertEmailPanel({ orgId }: { orgId: string }) {
                     <span className="text-sm text-zinc-600">
                         {currentEmail || (
                             <span className="italic text-zinc-400">
-                                No warehouse email set — using org primary email
+                                No email set — using org primary email as
+                                fallback
                             </span>
                         )}
                     </span>
@@ -142,7 +184,16 @@ function WarehouseAlertEmailPanel({ orgId }: { orgId: string }) {
 
 export default function WarehouseThresholdsPage() {
     const { orgId } = useAuth();
-    const { data: warehouse, isLoading, error } = useWarehouseLocation();
+    const { data: warehouses, isLoading, error } = useWarehouses();
+
+    const [selectedId, setSelectedId] = useState<string>("");
+
+    // Auto-select first warehouse once data loads
+    useEffect(() => {
+        if (warehouses?.length && !selectedId) {
+            setSelectedId(warehouses[0].id);
+        }
+    }, [warehouses, selectedId]);
 
     if (!orgId) return null;
 
@@ -159,7 +210,7 @@ export default function WarehouseThresholdsPage() {
         );
     }
 
-    if (error || !warehouse) {
+    if (error || !warehouses?.length) {
         return (
             <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
                 <div className="rounded-full bg-zinc-100 p-4">
@@ -176,26 +227,38 @@ export default function WarehouseThresholdsPage() {
         );
     }
 
+    const selectedWarehouse =
+        warehouses.find((w) => w.id === selectedId) ?? warehouses[0];
+
     return (
         <div className="space-y-6">
             {/* Page header */}
-            <div>
-                <h1 className="text-2xl font-semibold text-zinc-900">
-                    Warehouse Thresholds
-                </h1>
-                <p className="mt-1 text-sm text-zinc-500">
-                    Configure low-stock alert thresholds for{" "}
-                    <span className="font-medium text-zinc-700">
-                        {warehouse.name}
-                    </span>
-                    . Warehouse thresholds should be significantly higher than
-                    store thresholds — the warehouse must maintain enough stock
-                    to cover the{" "}
-                    <span className="font-medium text-zinc-700">
-                        ~45-day overseas lead time
-                    </span>{" "}
-                    plus a safety buffer.
-                </p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <h1 className="text-2xl font-semibold text-zinc-900">
+                        Warehouse Thresholds
+                    </h1>
+                    <p className="mt-1 text-sm text-zinc-500">
+                        Configure low-stock alert thresholds for{" "}
+                        <span className="font-medium text-zinc-700">
+                            {selectedWarehouse.name}
+                        </span>
+                        . Thresholds should cover the{" "}
+                        <span className="font-medium text-zinc-700">
+                            ~45-day overseas lead time
+                        </span>{" "}
+                        plus a safety buffer.
+                    </p>
+                </div>
+
+                {/* Warehouse picker */}
+                {warehouses.length > 1 && (
+                    <WarehouseSelector
+                        warehouses={warehouses}
+                        selectedId={selectedId || warehouses[0].id}
+                        onChange={setSelectedId}
+                    />
+                )}
             </div>
 
             {/* Context callout */}
@@ -212,33 +275,43 @@ export default function WarehouseThresholdsPage() {
                 </p>
             </div>
 
-            {/* Alert recipient */}
-            <WarehouseAlertEmailPanel orgId={orgId} />
+            {selectedWarehouse && (
+                <>
+                    {/* Alert recipient */}
+                    <WarehouseAlertEmailPanel
+                        orgId={orgId}
+                        warehouseId={selectedWarehouse.id}
+                    />
 
-            {/* Item thresholds */}
-            <div className="rounded-xl border border-zinc-200 bg-white p-6">
-                <div className="mb-1 flex items-center gap-2">
-                    <span className="text-base">📊</span>
-                    <h2 className="text-sm font-semibold text-zinc-900">
-                        Item Thresholds
-                    </h2>
-                </div>
-                <p className="mb-6 text-xs text-zinc-500 leading-relaxed">
-                    Set per-item or per-category minimums for the warehouse.
-                    These override the organization-wide{" "}
-                    <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-zinc-700">
-                        min_quantity
-                    </code>{" "}
-                    on each item when evaluating warehouse stock.
-                </p>
+                    {/* Item thresholds */}
+                    <div className="rounded-xl border border-zinc-200 bg-white p-6">
+                        <div className="mb-1 flex items-center gap-2">
+                            <span className="text-base">📊</span>
+                            <h2 className="text-sm font-semibold text-zinc-900">
+                                Item Thresholds
+                            </h2>
+                        </div>
+                        <p className="mb-6 text-xs text-zinc-500 leading-relaxed">
+                            Set per-item or per-category minimums for{" "}
+                            <span className="font-medium text-zinc-700">
+                                {selectedWarehouse.name}
+                            </span>
+                            . These override the organization-wide{" "}
+                            <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-zinc-700">
+                                min_quantity
+                            </code>{" "}
+                            when evaluating warehouse stock.
+                        </p>
 
-                <LowStockThresholdManager
-                    organizationId={orgId}
-                    locationId={warehouse.id}
-                    locationLabel="Warehouse"
-                    context="warehouse"
-                />
-            </div>
+                        <LowStockThresholdManager
+                            organizationId={orgId}
+                            locationId={selectedWarehouse.id}
+                            locationLabel={selectedWarehouse.name}
+                            context="warehouse"
+                        />
+                    </div>
+                </>
+            )}
         </div>
     );
 }

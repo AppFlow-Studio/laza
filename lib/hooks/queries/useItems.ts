@@ -18,6 +18,7 @@ import {
     superAdminBulkUpdateItems,
     superAdminBulkDeleteItems,
     getSuperAdminItems,
+    getUnassignedItemsForLocation,
 } from '@/lib/supabase/queries/items';
 import { Item } from '@/lib/supabase/types';
 import { useUserInfo } from './useUserInfo';
@@ -81,6 +82,7 @@ export function useCreateItem() {
         }) => createItem(item),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['items'] });
+            queryClient.invalidateQueries({ queryKey: ['unassigned-items'] });
         },
     });
 }
@@ -146,6 +148,7 @@ export function useSuperAdminCreateItem() {
         mutationFn: (item: Parameters<typeof superAdminCreateItem>[0]) => superAdminCreateItem(item),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['items'] });
+            queryClient.invalidateQueries({ queryKey: ['unassigned-items'] });
         },
     });
 }
@@ -190,6 +193,17 @@ export function useSuperAdminBulkDeleteItems() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['items'] });
         },
+    });
+}
+
+export function useUnassignedItemsForLocation(locationId: string) {
+    const { data: userInfo } = useUserInfo();
+    const organizationId = userInfo?.members?.organization_id;
+    return useQuery({
+        queryKey: ['unassigned-items', locationId],
+        queryFn: () => getUnassignedItemsForLocation(organizationId!, locationId),
+        enabled: !!locationId && !!organizationId,
+        staleTime: 60_000,
     });
 }
 

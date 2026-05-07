@@ -14,6 +14,7 @@ import {
     deletePurchaseOrderItemAction,
     recalculatePoCostsAction,
     receivePurchaseOrderAction,
+    getActionablePOCountAction,
 } from '@/lib/supabase/actions/purchaseOrderActions';
 
 import type { Database } from '@/lib/supabase/types';
@@ -23,10 +24,11 @@ type PurchaseOrderItemInsert = Database['public']['Tables']['purchase_order_item
 // ─── Query keys ───────────────────────────────────────────────────────────────
 
 export const purchaseOrderKeys = {
-    all:        (orgId: string)                  => ['purchaseOrders', orgId] as const,
-    detail:     (id: string)                     => ['purchaseOrders', 'detail', id] as const,
-    costs:      (orgId: string, itemId?: number) => ['itemCostHistory', orgId, itemId] as const,
-    warehouses: (orgId: string)                  => ['warehouseLocations', orgId] as const,
+    all:             (orgId: string)                  => ['purchaseOrders', orgId] as const,
+    detail:          (id: string)                     => ['purchaseOrders', 'detail', id] as const,
+    costs:           (orgId: string, itemId?: number) => ['itemCostHistory', orgId, itemId] as const,
+    warehouses:      (orgId: string)                  => ['warehouseLocations', orgId] as const,
+    actionableCount: (orgId: string)                  => ['purchaseOrders', 'actionable-count', orgId] as const,
 };
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
@@ -176,7 +178,20 @@ export function useReceivePurchaseOrder() {
             if (organization?.id) {
                 qc.invalidateQueries({ queryKey: purchaseOrderKeys.all(organization.id) });
                 qc.invalidateQueries({ queryKey: purchaseOrderKeys.costs(organization.id) });
+                qc.invalidateQueries({ queryKey: purchaseOrderKeys.actionableCount(organization.id) });
             }
         },
+    });
+}
+
+// ─── useActionablePOCount ─────────────────────────────────────────────────────
+
+export function useActionablePOCount(orgId: string | undefined) {
+    return useQuery({
+        queryKey:             purchaseOrderKeys.actionableCount(orgId ?? ''),
+        queryFn:              () => getActionablePOCountAction(orgId!),
+        enabled:              !!orgId,
+        staleTime:            30_000,
+        refetchOnWindowFocus: true,
     });
 }

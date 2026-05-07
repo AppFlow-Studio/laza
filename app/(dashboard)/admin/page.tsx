@@ -8,7 +8,6 @@ import ImmediateActions from '@/components/admin/dashboard/ImmediateActions';
 import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 import { useOrganizationUsers } from '@/lib/hooks/queries/useUsers';
 import { useAdminStore } from '@/lib/stores/adminStore';
-import { useMonthlySpend } from '@/lib/hooks/queries/useWarehouseSpend';
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
@@ -128,15 +127,13 @@ export default function AdminDashboard() {
     const { data: items, isLoading: itemsLoading } = useItems();
     const { data: alerts, isLoading: alertsLoading } = useAlerts({ resolved: false, locationId: selectedLocationId ?? undefined });
     const assignedLocationId = userInfo?.assigned_location_id ?? null;
-    const { data: monthlySpend, isLoading: spendLoading } = useMonthlySpend(assignedLocationId);
 
     const alertCount = alerts?.length ?? 0;
-    const spendFormatted = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(monthlySpend ?? 0);
 
     return (
         <div className="space-y-6">
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 <StatCard
                     label="Total Locations"
                     value={locations?.length ?? 0}
@@ -161,13 +158,6 @@ export default function AdminDashboard() {
                     icon={Icons.alerts}
                     loading={alertsLoading}
                     accent={alertCount > 0 ? "red" : "default"}
-                />
-                <StatCard
-                    label="Warehouse spend this month"
-                    value={spendFormatted}
-                    icon={Icons.spend}
-                    loading={spendLoading}
-                    accent="indigo"
                 />
             </div>
 

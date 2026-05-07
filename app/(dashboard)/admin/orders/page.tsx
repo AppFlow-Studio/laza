@@ -20,6 +20,7 @@ import {
     LayoutGrid,
     List,
     MapPin,
+    Columns,
 } from "lucide-react";
 import {
     Table,
@@ -41,7 +42,7 @@ type TicketStatus =
     | "confirmed"
     | "rejected"
     | "cancelled";
-type ViewMode = "list" | "grid";
+type ViewMode = "list" | "grid" | "status";
 
 type RawTicket = {
     id: string;
@@ -336,6 +337,67 @@ function TicketCard({ ticket }: { ticket: RawTicket }) {
     );
 }
 
+const KANBAN_STATUSES: TicketStatus[] = ["draft", "submitted", "processing", "fulfilled", "confirmed"];
+
+function KanbanView({ tickets, router }: { tickets: RawTicket[]; router: ReturnType<typeof useRouter> }) {
+    return (
+        <div className="flex gap-3 overflow-x-scroll pb-4">
+            {KANBAN_STATUSES.map((status) => {
+                const group = tickets.filter((t) => t.status === status);
+                const { label, dot, accent } = STATUS_CONFIG[status];
+                return (
+                    <div key={status} className="flex-shrink-0 w-72">
+                        <div className="flex items-center gap-2 mb-3 px-1">
+                            <span className={`w-2 h-2 rounded-full ${dot}`} />
+                            <span className="text-xs font-semibold text-gray-700">{label}</span>
+                            <span className="ml-auto text-[10px] font-semibold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                                {group.length}
+                            </span>
+                        </div>
+                        <div className="space-y-2">
+                            {group.length === 0 ? (
+                                <div className="rounded-xl border border-dashed border-gray-200 py-8 text-center text-xs text-gray-300">
+                                    No {label.toLowerCase()} orders
+                                </div>
+                            ) : (
+                                group.map((ticket) => {
+                                    const dateToShow = ticket.submitted_at ?? ticket.created_at;
+                                    return (
+                                        <button
+                                            key={ticket.id}
+                                            onClick={() => router.push(`/admin/orders/${ticket.id}`)}
+                                            className="w-full text-left group"
+                                        >
+                                            <div className="relative bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-violet-300 hover:shadow-[0_2px_12px_rgba(99,102,241,0.08)] hover:-translate-y-0.5 transition-all duration-150">
+                                                <div className={`h-[3px] w-full ${accent}`} />
+                                                <div className="p-3.5">
+                                                    <p className="text-sm font-semibold text-gray-900 truncate">
+                                                        {ticket.title ?? <span className="text-gray-300 italic text-xs font-normal">No title</span>}
+                                                    </p>
+                                                    <div className="flex items-center justify-between mt-2 text-[11px] text-gray-400">
+                                                        <span>{relativeDate(dateToShow)}</span>
+                                                        <span>{getItemCount(ticket)} items · {getTotalBoxes(ticket)} boxes</span>
+                                                    </div>
+                                                    {ticket.requesting_location && (
+                                                        <div className="flex items-center gap-1 mt-1.5 text-[11px] text-gray-400">
+                                                            <MapPin size={9} className="shrink-0" />
+                                                            {ticket.requesting_location.name}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 export default function AdminOrdersPage() {
     const router = useRouter();
     const { organization } = useOrganization();
@@ -394,19 +456,21 @@ export default function AdminOrdersPage() {
                             Orders
                         </h1>
                         <p className="text-xs text-gray-400 mt-1">
-                            Request inventory from the central warehouse
+                            Request inventory from the warehouse
                         </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                         <div className="flex border border-gray-200 rounded-lg overflow-hidden">
                             <button
                                 onClick={() => setViewMode("grid")}
+                                title="Grid view"
                                 className={`w-8 h-8 flex items-center justify-center transition-colors ${viewMode === "grid" ? "bg-indigo-600 text-white" : "bg-white text-gray-400 hover:bg-gray-50 hover:text-indigo-600"}`}
                             >
                                 <LayoutGrid size={14} />
                             </button>
                             <button
                                 onClick={() => setViewMode("list")}
+                                title="List view"
                                 className={`w-8 h-8 flex items-center justify-center transition-colors ${viewMode === "list" ? "bg-indigo-600 text-white" : "bg-white text-gray-400 hover:bg-gray-50 hover:text-indigo-600"}`}
                             >
                                 <List size={14} />
@@ -514,22 +578,22 @@ export default function AdminOrdersPage() {
                             <TableHeader>
                                 <TableRow className="bg-gray-50 hover:bg-gray-50 border-b border-gray-200">
                                     <TableHead className="w-4 pl-5 pr-2" />
-                                    <TableHead className="w-28 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                    <TableHead className="w-32 text-[11px] font-bold uppercase tracking-wider text-gray-400 py-3.5">
                                         Ticket ID
                                     </TableHead>
-                                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                    <TableHead className="text-[11px] font-bold uppercase tracking-wider text-gray-400 py-3.5">
                                         Title
                                     </TableHead>
-                                    <TableHead className="w-24 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                    <TableHead className="w-28 text-[11px] font-bold uppercase tracking-wider text-gray-400 py-3.5">
                                         Date
                                     </TableHead>
-                                    <TableHead className="w-36 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                    <TableHead className="w-40 text-[11px] font-bold uppercase tracking-wider text-gray-400 py-3.5">
                                         Location
                                     </TableHead>
-                                    <TableHead className="w-44 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                    <TableHead className="w-44 text-[11px] font-bold uppercase tracking-wider text-gray-400 py-3.5">
                                         Contents
                                     </TableHead>
-                                    <TableHead className="w-36 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                    <TableHead className="w-36 text-[11px] font-bold uppercase tracking-wider text-gray-400 py-3.5">
                                         Status
                                     </TableHead>
                                     <TableHead className="w-6 pr-5 pl-2" />
@@ -550,7 +614,7 @@ export default function AdminOrdersPage() {
                                                     `/admin/orders/${ticket.id}`,
                                                 )
                                             }
-                                            className="group cursor-pointer border-b border-gray-100 hover:bg-gray-50/70 transition-colors"
+                                            className="group cursor-pointer border-b border-gray-100 hover:bg-gray-50/70 transition-colors h-14"
                                         >
                                             <TableCell className="pl-5 pr-2">
                                                 <div
@@ -563,14 +627,14 @@ export default function AdminOrdersPage() {
                                                         fontFamily:
                                                             "var(--font-mono, 'JetBrains Mono', monospace)",
                                                     }}
-                                                    className="text-xs font-medium text-gray-500"
+                                                    className="text-sm font-medium text-gray-500"
                                                     title={ticket.id}
                                                 >
                                                     …{shortId(ticket.id)}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="max-w-0">
-                                                <span className="block text-xs font-medium truncate">
+                                                <span className="block text-sm font-medium truncate">
                                                     {ticket.title ? (
                                                         <span className="text-gray-800">
                                                             {ticket.title}
@@ -583,7 +647,7 @@ export default function AdminOrdersPage() {
                                                 </span>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex items-center gap-1 text-xs text-gray-400 whitespace-nowrap">
+                                                <div className="flex items-center gap-1 text-sm text-gray-400 whitespace-nowrap">
                                                     <CalendarDays
                                                         size={11}
                                                         className="flex-shrink-0"
@@ -592,7 +656,7 @@ export default function AdminOrdersPage() {
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex items-center gap-1 text-xs text-gray-400 min-w-0">
+                                                <div className="flex items-center gap-1 text-sm text-gray-400 min-w-0">
                                                     <MapPin
                                                         size={11}
                                                         className="flex-shrink-0 text-gray-300"
@@ -606,7 +670,7 @@ export default function AdminOrdersPage() {
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-3">
-                                                    <span className="text-xs text-gray-500">
+                                                    <span className="text-sm text-gray-500">
                                                         <span className="font-semibold text-gray-800">
                                                             {getItemCount(
                                                                 ticket,
@@ -614,7 +678,7 @@ export default function AdminOrdersPage() {
                                                         </span>{" "}
                                                         items
                                                     </span>
-                                                    <span className="text-xs text-gray-500">
+                                                    <span className="text-sm text-gray-500">
                                                         <span className="font-semibold text-gray-800">
                                                             {getTotalBoxes(
                                                                 ticket,
@@ -646,6 +710,9 @@ export default function AdminOrdersPage() {
                             </TableBody>
                         </Table>
                     </div>
+                ) : viewMode === "status" ? (
+                    /* ── KANBAN / STATUS VIEW ── */
+                    <KanbanView tickets={filtered} router={router} />
                 ) : (
                     /* ── GRID VIEW ── */
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

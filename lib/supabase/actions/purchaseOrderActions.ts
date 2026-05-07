@@ -210,3 +210,19 @@ export async function receivePurchaseOrderAction(
 	if (error) throw new Error(error.message);
 	return data;
 }
+
+// ─── Counts ───────────────────────────────────────────────────────────────────
+
+export async function getActionablePOCountAction(
+	organizationId: string,
+): Promise<number> {
+	const supabase = createServiceRoleClient();
+	const { count, error } = await supabase
+		.from('purchase_orders')
+		.select('id', { count: 'exact', head: true })
+		.eq('organization_id', organizationId)
+		.eq('status', 'arrived');
+
+	if (error) throw new Error(error.message);
+	return count ?? 0;
+}

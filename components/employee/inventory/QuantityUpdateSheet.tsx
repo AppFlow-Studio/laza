@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Sheet } from 'react-modal-sheet';
-import { useUser } from '@clerk/nextjs';
-import { useUpdateQuantity } from '@/lib/hooks/queries/useEmployee';
+import { useUser, useOrganization } from '@clerk/nextjs';
 import { useCheckUpdateAllowed } from '@/lib/hooks/queries/useUpdateLimits';
+import { useCreateInventoryUpdateRequest } from '@/lib/hooks/queries/useInventoryUpdateRequests';
 import { Button } from '@/components/ui/button';
 import { Minus, Plus, X, ChevronRight, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -35,7 +35,6 @@ const reasonOptions = [
 const actionTypes = [
     { value: 'count', label: 'Count' },
     { value: 'adjustment', label: 'Adjustment' },
-    { value: 'received', label: 'Received' },
     { value: 'used', label: 'Used' },
 ];
 
@@ -51,7 +50,8 @@ export default function QuantityUpdateSheet({
     onSuccess,
 }: QuantityUpdateSheetProps) {
     const { user } = useUser();
-    const updateMutation = useUpdateQuantity();
+    const { organization } = useOrganization();
+    const requestMutation = useCreateInventoryUpdateRequest();
 
     // Check update limits
     const { data: limitCheck, isLoading: limitCheckLoading } = useCheckUpdateAllowed(
@@ -167,39 +167,26 @@ export default function QuantityUpdateSheet({
         }
 
         try {
-            await updateMutation.mutateAsync({
+            const noteText = reason !== 'correction'
+                ? `Reason: ${reasonOptions.find(r => r.value === reason)?.label}`
+                : null;
 
-                id: id,
-                itemId: item.id,
+            await requestMutation.mutateAsync({
+                orgId:            organization?.id ?? "",
                 locationId,
-                storageSpaceId,
-                newQuantity: numericQuantity,
-                userId: user?.id || '',
-                actionType: actionType,
-                notes: reason !== 'correction' ? `Reason: ${reasonOptions.find(r => r.value === reason)?.label}` : undefined,
+                storageSpaceId:   storageSpaceId || null,
+                itemId:           item.id,
+                requestedBy:      user?.id ?? "",
+                actionType:       actionType as "count" | "adjustment" | "used",
+                newQuantity:      numericQuantity,
+                previousQuantity: originalQuantity,
+                notes:            noteText,
             });
 
-            // Enhanced toast notification
-            const changeText = quantityChange > 0
-                ? `+${quantityChange.toFixed(2)}`
-                : quantityChange.toFixed(2);
-
-            toast.success(
-                <div className="space-y-1">
-                    <p className="font-semibold">{item?.name || 'Item'}</p>
-                    <p className="text-sm">
-                        {originalQuantity.toFixed(2)} → {numericQuantity.toFixed(2)} ({changeText})
-                    </p>
-                    <p className="text-xs text-zinc-500">
-                        {actionTypes.find(a => a.value === actionType)?.label}
-                    </p>
-                </div>,
-                { duration: 4000 }
-            );
-
+            toast.success("Update submitted for admin approval");
             onSuccess();
         } catch (error: any) {
-            toast.error(error.message || 'Failed to update quantity');
+            toast.error(error.message || 'Failed to submit update request');
         }
     };
 
@@ -215,7 +202,7 @@ export default function QuantityUpdateSheet({
                                 <Button
                                     variant="secondary"
                                     onClick={onClose}
-                                    disabled={updateMutation.isPending}
+                                    disabled={requestMutation.isPending}
                                     className="text-zinc-600"
                                 >
                                     <X className="w-5 h-5" /> Cancel
@@ -223,7 +210,7 @@ export default function QuantityUpdateSheet({
                                 <Button
                                     onClick={handleSave}
                                     disabled={
-                                        updateMutation.isPending ||
+                                        requestMutation.isPending ||
                                         quantityChange === 0 ||
                                         numericQuantity < 0 ||
                                         (limitCheck && !limitCheck.allowed) ||
@@ -231,7 +218,7 @@ export default function QuantityUpdateSheet({
                                     }
                                     className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {updateMutation.isPending ? 'Saving...' : 'Save'}
+                                    {requestMutation.isPending ? 'Submitting…' : 'Submit for Approval'}
                                 </Button>
                             </div>
 
@@ -306,7 +293,7 @@ export default function QuantityUpdateSheet({
                                         <motion.button
                                             whileTap={{ scale: 0.9 }}
                                             onClick={handleDecrement}
-                                            disabled={updateMutation.isPending}
+                                            disabled={requestMutation.isPending}
                                             className={cn(
                                                 "w-12 h-12 rounded-full border-2 border-zinc-300",
                                                 "bg-white flex items-center justify-center",
@@ -325,7 +312,7 @@ export default function QuantityUpdateSheet({
                                                 setShowKeypad(true);
                                                 setIsFirstInput(true);
                                             }}
-                                            disabled={updateMutation.isPending}
+                                            disabled={requestMutation.isPending}
                                             className={cn(
                                                 "w-1/2 h-20 bg-white border-2 rounded-xl",
                                                 "flex flex-col items-center justify-center gap-1",
@@ -364,7 +351,7 @@ export default function QuantityUpdateSheet({
                                         <motion.button
                                             whileTap={{ scale: 0.9 }}
                                             onClick={handleIncrement}
-                                            disabled={updateMutation.isPending}
+                                            disabled={requestMutation.isPending}
                                             className={cn(
                                                 "w-16 h-12 rounded-xl border-2 border-blue-300",
                                                 "bg-blue-50 flex items-center justify-center",

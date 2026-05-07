@@ -3,10 +3,10 @@
 import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Papa from "papaparse";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useAllTickets } from "@/lib/hooks/queries/useOrderTickets";
 import { useLocations } from "@/lib/hooks/queries/useLocations";
-import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
+import { useOrganization } from "@clerk/nextjs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -465,8 +465,8 @@ function DistributionTable({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function DistributionReportPage() {
-    const { data: userInfo } = useUserInfo();
-    const orgId = userInfo?.organizationId ?? "";
+    const { organization } = useOrganization();
+    const orgId = organization?.id ?? "";
 
     const [preset, setPreset] = useState<DateRangePreset>("this_month");
     const [customRange, setCustomRange] = useState<DateRange>({});
@@ -520,8 +520,8 @@ export default function DistributionReportPage() {
                         "Unknown Store",
                     storeId: ticket.requesting_location_id,
                     fulfilledAt: datestamp,
-                    itemName: item.item?.name ?? item.name ?? "Unknown Item",
-                    itemSku: item.item?.sku ?? item.sku ?? "—",
+                    itemName: item.items?.name ?? item.name ?? "Unknown Item",
+                    itemSku: item.items?.sku ?? item.sku ?? "—",
                     boxesRequested: item.quantity_boxes ?? 0,
                     boxesFulfilled:
                         item.fulfilled_boxes ?? item.quantity_boxes ?? 0,
