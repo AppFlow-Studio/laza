@@ -131,22 +131,22 @@ export default function EmailDeliveryLogs({ organizationId }: EmailDeliveryLogsP
                                     <tbody className="divide-y">
                                         {data.logs.map((log: any) => (
                                             <tr key={log.id} className="hover:bg-zinc-50">
-                                                <td className="px-4 py-3 text-sm">
+                                                <td className="px-4 py-3 text-sm whitespace-nowrap">
                                                     <span className="capitalize">
-                                                        {log.email_type.replace('_', ' ')}
+                                                        {log.email_type.replace(/_/g, ' ')}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-sm">{log.recipient_email}</td>
                                                 <td className="px-4 py-3 text-sm max-w-md truncate" title={log.subject}>
                                                     {log.subject}
                                                 </td>
-                                                <td className="px-4 py-3 text-sm">
+                                                <td className="px-4 py-3 text-sm whitespace-nowrap">
                                                     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(log.status)}`}>
                                                         {getStatusIcon(log.status)}
                                                         {log.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 text-sm text-zinc-600">
+                                                <td className="px-4 py-3 text-sm text-zinc-600 whitespace-nowrap">
                                                     {log.sent_at
                                                         ? format(new Date(log.sent_at), 'MMM d, yyyy h:mm a')
                                                         : log.created_at

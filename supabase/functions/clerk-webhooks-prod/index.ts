@@ -191,8 +191,10 @@ Deno.serve(async (req) => {
 
             // Sync role to users table (location handled via junction table)
             const userId = event.data.public_user_data?.user_id;
-            const assignedLocationId =
+            const assignedLocationId: string | null =
                 event.data.public_metadata?.assigned_location_id || null;
+            const assignedLocationIds: string[] =
+                event.data.public_metadata?.assigned_location_ids ?? [];
 
             const { data: userData, error: userError } = await supabase
                 .from("users")
@@ -213,15 +215,31 @@ Deno.serve(async (req) => {
                 );
             }
 
-            // Create junction row for employees with a pre-assigned location
-            if (role === "employee" && assignedLocationId && userId) {
+            // Sync location assignments via junction table
+            if (userId) {
                 await supabase
                     .from("user_location_assignments")
                     .delete()
                     .eq("user_id", userId);
-                await supabase
-                    .from("user_location_assignments")
-                    .insert({ user_id: userId, location_id: assignedLocationId });
+
+                if (role === "employee" && assignedLocationId) {
+                    await supabase
+                        .from("user_location_assignments")
+                        .insert({ user_id: userId, location_id: assignedLocationId });
+                } else if (role === "admin" && assignedLocationIds.length > 0) {
+                    const { error: assignError } = await supabase
+                        .from("user_location_assignments")
+                        .insert(
+                            assignedLocationIds.map((location_id: string) => ({
+                                user_id: userId,
+                                location_id,
+                            })),
+                        );
+                    if (assignError) {
+                        console.error("Error inserting location assignments:", assignError);
+                    }
+                }
+                // super_admin: no junction rows
             }
 
             if (error) {

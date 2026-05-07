@@ -402,7 +402,20 @@ function ReorderAlertsSection({ orgId }: { orgId: string }) {
                                 custom={i}
                                 variants={fadeUp}
                                 initial="hidden"
-                                animate="show"
+                                animate={
+                                    alert.urgency === "critical"
+                                        ? {
+                                              opacity: 1,
+                                              y: 0,
+                                              x: [0, -3, 3, -2, 2, 0],
+                                              transition: {
+                                                  opacity: { duration: 0.3, delay: i * 0.07 },
+                                                  y: { duration: 0.3, delay: i * 0.07 },
+                                                  x: { duration: 0.4, delay: i * 0.07 + 0.3, ease: "easeOut" },
+                                              },
+                                          }
+                                        : "show"
+                                }
                                 className={`flex items-center justify-between py-3.5 first:pt-4 last:pb-4 ${
                                     alert.urgency === "critical"
                                         ? "relative"

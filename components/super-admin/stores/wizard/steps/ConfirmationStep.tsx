@@ -1,20 +1,24 @@
 "use client";
 
-import { CheckCircle2, MapPin, Package, Users, Snowflake, Thermometer, Sun, Pencil, ExternalLink } from 'lucide-react';
+import { CheckCircle2, MapPin, Package, Users, Snowflake, Thermometer, Sun, Pencil, ExternalLink, Send, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useItems } from '@/lib/hooks/queries/useItems';
 import type { StoreFormData } from './StoreDetailsStep';
 import type { WizardStorageSpace } from './StoreStorageSpacesStep';
 import type { ItemAssignmentData } from '@/components/admin/locations/wizard/steps/AssignItemsStep';
 import type { InviteAdminFormData } from './InviteAdminStep';
+import type { InviteStatus } from '../StoreSetupWizard';
 
 interface ConfirmationStepProps {
-    storeData:       StoreFormData;
-    storageSpaces:   WizardStorageSpace[];
-    itemAssignments: Record<string, ItemAssignmentData>;
-    inviteData:      InviteAdminFormData | null;
-    createdLocationId: string | null; // set after successful submit
-    onEditStep: (step: number) => void;
+    storeData:         StoreFormData;
+    storageSpaces:     WizardStorageSpace[];
+    itemAssignments:   Record<string, ItemAssignmentData>;
+    inviteData:        InviteAdminFormData | null;
+    createdLocationId: string | null;
+    inviteStatus:      InviteStatus;
+    inviteError:       string | null;
+    onEditStep:        (step: number) => void;
+    onSendInvite:      () => void;
 }
 
 const TEMP_CONFIG = {
@@ -29,7 +33,10 @@ export default function ConfirmationStep({
     itemAssignments,
     inviteData,
     createdLocationId,
+    inviteStatus,
+    inviteError,
     onEditStep,
+    onSendInvite,
 }: ConfirmationStepProps) {
     const { data: allItems } = useItems();
     const itemsMap = new Map(allItems?.map(item => [item.id, item]) || []);
@@ -38,33 +45,83 @@ export default function ConfirmationStep({
         (sum, a) => sum + a.selectedItems.size, 0
     );
 
-    // If submission has completed, show success screen
+    // Success screen after store creation
     if (createdLocationId) {
         return (
-            <div className="text-center py-8 space-y-6">
-                <div className="flex items-center justify-center">
-                    <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-                        <CheckCircle2 className="w-9 h-9 text-green-600" />
+            <div className="py-6 space-y-6">
+                {/* Success header */}
+                <div className="text-center space-y-3">
+                    <div className="flex items-center justify-center">
+                        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                            <CheckCircle2 className="w-9 h-9 text-green-600" />
+                        </div>
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-semibold text-zinc-900">Store is ready!</h3>
+                        <p className="text-sm text-zinc-500 mt-1">
+                            <strong>{storeData.name}</strong> has been created with {storageSpaces.length} storage space{storageSpaces.length !== 1 ? 's' : ''} and {totalItems} item assignment{totalItems !== 1 ? 's' : ''}.
+                        </p>
                     </div>
                 </div>
-                <div>
-                    <h3 className="text-xl font-semibold text-zinc-900">Store is ready!</h3>
-                    <p className="text-sm text-zinc-500 mt-2">
-                        <strong>{storeData.name}</strong> has been created with {storageSpaces.length} storage space{storageSpaces.length !== 1 ? 's' : ''} and {totalItems} item assignment{totalItems !== 1 ? 's' : ''}.
-                    </p>
-                    {inviteData && (
-                        <p className="text-sm text-zinc-500 mt-1">
-                            An invitation has been sent to <strong>{inviteData.email}</strong>.
-                        </p>
-                    )}
+
+                {/* Invite section — shown if an email was entered */}
+                {inviteData?.email && (
+                    <div className="border border-zinc-200 rounded-xl p-5">
+                        <div className="flex items-start gap-3 mb-4">
+                            <Users className="w-5 h-5 text-indigo-500 mt-0.5 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-zinc-900">Invite Store Admin</p>
+                                <p className="text-sm text-zinc-500 truncate">{inviteData.email}</p>
+                            </div>
+                            {inviteStatus === 'sent' && (
+                                <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                            )}
+                        </div>
+
+                        {inviteStatus === 'sent' ? (
+                            <p className="text-sm text-green-600 font-medium">
+                                Invitation sent! They'll receive an email to join the store.
+                            </p>
+                        ) : (
+                            <>
+                                {inviteStatus === 'failed' && inviteError && (
+                                    <div className="flex items-start gap-2 mb-3 p-3 rounded-lg bg-red-50 border border-red-100">
+                                        <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                                        <p className="text-xs text-red-600">{inviteError}</p>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={onSendInvite}
+                                    disabled={inviteStatus === 'sending'}
+                                    className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
+                                >
+                                    {inviteStatus === 'sending' ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            Sending…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Send className="w-4 h-4" />
+                                            {inviteStatus === 'failed' ? 'Retry Invitation' : 'Send Invitation'}
+                                        </>
+                                    )}
+                                </button>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* Go to store */}
+                <div className="text-center">
+                    <a
+                        href={`/super-admin/stores/${createdLocationId}`}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                    >
+                        View Store Dashboard
+                        <ExternalLink className="w-4 h-4" />
+                    </a>
                 </div>
-                <a
-                    href={`/super-admin/stores/${createdLocationId}`}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-                >
-                    View Store Dashboard
-                    <ExternalLink className="w-4 h-4" />
-                </a>
             </div>
         );
     }

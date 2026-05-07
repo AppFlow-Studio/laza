@@ -24,6 +24,8 @@ import ConfirmationStep from './steps/ConfirmationStep';
 
 const TOTAL_STEPS = 5;
 
+export type InviteStatus = 'idle' | 'sending' | 'sent' | 'failed';
+
 export default function StoreSetupWizard() {
     const router = useRouter();
     const { data: userInfo } = useUserInfo();
@@ -34,7 +36,6 @@ export default function StoreSetupWizard() {
     const createStorageSpaceMutation  = useCreateStorageSpace();
     const bulkAssignMutation          = useBulkAssignItems();
     const createInvitationMutation    = useCreateInvitation();
-    // Fetch org-wide catalog items to seed the Default Storage space
     const { data: items, isLoading: itemsLoading } = useItems();
 
     // ── Wizard state ─────────────────────────────────────────────────────────
@@ -50,6 +51,10 @@ export default function StoreSetupWizard() {
 
     const [isSubmitting,      setIsSubmitting]      = useState(false);
     const [createdLocationId, setCreatedLocationId] = useState<string | null>(null);
+
+    // ── Invite state (separate from store creation) ───────────────────────────
+    const [inviteStatus, setInviteStatus] = useState<InviteStatus>('idle');
+    const [inviteError,  setInviteError]  = useState<string | null>(null);
 
     // ── Clone support ─────────────────────────────────────────────────────────
     const cloneSourceId = storeData?.clone_from_id ?? '';
@@ -143,7 +148,7 @@ export default function StoreSetupWizard() {
         if (currentStep > 1) goToStep(currentStep - 1);
     };
 
-    // ── Final submission ──────────────────────────────────────────────────────
+    // ── Store creation (no invitation here) ───────────────────────────────────
     const handleSubmit = async () => {
         if (!storeData || !organizationId || !userId) return;
         setIsSubmitting(true);
@@ -197,7 +202,7 @@ export default function StoreSetupWizard() {
             }
             if (assignPromises.length > 0) await Promise.all(assignPromises);
 
-            // 4. Always create a Default Storage space; assign all catalog items if available (qty 0).
+            // 4. Always create a Default Storage space and seed all catalog items (qty 0)
             const defaultNameTaken = storageSpaces.some(
                 s => s.name.trim().toLowerCase() === 'default storage'
             );
@@ -224,23 +229,43 @@ export default function StoreSetupWizard() {
                 }
             }
 
-            // 5. Send admin invitation if not skipped
-            if (inviteData?.email) {
-                await createInvitationMutation.mutateAsync({
-                    email:                 inviteData.email,
-                    role:                  'admin',
-                    organizationId,
-                    assigned_location_id:  location.id,
-                    assigned_location_ids: [location.id],
-                });
-            }
-
             setCreatedLocationId(location.id);
             toast.success('Store created successfully!');
         } catch (error: any) {
             toast.error(error.message || 'Failed to create store');
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    // ── Invitation (separate action, mirrors InviteUserWizard exactly) ────────
+    const handleSendInvite = async () => {
+        if (!inviteData?.email || !organizationId || !createdLocationId) return;
+        setInviteStatus('sending');
+        setInviteError(null);
+
+        try {
+            const result = await createInvitationMutation.mutateAsync({
+                organizationId,
+                email:                 inviteData.email,
+                role:                  'admin',
+                assigned_location_id:  createdLocationId,
+                assigned_location_ids: [createdLocationId],
+            });
+
+            if (result.success) {
+                toast.success(result.message);
+                setInviteStatus('sent');
+            } else {
+                toast.error(result.message);
+                setInviteStatus('failed');
+                setInviteError(result.message);
+            }
+        } catch (error: any) {
+            const msg = error.message || 'Failed to send invitation';
+            toast.error(msg);
+            setInviteStatus('failed');
+            setInviteError(msg);
         }
     };
 
@@ -313,7 +338,10 @@ export default function StoreSetupWizard() {
                             itemAssignments={itemAssignments}
                             inviteData={inviteData}
                             createdLocationId={createdLocationId}
+                            inviteStatus={inviteStatus}
+                            inviteError={inviteError}
                             onEditStep={goToStep}
+                            onSendInvite={handleSendInvite}
                         />
                     </div>
                 ) : null;

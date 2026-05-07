@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useLocationWithDetails } from "@/lib/hooks/queries/useLocations";
+import { useLocationWithDetails, useUpdateLocation, useDeleteLocation } from "@/lib/hooks/queries/useLocations";
 import { useEmployeesByLocation } from "@/lib/hooks/queries/useEmployees";
 import { useAlerts, useInventoryByLocation, useInventoryLogs } from "@/lib/hooks/queries/useInventory";
 import { useDeleteStorageSpace } from "@/lib/hooks/queries/useStorageSpace";
@@ -11,7 +11,6 @@ import {
     ArrowLeft,
     Package,
     AlertTriangle,
-    Eye,
     Users,
     Clock,
     Thermometer,
@@ -22,7 +21,17 @@ import {
     Plus,
     Bell,
     Trash2,
+    Pencil,
 } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { LocationNotificationPreferences } from "@/components/location-notification-preferences";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -67,11 +76,18 @@ export default function SuperAdminStoreDetailPage() {
     const { data: logs } = useInventoryLogs({ locationId, limit: 100 });
     const { data: inventory } = useInventoryByLocation(locationId);
 
+    const updateLocation = useUpdateLocation();
+    const deleteLocation = useDeleteLocation();
+
     const [activeTab, setActiveTab] = useState<TabKey>("stock");
     const [stockView, setStockView] = useState<"spaces" | "matrix">("spaces");
     const [showStorageSetup, setShowStorageSetup] = useState(false);
     const [pendingDelete, setPendingDelete] = useState<StorageSpace | null>(null);
     const deleteStorageSpace = useDeleteStorageSpace();
+
+    const [showEditDialog, setShowEditDialog] = useState(false);
+    const [showDeleteStoreDialog, setShowDeleteStoreDialog] = useState(false);
+    const [editForm, setEditForm] = useState({ name: "", street: "", city: "", state: "", zip: "" });
 
     const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
 
@@ -143,28 +159,51 @@ export default function SuperAdminStoreDetailPage() {
             <div className="bg-white rounded-xl shadow-sm p-6 border border-zinc-200">
                 <div className="flex items-start justify-between">
                     <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <h1 className="text-2xl font-semibold text-zinc-900">
-                                {location.name}
-                            </h1>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600">
-                                <Eye className="w-3 h-3" />
-                                Read-only
-                            </span>
-                        </div>
+                        <h1 className="text-2xl font-semibold text-zinc-900 mb-1">
+                            {location.name}
+                        </h1>
                         <p className="text-zinc-600">
                             {address.street}, {address.city}, {address.state}{" "}
                             {address.zip}
                         </p>
                     </div>
 
-                    {activeAlertCount > 0 && (
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
-                            <AlertTriangle className="w-4 h-4" />
-                            {activeAlertCount} active{" "}
-                            {activeAlertCount === 1 ? "alert" : "alerts"}
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {activeAlertCount > 0 && (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
+                                <AlertTriangle className="w-4 h-4" />
+                                {activeAlertCount} active{" "}
+                                {activeAlertCount === 1 ? "alert" : "alerts"}
+                            </div>
+                        )}
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                                setEditForm({
+                                    name: location.name ?? "",
+                                    street: address.street ?? "",
+                                    city: address.city ?? "",
+                                    state: address.state ?? "",
+                                    zip: address.zip ?? "",
+                                });
+                                setShowEditDialog(true);
+                            }}
+                            className="flex items-center gap-1.5"
+                        >
+                            <Pencil className="w-3.5 h-3.5" />
+                            Edit
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowDeleteStoreDialog(true)}
+                            className="flex items-center gap-1.5 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Quick stats */}
@@ -541,6 +580,131 @@ export default function SuperAdminStoreDetailPage() {
                     </div>
                 )}
             </div>
+
+            {/* Edit store dialog */}
+            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Edit Store</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="store-name">Store Name</Label>
+                            <Input
+                                id="store-name"
+                                value={editForm.name}
+                                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                                placeholder="Store name"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="store-street">Street</Label>
+                            <Input
+                                id="store-street"
+                                value={editForm.street}
+                                onChange={(e) => setEditForm((f) => ({ ...f, street: e.target.value }))}
+                                placeholder="Street address"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="store-city">City</Label>
+                                <Input
+                                    id="store-city"
+                                    value={editForm.city}
+                                    onChange={(e) => setEditForm((f) => ({ ...f, city: e.target.value }))}
+                                    placeholder="City"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="store-state">State</Label>
+                                <Input
+                                    id="store-state"
+                                    value={editForm.state}
+                                    onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value }))}
+                                    placeholder="State"
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="store-zip">ZIP Code</Label>
+                            <Input
+                                id="store-zip"
+                                value={editForm.zip}
+                                onChange={(e) => setEditForm((f) => ({ ...f, zip: e.target.value }))}
+                                placeholder="ZIP code"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            disabled={updateLocation.isPending || !editForm.name.trim()}
+                            onClick={() => {
+                                updateLocation.mutate(
+                                    {
+                                        id: locationId,
+                                        updates: {
+                                            name: editForm.name.trim(),
+                                            address: JSON.stringify({
+                                                street: editForm.street,
+                                                city: editForm.city,
+                                                state: editForm.state,
+                                                zip: editForm.zip,
+                                            }),
+                                        },
+                                    },
+                                    {
+                                        onSuccess: () => {
+                                            setShowEditDialog(false);
+                                            toast.success("Store updated successfully");
+                                        },
+                                        onError: () => {
+                                            toast.error("Failed to update store");
+                                        },
+                                    }
+                                );
+                            }}
+                        >
+                            {updateLocation.isPending ? "Saving…" : "Save Changes"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete store dialog */}
+            <AlertDialog open={showDeleteStoreDialog} onOpenChange={setShowDeleteStoreDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete store?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <strong>{location.name}</strong> will be permanently deleted along with all its storage spaces and inventory records. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                deleteLocation.mutate(locationId, {
+                                    onSuccess: () => {
+                                        toast.success(`"${location.name}" deleted successfully`);
+                                        router.push("/super-admin/stores");
+                                    },
+                                    onError: () => {
+                                        toast.error("Failed to delete store");
+                                    },
+                                });
+                            }}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                            disabled={deleteLocation.isPending}
+                        >
+                            {deleteLocation.isPending ? "Deleting…" : "Delete Store"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <AlertDialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
                 <AlertDialogContent>
