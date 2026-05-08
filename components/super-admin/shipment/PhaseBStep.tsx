@@ -515,19 +515,31 @@ export function PhaseBStep({ po, phaseAData, onSubmit, onValidityChange }: Phase
     }, [watchedPallets, onValidityChange]);
 
     const handleFormSubmit = (data: PhaseBData) => {
-        console.log(data, phaseAData)
-        const overItems = phaseAData.lineItems.filter((li) => {
+        const itemTotals = phaseAData.lineItems.map((li) => {
             const assignedUnits = data.pallets.reduce((sum, p) => {
                 const match = p.items.find((i) => i.item_id === li.item_id);
                 if (!match) return sum;
                 return sum + totalUnitsForItem(match.box_configs ?? []);
             }, 0);
-            return assignedUnits > li.quantity_received;
+            return { li, assignedUnits };
         });
 
+        const overItems = itemTotals.filter(({ li, assignedUnits }) => assignedUnits > li.quantity_received);
         if (overItems.length > 0) {
+            alert("Some items have more boxes assigned than were received. Please fix the highlighted rows.");
+            return;
+        }
+
+        const underItems = itemTotals.filter(({ li, assignedUnits }) => assignedUnits !== li.quantity_received);
+        if (underItems.length > 0) {
             alert(
-                "Some items have more boxes assigned than were received. Please fix the highlighted rows."
+                `${underItems.length} item${underItems.length !== 1 ? "s" : ""} still have unassigned units:\n\n` +
+                underItems.map(({ li, assignedUnits }) => {
+                    const po = data.pallets[0]?.items.find((i) => i.item_id === li.item_id);
+                    const name = po?.item_name ?? `Item ${li.item_id}`;
+                    return `• ${name}: assigned ${assignedUnits} of ${li.quantity_received} pcs`;
+                }).join("\n") +
+                "\n\nAll received units must be assigned to pallets before proceeding."
             );
             return;
         }

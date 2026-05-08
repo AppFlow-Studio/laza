@@ -33,12 +33,15 @@ export default clerkMiddleware(async (auth, req) => {
         return NextResponse.next();
     }
 
-    // Protect admin routes - only admins can access
+    // Protect admin routes - only store admins can access (super_admin redirects to their dashboard)
     if (isAdminRoute(req)) {
         if (!userId) {
             return NextResponse.redirect(new URL('/sign-in', req.url));
         }
-        if (role !== 'admin' && role !== 'super_admin') {
+        if (role === 'super_admin') {
+            return NextResponse.redirect(new URL('/super-admin', req.url));
+        }
+        if (role !== 'admin') {
             return new Response('Unauthorized', { status: 403 })
         }
         return NextResponse.next();

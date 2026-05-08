@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { Package, Edit, Trash2, Check, AlertTriangle, Warehouse } from 'lucide-react';
 import { Item } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';
+import { BarChart2 } from 'lucide-react';
 import {
     Table,
     TableBody,
@@ -28,6 +29,7 @@ interface ItemGridProps {
     items: Item[];
     onEdit?: (item: Item) => void;
     onDelete?: (item: Item) => void;
+    onViewHistory?: (item: Item) => void;
     viewMode?: 'grid' | 'list';
     selectedItems?: Set<string>;
     onItemToggle?: (itemId: string) => void;
@@ -38,6 +40,7 @@ export default function ItemGrid({
     items,
     onEdit,
     onDelete,
+    onViewHistory,
     viewMode = 'grid',
     selectedItems = new Set(),
     onItemToggle,
@@ -185,6 +188,15 @@ export default function ItemGrid({
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-2">
+                                                {onViewHistory && (
+                                                    <button
+                                                        onClick={() => onViewHistory(item)}
+                                                        className="p-2 text-zinc-500 hover:bg-zinc-50 rounded-lg transition-colors"
+                                                        title="View history"
+                                                    >
+                                                        <BarChart2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                                 {onEdit && (
                                                     <button
                                                         onClick={() => onEdit(item)}
@@ -308,6 +320,15 @@ export default function ItemGrid({
                             </p>
 
                             <div className="flex items-center gap-2 pt-3 border-t border-zinc-200">
+                                {onViewHistory && (
+                                    <button
+                                        onClick={() => onViewHistory(item)}
+                                        className="flex items-center justify-center gap-2 px-3 py-2 bg-zinc-50 text-zinc-500 rounded-lg hover:bg-zinc-100 transition-colors"
+                                        title="View history"
+                                    >
+                                        <BarChart2 className="w-4 h-4" />
+                                    </button>
+                                )}
                                 {onEdit && (
                                     <button
                                         onClick={() => onEdit(item)}

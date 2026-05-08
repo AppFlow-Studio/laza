@@ -132,6 +132,13 @@ export default function LocationDetailsStep({
         setValue("longitude", null);
     };
 
+    const handleAddressBlur = useCallback(() => {
+        const { address } = getValues();
+        if (address.street && address.city && !geocoding && isLoaded) {
+            handleGeocode();
+        }
+    }, [getValues, geocoding, isLoaded]);
+
     const inputClass = (hasError?: boolean) =>
         cn(
             "w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all",
@@ -232,6 +239,7 @@ export default function LocationDetailsStep({
                     {...register("address.street")}
                     placeholder="123 Main St"
                     className={inputClass(!!errors.address?.street)}
+                    onBlur={handleAddressBlur}
                 />
                 {errors.address?.street && (
                     <p className="text-xs text-rose-500 font-medium mt-1">
@@ -253,6 +261,7 @@ export default function LocationDetailsStep({
                         id="city"
                         {...register("address.city")}
                         className={inputClass(!!errors.address?.city)}
+                        onBlur={handleAddressBlur}
                     />
                     {errors.address?.city && (
                         <p className="text-xs text-rose-500 font-medium mt-1">
@@ -271,6 +280,7 @@ export default function LocationDetailsStep({
                         id="state"
                         {...register("address.state")}
                         className={inputClass(!!errors.address?.state)}
+                        onBlur={handleAddressBlur}
                     />
                     {errors.address?.state && (
                         <p className="text-xs text-rose-500 font-medium mt-1">
@@ -292,6 +302,7 @@ export default function LocationDetailsStep({
                     id="zip"
                     {...register("address.zip")}
                     className={inputClass(!!errors.address?.zip)}
+                    onBlur={handleAddressBlur}
                 />
                 {errors.address?.zip && (
                     <p className="text-xs text-rose-500 font-medium mt-1">
