@@ -111,6 +111,7 @@ export default function StoreDetailsStep({
     const handleGeocode = useCallback(() => {
         if (!isLoaded) return;
         const { address } = getValues();
+        console.log(address)
         const parts = [address.street, address.city, address.state, address.zip].filter(Boolean);
         if (parts.length === 0) return;
 

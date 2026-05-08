@@ -27,7 +27,7 @@ export async function sendInventoryAdjustmentNotification(requestId: string): Pr
                 items ( name, unit_of_measure ),
                 storage_spaces ( name ),
                 locations ( name ),
-                users ( first_name, last_name )
+                users!inventory_update_requests_requested_by_fkey ( first_name, last_name )
             `)
             .eq('id', requestId)
             .single();
@@ -37,7 +37,7 @@ export async function sendInventoryAdjustmentNotification(requestId: string): Pr
             return;
         }
 
-        const recipients = await getRecipients(req.org_id);
+        const recipients = await getRecipients(req.org_id, req.location_id);
         if (recipients.length === 0) {
             console.warn('[sendInventoryAdjustmentNotification] no recipients configured for org', req.org_id);
             return;
