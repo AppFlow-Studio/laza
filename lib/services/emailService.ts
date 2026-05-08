@@ -20,7 +20,7 @@ export interface EmailOptions {
  */
 export async function sendEmail(
     organizationId: string,
-    emailType: 'low_stock_alert' | 'low_stock_digest' | 'daily_summary',
+    emailType: 'low_stock_alert' | 'low_stock_digest' | 'daily_summary' | 'inventory_adjustment_request',
     options: EmailOptions
 ): Promise<{ success: boolean; emailId?: string; error?: string }> {
     try {
