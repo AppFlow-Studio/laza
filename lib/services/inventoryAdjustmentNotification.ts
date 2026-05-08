@@ -27,19 +27,23 @@ export async function sendInventoryAdjustmentNotification(requestId: string): Pr
                 items ( name, unit_of_measure ),
                 storage_spaces ( name ),
                 locations ( name ),
-                users ( first_name, last_name )
+                users!inventory_update_requests_requested_by_fkey ( first_name, last_name )
             `)
             .eq('id', requestId)
             .single();
 
         if (error || !req) {
-            console.error('[sendInventoryAdjustmentNotification] fetch error:', error);
+            console.error('[adj-email] fetch error:', error);
             return;
         }
 
+        console.log('[adj-email] request fetched — org_id:', req.org_id, '| location_id:', req.location_id);
+
         const recipients = await getRecipients(req.org_id, req.location_id);
+        console.log('[adj-email] resolved recipients:', recipients);
+
         if (recipients.length === 0) {
-            console.warn('[sendInventoryAdjustmentNotification] no recipients configured for org', req.org_id);
+            console.warn('[adj-email] no recipients — check notification_preferences for org', req.org_id, 'location', req.location_id);
             return;
         }
 
@@ -52,7 +56,7 @@ export async function sendInventoryAdjustmentNotification(requestId: string): Pr
         const locationName = (req.locations as any)?.name ?? '';
         const storageSpaceName = (req.storage_spaces as any)?.name ?? null;
 
-        await sendEmail(req.org_id, 'inventory_adjustment_request', {
+        const emailResult = await sendEmail(req.org_id, 'inventory_adjustment_request', {
             to: recipients,
             subject: `[Laza] ${employeeName} requested an inventory adjustment — ${itemName}`,
             react: React.createElement(InventoryAdjustmentRequest, {
@@ -73,6 +77,7 @@ export async function sendInventoryAdjustmentNotification(requestId: string): Pr
                 locationId: req.location_id,
             },
         });
+        console.log('[adj-email] sendEmail result:', emailResult);
     } catch (error) {
         console.error('[sendInventoryAdjustmentNotification] unexpected error:', error);
     }
