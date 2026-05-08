@@ -94,7 +94,19 @@ export async function shouldSendInQuietHours(
 /**
  * Get all email recipients for an organization
  */
-export async function getRecipients(organizationId: string): Promise<string[]> {
+export async function getRecipients(organizationId: string, locationId?: string | null): Promise<string[]> {
+    // Try location-specific preferences first; fall back to org-wide default
+    if (locationId) {
+        const locationPrefs = await getNotificationPreferences(organizationId, locationId);
+        if (locationPrefs?.primary_email) {
+            const recipients = [locationPrefs.primary_email];
+            if (locationPrefs.secondary_emails && Array.isArray(locationPrefs.secondary_emails)) {
+                recipients.push(...locationPrefs.secondary_emails);
+            }
+            return recipients.filter(Boolean) as string[];
+        }
+    }
+
     const preferences = await getNotificationPreferences(organizationId);
     if (!preferences) return [];
 

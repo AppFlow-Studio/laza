@@ -37,7 +37,7 @@ export async function sendInventoryAdjustmentNotification(requestId: string): Pr
             return;
         }
 
-        const recipients = await getRecipients(req.org_id);
+        const recipients = await getRecipients(req.org_id, req.location_id);
         if (recipients.length === 0) {
             console.warn('[sendInventoryAdjustmentNotification] no recipients configured for org', req.org_id);
             return;
