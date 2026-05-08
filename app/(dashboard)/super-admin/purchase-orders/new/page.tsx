@@ -191,6 +191,23 @@ function NumInput({
     );
 }
 
+// ─── DateInput ────────────────────────────────────────────────────────────────
+
+function DateInput({ value, onChange, className }: { value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; className?: string }) {
+    const [type, setType] = useState<"text" | "date">(value ? "date" : "text");
+    return (
+        <input
+            type={type}
+            value={value}
+            placeholder="mm/dd/yyyy"
+            onFocus={() => setType("date")}
+            onBlur={() => { if (!value) setType("text"); }}
+            onChange={onChange}
+            className={className}
+        />
+    );
+}
+
 // ─── Small helpers ────────────────────────────────────────────────────────────
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
@@ -361,10 +378,10 @@ export default function NewPurchaseOrderGlobalPage() {
                         <input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="China Supplier" className={inputCls} />
                     </Field>
                     <Field label="Order Date">
-                        <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className={inputCls} />
+                        <DateInput value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className={inputCls} />
                     </Field>
                     <Field label="Expected Arrival">
-                        <input type="date" value={expectedArrival} onChange={(e) => setExpectedArrival(e.target.value)} className={inputCls} />
+                        <DateInput value={expectedArrival} onChange={(e) => setExpectedArrival(e.target.value)} className={inputCls} />
                     </Field>
                 </div>
 
