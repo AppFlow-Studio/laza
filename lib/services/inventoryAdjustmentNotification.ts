@@ -3,6 +3,7 @@
 import React from 'react';
 import { createServiceRoleClient } from '../supabase/server';
 import { sendEmail, getRecipients } from './emailService';
+import { getNotificationPreferences } from '../supabase/queries/notificationPreferences';
 import InventoryAdjustmentRequest from '../../email/InventoryAdjustmentRequest';
 
 const appUrl = 'https://lazadessert.cafe';
@@ -33,15 +34,18 @@ export async function sendInventoryAdjustmentNotification(requestId: string): Pr
             .single();
 
         if (error || !req) {
-            console.error('[adj-email] fetch error:', error);
+            console.error('[sendInventoryAdjustmentNotification] fetch error:', error);
             return;
         }
 
+        // B3: check notification preferences — skip if master switch is off
+        const prefs =
+            (await getNotificationPreferences(req.org_id, req.location_id)) ??
+            (await getNotificationPreferences(req.org_id));
+        if (!prefs?.notifications_enabled) return;
+
         const recipients = await getRecipients(req.org_id, req.location_id);
-        if (recipients.length === 0) {
-            console.warn('[adj-email] no recipients — check notification_preferences for org', req.org_id, 'location', req.location_id);
-            return;
-        }
+        if (recipients.length === 0) return;
 
         const userRow = Array.isArray(req.users) ? req.users[0] : req.users;
         const employeeName =
@@ -52,7 +56,7 @@ export async function sendInventoryAdjustmentNotification(requestId: string): Pr
         const locationName = (req.locations as any)?.name ?? '';
         const storageSpaceName = (req.storage_spaces as any)?.name ?? null;
 
-        const emailResult = await sendEmail(req.org_id, 'inventory_adjustment_request', {
+        await sendEmail(req.org_id, 'inventory_adjustment_request', {
             to: recipients,
             subject: `[Laza] ${employeeName} requested an inventory adjustment — ${itemName}`,
             react: React.createElement(InventoryAdjustmentRequest, {
@@ -73,7 +77,6 @@ export async function sendInventoryAdjustmentNotification(requestId: string): Pr
                 locationId: req.location_id,
             },
         });
-        console.log('[adj-email] sendEmail result:', emailResult);
     } catch (error) {
         console.error('[sendInventoryAdjustmentNotification] unexpected error:', error);
     }
