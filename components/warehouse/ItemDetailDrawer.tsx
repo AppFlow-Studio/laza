@@ -573,7 +573,7 @@ function CostTooltip({
 	);
 }
 
-function CostHistoryTab({ itemId }: { itemId: number }) {
+export function CostHistoryTab({ itemId }: { itemId: number }) {
 	const { data: history = [], isLoading } = useItemCostHistory(itemId);
 	const [chartKey, setChartKey] = useState(0);
 
@@ -813,7 +813,7 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
 	bulk_markup: { label: "Bulk", color: "bg-amber-50 text-amber-700 ring-1 ring-amber-200/60" },
 };
 
-function PriceHistoryTab({ itemId }: { itemId: number }) {
+export function PriceHistoryTab({ itemId }: { itemId: number }) {
 	const { data: history = [], isLoading } = useItemPriceHistory(itemId);
 	const [batchFilter, setBatchFilter] = useState<string | null>(null);
 

@@ -16,7 +16,7 @@ export interface CreateInventoryUpdateRequestInput {
 
 export async function createInventoryUpdateRequest(
   input: CreateInventoryUpdateRequestInput
-): Promise<void> {
+): Promise<string> {
   const supabase = createServerSupabaseClient();
 
   // Replace any existing pending request for the same item+location+storage slot
@@ -33,7 +33,7 @@ export async function createInventoryUpdateRequest(
 
   if (deleteError) throw deleteError;
 
-  const { error } = await supabase.from("inventory_update_requests").insert({
+  const { data, error } = await supabase.from("inventory_update_requests").insert({
     org_id:            input.orgId,
     location_id:       input.locationId,
     storage_space_id:  input.storageSpaceId,
@@ -44,9 +44,10 @@ export async function createInventoryUpdateRequest(
     previous_quantity: input.previousQuantity,
     notes:             input.notes ?? null,
     status:            "pending",
-  });
+  }).select('id').single();
 
   if (error) throw error;
+  return data.id as string;
 }
 
 export async function getInventoryUpdateRequests(

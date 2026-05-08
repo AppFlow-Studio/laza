@@ -81,7 +81,7 @@ export default function StoreDetailsStep({
     );
 
     const { isLoaded } = useJsApiLoader({
-        googleMapsApiKey: "",
+        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
         libraries: LIBRARIES,
     });
 
@@ -138,6 +138,13 @@ export default function StoreDetailsStep({
         setValue("longitude", null);
     };
 
+    const handleAddressBlur = useCallback(() => {
+        const { address } = getValues();
+        if (address.street && address.city && !geocoding && isLoaded) {
+            handleGeocode();
+        }
+    }, [getValues, geocoding, isLoaded]);
+
     const inputClass = (hasError?: boolean) =>
         cn(
             "w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all",
@@ -186,6 +193,7 @@ export default function StoreDetailsStep({
                     {...register("address.street")}
                     placeholder="123 Main St"
                     className={inputClass(!!errors.address?.street)}
+                    onBlur={handleAddressBlur}
                 />
                 {errors.address?.street && (
                     <p className="text-xs text-rose-500 font-medium mt-1">
@@ -207,6 +215,7 @@ export default function StoreDetailsStep({
                         id="city"
                         {...register("address.city")}
                         className={inputClass(!!errors.address?.city)}
+                        onBlur={handleAddressBlur}
                     />
                     {errors.address?.city && (
                         <p className="text-xs text-rose-500 font-medium mt-1">
@@ -225,6 +234,7 @@ export default function StoreDetailsStep({
                         id="state"
                         {...register("address.state")}
                         className={inputClass(!!errors.address?.state)}
+                        onBlur={handleAddressBlur}
                     />
                     {errors.address?.state && (
                         <p className="text-xs text-rose-500 font-medium mt-1">
@@ -246,6 +256,7 @@ export default function StoreDetailsStep({
                     id="zip"
                     {...register("address.zip")}
                     className={inputClass(!!errors.address?.zip)}
+                    onBlur={handleAddressBlur}
                 />
                 {errors.address?.zip && (
                     <p className="text-xs text-rose-500 font-medium mt-1">

@@ -48,6 +48,27 @@ export async function getEmployeeStorageSpaces(locationId: string) {
     return data as StorageSpace[];
 }
 
+export async function getEmployeeStorageSpacesWithCounts(locationId: string) {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase
+        .from('storage_spaces')
+        .select(`
+            *,
+            item_locations (
+                current_quantity,
+                min_quantity_override,
+                items (
+                    min_quantity
+                )
+            )
+        `)
+        .eq('location_id', locationId)
+        .order('name', { ascending: true });
+
+    if (error) throw error;
+    return data as any[];
+}
+
 export async function getStorageSpaceById(storageSpaceId: string) {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase

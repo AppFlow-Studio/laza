@@ -44,7 +44,8 @@ export default function NewPurchaseForm() {
   const { selectedLocationId } = useAdminStore();
   const { data: location } = useLocationWithDetails(selectedLocationId);
   const storageSpaces = location?.storage_spaces ?? [];
-  const { data: catalogItems } = useItems();
+  const { data: rawItems } = useItems();
+  const catalogItems = (rawItems ?? []).filter((i: any) => !i.is_warehouse_item);
   const createMutation = useCreateStorePurchase();
 
   const {
@@ -165,7 +166,7 @@ export default function NewPurchaseForm() {
                         className={`w-full border rounded-md px-3 py-2 text-sm ${errors.items?.[index]?.itemId ? "border-red-400" : "border-input"}`}
                       >
                         <option value="">Select item…</option>
-                        {(catalogItems ?? []).map((item) => (
+                        {catalogItems.map((item) => (
                           <option key={item.id} value={item.id}>
                             {item.name ?? ""}
                           </option>

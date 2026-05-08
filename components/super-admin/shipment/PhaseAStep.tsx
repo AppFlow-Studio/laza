@@ -104,6 +104,21 @@ export function PhaseAStep({ po, onSubmit, isLoading }: PhaseAStepProps) {
 
     // ── Confirm with discrepancy dialog ───────────────────────────────────
     const handleFormSubmit = (data: PhaseAData) => {
+        const boxErrors = data.lineItems.filter(
+            (l) => l.pieces_per_box > 0 && l.quantity_received > 0 && l.quantity_received % l.pieces_per_box !== 0
+        );
+        if (boxErrors.length > 0) {
+            alert(
+                `${boxErrors.length} item${boxErrors.length !== 1 ? "s" : ""} have quantities that don't divide into whole boxes:\n\n` +
+                boxErrors.map((l) => {
+                    const name = items.find((i) => i.item_id === l.item_id)?.items?.short_label
+                        ?? items.find((i) => i.item_id === l.item_id)?.items?.name ?? "—";
+                    return `• ${name}: ${l.quantity_received} ÷ ${l.pieces_per_box} = ${(l.quantity_received / l.pieces_per_box).toFixed(2)} (not a whole box)`;
+                }).join("\n")
+            );
+            return;
+        }
+
         const hasDiscrepancies = data.lineItems.some(
             (l) => l.quantity_received !== l.quantity_ordered
         );

@@ -5,6 +5,7 @@ import { useUser } from '@clerk/nextjs';
 import {
     getEmployeeLocation,
     getEmployeeStorageSpaces,
+    getEmployeeStorageSpacesWithCounts,
     getStorageSpaceById,
     getStorageSpaceItems,
     getEmployeeInventoryLogs,
@@ -30,6 +31,15 @@ export function useEmployeeStorageSpaces(locationId: string | null) {
         queryFn: () => getEmployeeStorageSpaces(locationId!),
         enabled: !!locationId,
         staleTime: 30 * 1000, // 30 seconds
+    });
+}
+
+export function useEmployeeStorageSpacesWithCounts(locationId: string | null) {
+    return useQuery({
+        queryKey: ['employee-storage-spaces-counts', locationId],
+        queryFn: () => getEmployeeStorageSpacesWithCounts(locationId!),
+        enabled: !!locationId,
+        staleTime: 30 * 1000,
     });
 }
 
