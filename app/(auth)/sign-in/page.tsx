@@ -153,6 +153,7 @@ export default function SignInPage() {
                     {/* Clerk Sign In Component */}
                     <div className="flex justify-center">
                         <SignIn
+                            fallbackRedirectUrl="/auth-redirect"
                             appearance={{
                                 elements: {
                                     rootBox: "mx-auto",

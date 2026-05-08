@@ -7,7 +7,7 @@ import { createServiceRoleClient } from '../server';
 export interface EmailDeliveryLog {
     id: string;
     organization_id: string;
-    email_type: 'low_stock_alert' | 'low_stock_digest' | 'daily_summary';
+    email_type: 'low_stock_alert' | 'low_stock_digest' | 'daily_summary' | 'inventory_adjustment_request';
     recipient_email: string;
     subject: string;
     resend_email_id: string | null;

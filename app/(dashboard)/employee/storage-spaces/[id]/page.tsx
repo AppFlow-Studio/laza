@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
-import { ArrowLeft, GripVertical, Filter, Package } from 'lucide-react';
+import { ArrowLeft, Package } from 'lucide-react';
 import { useStorageSpace, useStorageSpaceItems } from '@/lib/hooks/queries/useEmployee';
 import { useEmployeeLocation } from '@/lib/hooks/queries/useEmployee';
 import SearchBar from '@/components/admin/shared/SearchBar';
@@ -44,6 +44,17 @@ export default function StorageSpaceDetailPage() {
             }
         });
         return Array.from(categoryMap.values());
+    }, [items]);
+
+    const lowStockCount = useMemo(() => {
+        if (!items) return 0;
+        return items.filter((item: any) => {
+            const currentQuantity = item.current_quantity ?? 0;
+            const min = item.min_quantity_override !== null && item.min_quantity_override !== undefined
+                ? item.min_quantity_override
+                : (item.items?.min_quantity ?? 0);
+            return currentQuantity <= min;
+        }).length;
     }, [items]);
 
     const filteredItems = useMemo(() => {
@@ -108,9 +119,19 @@ export default function StorageSpaceDetailPage() {
                     >
                         <ArrowLeft className="w-5 h-5 text-zinc-900" />
                     </button>
-                    <h1 className="text-lg font-semibold text-zinc-900 flex-1">
-                        {storageSpace?.name || 'Inventory'}
-                    </h1>
+                    <div className="flex-1 min-w-0">
+                        <h1 className="text-lg font-semibold text-zinc-900">
+                            {storageSpace?.name || 'Inventory'}
+                        </h1>
+                        {items && items.length > 0 && (
+                            <p className="text-xs text-zinc-500 mt-0.5">
+                                {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
+                                {lowStockCount > 0 && (
+                                    <span className="text-red-500 font-medium"> · {lowStockCount} low stock</span>
+                                )}
+                            </p>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -135,12 +156,6 @@ export default function StorageSpaceDetailPage() {
                         />
                     )}
                 </div>
-                {storageSpace && (
-                    <div className="flex items-center gap-2 mt-2 text-sm text-zinc-600">
-                        <span>📍</span>
-                        <span>{storageSpace.name}</span>
-                    </div>
-                )}
             </div>
 
             {/* Items List */}

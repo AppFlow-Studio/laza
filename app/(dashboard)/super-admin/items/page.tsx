@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { BulkMarkupModal } from '@/app/(dashboard)/super-admin/items/components/BulkMarkupModal';
 import { useSuperAdminItems } from '@/lib/hooks/queries/useItems';
 import ItemGrid from '@/components/admin/items/ItemGrid';
+import { ItemHistoryDrawer } from '@/components/admin/items/ItemHistoryDrawer';
 import SearchBar from '@/components/admin/shared/SearchBar';
 import FilterDropdown from '@/components/admin/shared/FilterDropdown';
 import { LoadingSkeleton, CardSkeleton } from '@/components/admin/shared/LoadingSkeleton';
@@ -41,6 +42,7 @@ export default function ItemsPage() {
     const [bulkUpdateField, setBulkUpdateField] = useState<'min_quantity' | 'category' | 'unit' | 'price' | 'warehouse' | 'all'>('all');
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
     const [bulkMarkupOpen, setBulkMarkupOpen] = useState(false);
+    const [historyItem, setHistoryItem] = useState<{ id: number; name: string } | null>(null);
     const debouncedSearch = useDebounce(searchQuery, 300);
     const { viewMode, setViewMode } = useAdminStore();
 
@@ -220,6 +222,7 @@ export default function ItemsPage() {
                         setShowAddForm(true);
                     }}
                     onDelete={handleDelete}
+                    onViewHistory={(item) => setHistoryItem({ id: Number(item.id), name: item.name ?? '' })}
                 />
             )}
 
@@ -267,6 +270,14 @@ export default function ItemsPage() {
                         current_unit_cost: item.current_unit_cost ?? null,
                         item_warehouse_pricing: item.item_warehouse_pricing ?? null,
                     }))}
+            />
+
+            {/* Item History Drawer */}
+            <ItemHistoryDrawer
+                itemId={historyItem?.id ?? null}
+                itemName={historyItem?.name}
+                open={historyItem !== null}
+                onClose={() => setHistoryItem(null)}
             />
 
             {/* Bulk Delete Confirmation Dialog */}

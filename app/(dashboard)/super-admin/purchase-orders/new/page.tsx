@@ -191,6 +191,35 @@ function NumInput({
     );
 }
 
+// ─── DateInput ────────────────────────────────────────────────────────────────
+
+function DateInput({ value, onChange, className }: { value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; className?: string }) {
+    const [type, setType] = useState<"text" | "date">(value ? "date" : "text");
+    return (
+        <input
+            type={type}
+            value={value}
+            placeholder="mm/dd/yyyy"
+            onFocus={() => setType("date")}
+            onBlur={() => { if (!value) setType("text"); }}
+            onChange={onChange}
+            className={className}
+        />
+    );
+}
+
+// ─── Box division validation ──────────────────────────────────────────────────
+
+function boxDivisionError(qty: string, ppb: string): string | null {
+    const q = parseFloat(qty);
+    const p = parseFloat(ppb);
+    if (!q || !p || p <= 0) return null;
+    if (q % p !== 0) {
+        return `Boxes must divide evenly. ${q.toLocaleString()} ÷ ${p} = ${(q / p).toFixed(2)}, which isn't a whole box.`;
+    }
+    return null;
+}
+
 // ─── Small helpers ────────────────────────────────────────────────────────────
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
@@ -255,6 +284,10 @@ export default function NewPurchaseOrderGlobalPage() {
         const validLines = lines.filter((l) => l.item_id !== null && l.quantity_ordered && l.unit_price_before);
         if (validLines.length === 0) { toast.error("Add at least one line item"); return; }
         if (lines.some((l) => l.quantity_ordered && !l.item_id)) { toast.error("Each row with a quantity must have an item selected"); return; }
+        if (validLines.some((l) => boxDivisionError(l.quantity_ordered, l.pieces_per_box))) {
+            toast.error("Fix box division errors before submitting");
+            return;
+        }
 
         try {
             const po = await createPO.mutateAsync({
@@ -361,10 +394,10 @@ export default function NewPurchaseOrderGlobalPage() {
                         <input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="China Supplier" className={inputCls} />
                     </Field>
                     <Field label="Order Date">
-                        <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className={inputCls} />
+                        <DateInput value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className={inputCls} />
                     </Field>
                     <Field label="Expected Arrival">
-                        <input type="date" value={expectedArrival} onChange={(e) => setExpectedArrival(e.target.value)} className={inputCls} />
+                        <DateInput value={expectedArrival} onChange={(e) => setExpectedArrival(e.target.value)} className={inputCls} />
                     </Field>
                 </div>
 
@@ -416,7 +449,7 @@ export default function NewPurchaseOrderGlobalPage() {
                         <div key={line._key} className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-3 px-6 py-4 items-start">
                             <div>
                                 <label className="sm:hidden block text-xs text-zinc-400 mb-1">Item *</label>
-                                <ItemPicker items={allItems as Item[]} selectedId={line.item_id} usedIds={usedItemIds}
+                                <ItemPicker items={(allItems as any[]).filter(i => i.is_warehouse_item) as Item[]} selectedId={line.item_id} usedIds={usedItemIds}
                                             onSelect={(item) => handleItemSelect(line._key, item)} placeholder={`Select item ${idx + 1}…`} />
                                 {!line.item_id && line.quantity_ordered && <p className="mt-1 text-xs text-red-500">Item required</p>}
                             </div>
@@ -430,8 +463,19 @@ export default function NewPurchaseOrderGlobalPage() {
                             </div>
                             <div>
                                 <label className="sm:hidden block text-xs text-zinc-400 mb-1">Pcs / Box</label>
-                                <NumInput value={line.pieces_per_box} onChange={(v) => updateLine(line._key, { pieces_per_box: v })} placeholder="250" step="1" min="1" presets={[100, 250, 500]} />
-                                {line.item_id && !line.pieces_per_box && <p className="mt-1 text-xs text-amber-500">Required for receiving</p>}
+                                <NumInput value={line.pieces_per_box} onChange={(v) => updateLine(line._key, { pieces_per_box: v })} placeholder="250" step="1" min="1" presets={[100, 250, 500]}
+                                    className={boxDivisionError(line.quantity_ordered, line.pieces_per_box) ? "ring-2 ring-red-400 rounded-lg" : ""} />
+                                {(() => {
+                                    const err = boxDivisionError(line.quantity_ordered, line.pieces_per_box);
+                                    if (err) return (
+                                        <div>
+                                            <p className="mt-1 text-xs text-red-500">{err}</p>
+                                            <p className="mt-0.5 text-xs text-zinc-400">If your supplier invoice shows a decimal box count, it&apos;s likely a rounding error on their end.</p>
+                                        </div>
+                                    );
+                                    if (line.item_id && !line.pieces_per_box) return <p className="mt-1 text-xs text-amber-500">Required for receiving</p>;
+                                    return null;
+                                })()}
                             </div>
                             <div>
                                 <label className="sm:hidden block text-xs text-zinc-400 mb-1">CBM</label>

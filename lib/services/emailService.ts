@@ -20,7 +20,7 @@ export interface EmailOptions {
  */
 export async function sendEmail(
     organizationId: string,
-    emailType: 'low_stock_alert' | 'low_stock_digest' | 'daily_summary',
+    emailType: 'low_stock_alert' | 'low_stock_digest' | 'daily_summary' | 'inventory_adjustment_request',
     options: EmailOptions
 ): Promise<{ success: boolean; emailId?: string; error?: string }> {
     try {
@@ -92,10 +92,19 @@ export async function shouldSendInQuietHours(
 }
 
 /**
- * Get all email recipients for an organization
+ * Get all email recipients for an organization.
+ * When locationId is provided, tries the location-specific row first,
+ * then falls back to the org-wide row.
  */
-export async function getRecipients(organizationId: string): Promise<string[]> {
-    const preferences = await getNotificationPreferences(organizationId);
+export async function getRecipients(organizationId: string, locationId?: string | null): Promise<string[]> {
+    let preferences = locationId
+        ? await getNotificationPreferences(organizationId, locationId)
+        : null;
+
+    if (!preferences) {
+        preferences = await getNotificationPreferences(organizationId);
+    }
+
     if (!preferences) return [];
 
     const recipients = [preferences.primary_email];

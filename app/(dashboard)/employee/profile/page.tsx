@@ -104,13 +104,6 @@ export default function ProfilePage() {
                                 )}
                             </div>
                         </div>
-                        <Button
-                            onClick={() => router.push('/employee/dashboard')}
-                            className="w-full"
-                            variant="outline"
-                        >
-                            View Dashboard
-                        </Button>
                     </div>
                 </motion.div>
             )}

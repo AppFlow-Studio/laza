@@ -5,6 +5,7 @@ import { Sheet } from 'react-modal-sheet';
 import { useUser, useOrganization } from '@clerk/nextjs';
 import { useCheckUpdateAllowed } from '@/lib/hooks/queries/useUpdateLimits';
 import { useCreateInventoryUpdateRequest } from '@/lib/hooks/queries/useInventoryUpdateRequests';
+import { notifyAdminOfAdjustment } from '@/lib/supabase/actions/inventoryAdjustmentEmailAction';
 import { Button } from '@/components/ui/button';
 import { Minus, Plus, X, ChevronRight, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -171,7 +172,7 @@ export default function QuantityUpdateSheet({
                 ? `Reason: ${reasonOptions.find(r => r.value === reason)?.label}`
                 : null;
 
-            await requestMutation.mutateAsync({
+            const requestId = await requestMutation.mutateAsync({
                 orgId:            organization?.id ?? "",
                 locationId,
                 storageSpaceId:   storageSpaceId || null,
@@ -182,6 +183,8 @@ export default function QuantityUpdateSheet({
                 previousQuantity: originalQuantity,
                 notes:            noteText,
             });
+
+            notifyAdminOfAdjustment(requestId).catch(() => {});
 
             toast.success("Update submitted for admin approval");
             onSuccess();

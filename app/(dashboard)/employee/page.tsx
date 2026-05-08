@@ -30,9 +30,7 @@ import {
     ChevronRight,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
-import { useEmployeeLocation } from "@/lib/hooks/queries/useEmployee";
-import { useEmployeeStorageSpaces } from "@/lib/hooks/queries/useEmployee";
-import { useEmployeeStats } from "@/lib/hooks/queries/useEmployee";
+import { useEmployeeLocation, useEmployeeStorageSpacesWithCounts, useEmployeeStats } from "@/lib/hooks/queries/useEmployee";
 import { useTickets } from "@/lib/hooks/queries/useOrderTickets";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { ConfirmOrderSheet } from "@/components/orders/ConfirmOrderSheet";
@@ -73,6 +71,14 @@ function relativeDate(iso: string) {
     const hrs = Math.floor(diff / 3_600_000);
     if (hrs < 24) return `${hrs}h ago`;
     return `${Math.floor(diff / 86_400_000)}d ago`;
+}
+
+// ─── Greeting ─────────────────────────────────────────────────────────────────
+function getGreeting() {
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning";
+    if (h < 18) return "Good afternoon";
+    return "Good evening";
 }
 
 // ─── Temperature badge ────────────────────────────────────────────────────────
@@ -191,7 +197,7 @@ export default function EmployeeHomePage() {
     const { data: location } = useEmployeeLocation();
     const locationId = location?.id ?? "";
 
-    const { data: storageSpaces } = useEmployeeStorageSpaces(locationId);
+    const { data: storageSpaces } = useEmployeeStorageSpacesWithCounts(locationId);
     const { data: stats } = useEmployeeStats(
         userInfo?.id ?? "",
         locationId,
@@ -205,9 +211,6 @@ export default function EmployeeHomePage() {
         status: "fulfilled",
     });
     const fulfilledTickets = (rawTickets ?? []) as FulfilledTicket[];
-
-    console.log(fulfilledTickets);
-    
 
     // ── Sheet state ────────────────────────────────────────────────────────────
     const [sheetOpen, setSheetOpen] = useState(false);
@@ -238,7 +241,10 @@ export default function EmployeeHomePage() {
     return (
         <div className="min-h-screen bg-gray-50 pb-24">
             {/* ── Location header ── */}
-            <div className="px-4 pt-6 pb-2">
+            <div className="px-4 pt-10 pb-2">
+                <p className="text-xl font-bold mb-6">
+                    {getGreeting()}, {user?.firstName ?? "there"}
+                </p>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">
                     Your store
                 </p>
@@ -295,7 +301,7 @@ export default function EmployeeHomePage() {
                 ].map(({ val, label, bg, icon, highlight }) => (
                     <div
                         key={label}
-                        className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border flex-shrink-0 ${
+                        className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border flex-shrink-0 w-[49%] ${
                             highlight
                                 ? "border-violet-300 bg-violet-100"
                                 : `${bg} border-gray-200`
@@ -364,7 +370,17 @@ export default function EmployeeHomePage() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 gap-3">
-                        {(storageSpaces as StorageSpace[]).map((space) => (
+                        {(storageSpaces as any[]).map((space) => {
+                            const itemLocs: any[] = space.item_locations ?? [];
+                            const totalItems = itemLocs.length;
+                            const lowStockCount = itemLocs.filter((il) => {
+                                const min = il.min_quantity_override !== null && il.min_quantity_override !== undefined
+                                    ? il.min_quantity_override
+                                    : (il.items?.min_quantity ?? 0);
+                                return (il.current_quantity ?? 0) <= min;
+                            }).length;
+
+                            return (
                             <motion.button
                                 key={space.id}
                                 whileTap={{ scale: 0.97 }}
@@ -409,8 +425,17 @@ export default function EmployeeHomePage() {
                                     {space.name}
                                 </p>
                                 <TempBadge type={space.temperature_type} />
+                                <p className="text-xs text-gray-400 mt-1.5">
+                                    {totalItems} item{totalItems !== 1 ? "s" : ""}
+                                    {lowStockCount > 0 && (
+                                        <span className="ml-1.5 text-red-500 font-semibold">
+                                            · {lowStockCount} low
+                                        </span>
+                                    )}
+                                </p>
                             </motion.button>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

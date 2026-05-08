@@ -81,7 +81,7 @@ export default function StoreDetailsStep({
     );
 
     const { isLoaded } = useJsApiLoader({
-        googleMapsApiKey: "",
+        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
         libraries: LIBRARIES,
     });
 
@@ -108,35 +108,37 @@ export default function StoreDetailsStep({
         [setValue]
     );
 
-    const handleGeocode = async () => {
+    const handleGeocode = useCallback(() => {
+        if (!isLoaded) return;
         const { address } = getValues();
+        console.log(address)
         const parts = [address.street, address.city, address.state, address.zip].filter(Boolean);
         if (parts.length === 0) return;
 
         setGeocoding(true);
-        try {
-            const encoded = encodeURIComponent(parts.join(", "));
-            const res = await fetch(
-                `https://maps.googleapis.com/maps/api/geocode/json?address=${encoded}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
-            );
-            const data = await res.json();
-            if (data.status === "OK" && data.results[0]) {
-                const { lat, lng } = data.results[0].geometry.location;
-                setValue("latitude", lat);
-                setValue("longitude", lng);
-                setMapCenter({ lat, lng });
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ address: parts.join(", ") }, (results, status) => {
+            if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
+                const loc = results[0].geometry.location;
+                setValue("latitude", loc.lat());
+                setValue("longitude", loc.lng());
+                setMapCenter({ lat: loc.lat(), lng: loc.lng() });
             }
-        } catch {
-            // silently fail
-        } finally {
             setGeocoding(false);
-        }
-    };
+        });
+    }, [isLoaded, getValues, setValue]);
 
     const clearCoords = () => {
         setValue("latitude", null);
         setValue("longitude", null);
     };
+
+    const handleAddressBlur = useCallback(() => {
+        const { address } = getValues();
+        if (address.street && address.city && !geocoding) {
+            handleGeocode();
+        }
+    }, [getValues, geocoding, handleGeocode]);
 
     const inputClass = (hasError?: boolean) =>
         cn(
@@ -186,6 +188,7 @@ export default function StoreDetailsStep({
                     {...register("address.street")}
                     placeholder="123 Main St"
                     className={inputClass(!!errors.address?.street)}
+                    onBlur={handleAddressBlur}
                 />
                 {errors.address?.street && (
                     <p className="text-xs text-rose-500 font-medium mt-1">
@@ -207,6 +210,7 @@ export default function StoreDetailsStep({
                         id="city"
                         {...register("address.city")}
                         className={inputClass(!!errors.address?.city)}
+                        onBlur={handleAddressBlur}
                     />
                     {errors.address?.city && (
                         <p className="text-xs text-rose-500 font-medium mt-1">
@@ -225,6 +229,7 @@ export default function StoreDetailsStep({
                         id="state"
                         {...register("address.state")}
                         className={inputClass(!!errors.address?.state)}
+                        onBlur={handleAddressBlur}
                     />
                     {errors.address?.state && (
                         <p className="text-xs text-rose-500 font-medium mt-1">
@@ -246,6 +251,7 @@ export default function StoreDetailsStep({
                     id="zip"
                     {...register("address.zip")}
                     className={inputClass(!!errors.address?.zip)}
+                    onBlur={handleAddressBlur}
                 />
                 {errors.address?.zip && (
                     <p className="text-xs text-rose-500 font-medium mt-1">

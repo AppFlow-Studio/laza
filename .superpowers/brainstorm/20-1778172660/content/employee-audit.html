@@ -1,0 +1,157 @@
+<style>
+  .audit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .page-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .page-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin-bottom: 10px; }
+  .issue { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .issue:last-child { border-bottom: none; }
+  .pill { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; flex-shrink: 0; margin-top: 1px; }
+  .pill-bug { background: #fee2e2; color: #b91c1c; }
+  .pill-ux  { background: #fef3c7; color: #92400e; }
+  .pill-ui  { background: #ede9fe; color: #6d28d9; }
+  .issue-text { font-size: 13px; color: var(--text); line-height: 1.5; }
+  .issue-text strong { color: var(--text); font-weight: 600; }
+  .issue-text .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .summary-bar { display: flex; gap: 12px; margin-bottom: 20px; }
+  .summary-chip { display: flex; align-items: center; gap-6px; gap: 6px; padding: 6px 14px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+  .chip-bug { background: #fee2e2; color: #b91c1c; }
+  .chip-ux  { background: #fef3c7; color: #92400e; }
+  .chip-ui  { background: #ede9fe; color: #6d28d9; }
+</style>
+
+<h2>Employee Dashboard — UX/UI Audit</h2>
+<p class="subtitle">Issues found across all 4 screens + layout</p>
+
+<div class="summary-bar">
+  <div class="summary-chip chip-bug">🐛 3 Bugs</div>
+  <div class="summary-chip chip-ux">⚠️ 7 UX issues</div>
+  <div class="summary-chip chip-ui">🎨 4 UI polish</div>
+</div>
+
+<div class="audit-grid">
+
+  <!-- HOME -->
+  <div class="page-section">
+    <div class="page-label">/ Home</div>
+    <div class="issue">
+      <span class="pill pill-bug">BUG</span>
+      <div class="issue-text">
+        <strong>console.log in production</strong>
+        <div class="sub">Line 209 — <code>console.log(fulfilledTickets)</code> logs live data to browser console</div>
+      </div>
+    </div>
+    <div class="issue">
+      <span class="pill pill-ux">UX</span>
+      <div class="issue-text">
+        <strong>No greeting</strong>
+        <div class="sub">Page opens cold with "Your store" — no "Good morning, Sara" personalisation</div>
+      </div>
+    </div>
+    <div class="issue">
+      <span class="pill pill-ui">UI</span>
+      <div class="issue-text">
+        <strong>Color inconsistency in Incoming Orders</strong>
+        <div class="sub">Count badge is <code>bg-blue-500</code> but the section uses <code>violet</code> everywhere else</div>
+      </div>
+    </div>
+    <div class="issue">
+      <span class="pill pill-ux">UX</span>
+      <div class="issue-text">
+        <strong>Storage cards show no quantity info</strong>
+        <div class="sub">Tapping a card is the only way to know if anything needs attention — no at-a-glance status</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIVITY -->
+  <div class="page-section">
+    <div class="page-label">/ Activity</div>
+    <div class="issue">
+      <span class="pill pill-bug">BUG</span>
+      <div class="issue-text">
+        <strong>Unused import: <code>user</code></strong>
+        <div class="sub">Line 3 — <code>useUser()</code> is called and destructured but <code>user</code> is never used</div>
+      </div>
+    </div>
+    <div class="issue">
+      <span class="pill pill-ux">UX</span>
+      <div class="issue-text">
+        <strong>Default filter is "All Time"</strong>
+        <div class="sub">Could show hundreds of old logs — "Today" would be a more focused default</div>
+      </div>
+    </div>
+    <div class="issue">
+      <span class="pill pill-ux">UX</span>
+      <div class="issue-text">
+        <strong>No result count</strong>
+        <div class="sub">No indication of how many entries are shown — e.g. "14 activities today"</div>
+      </div>
+    </div>
+    <div class="issue">
+      <span class="pill pill-ui">UI</span>
+      <div class="issue-text">
+        <strong>Quantities show unnecessary decimals</strong>
+        <div class="sub"><code>.toFixed(2)</code> renders "+1.00" instead of "+1" for whole-box counts</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="page-section">
+    <div class="page-label">/ Profile</div>
+    <div class="issue">
+      <span class="pill pill-bug">BUG</span>
+      <div class="issue-text">
+        <strong>Unused import: <code>useRouter</code></strong>
+        <div class="sub">Line 11 — <code>useRouter</code> is imported and called but never used</div>
+      </div>
+    </div>
+    <div class="issue">
+      <span class="pill pill-ux">UX</span>
+      <div class="issue-text">
+        <strong>"Storage Spaces" stat shows "Active" / "N/A"</strong>
+        <div class="sub">Other stat cards show numbers — this one shows a string, making it feel broken</div>
+      </div>
+    </div>
+    <div class="issue">
+      <span class="pill pill-ui">UI</span>
+      <div class="issue-text">
+        <strong>4 gradient stat cards are visually noisy</strong>
+        <div class="sub">Each card is a different gradient color — the page feels like a rainbow of gradients</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STORAGE SPACE DETAIL -->
+  <div class="page-section">
+    <div class="page-label">/ Storage Space Detail</div>
+    <div class="issue">
+      <span class="pill pill-ux">UX</span>
+      <div class="issue-text">
+        <strong>Redundant location label below search bar</strong>
+        <div class="sub">"📍 {storageSpace.name}" duplicates the sticky header title right above it</div>
+      </div>
+    </div>
+    <div class="issue">
+      <span class="pill pill-ux">UX</span>
+      <div class="issue-text">
+        <strong>Low stock indicator is too subtle</strong>
+        <div class="sub">Just a tiny "Low" pill — a red border on the card already exists but the label is easy to miss</div>
+      </div>
+    </div>
+    <div class="issue">
+      <span class="pill pill-bug">BUG</span>
+      <div class="issue-text">
+        <strong>Unused imports: <code>GripVertical</code>, <code>Filter</code></strong>
+        <div class="sub">Line 5 — both icons are imported but never rendered</div>
+      </div>
+    </div>
+    <div class="issue">
+      <span class="pill pill-ui">UI</span>
+      <div class="issue-text">
+        <strong>No item count in header</strong>
+        <div class="sub">Header just shows the space name — no "12 items" or "3 low stock" summary</div>
+      </div>
+    </div>
+  </div>
+
+</div>
