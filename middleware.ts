@@ -62,9 +62,6 @@ export default clerkMiddleware(async (auth, req) => {
     // Allow them to navigate to other public pages freely
     const url = new URL(req.url);
     if (userId && url.pathname === '/') {
-        if (role === 'super_admin') {
-            return NextResponse.redirect(new URL('/super-admin', req.url));
-        }
         if (role === 'admin') {
             return NextResponse.redirect(new URL('/admin', req.url));
         }

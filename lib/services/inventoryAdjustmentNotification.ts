@@ -37,11 +37,7 @@ export async function sendInventoryAdjustmentNotification(requestId: string): Pr
             return;
         }
 
-        console.log('[adj-email] request fetched — org_id:', req.org_id, '| location_id:', req.location_id);
-
         const recipients = await getRecipients(req.org_id, req.location_id);
-        console.log('[adj-email] resolved recipients:', recipients);
-
         if (recipients.length === 0) {
             console.warn('[adj-email] no recipients — check notification_preferences for org', req.org_id, 'location', req.location_id);
             return;

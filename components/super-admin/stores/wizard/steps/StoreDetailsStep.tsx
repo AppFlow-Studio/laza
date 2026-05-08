@@ -108,30 +108,25 @@ export default function StoreDetailsStep({
         [setValue]
     );
 
-    const handleGeocode = async () => {
+    const handleGeocode = useCallback(() => {
+        if (!isLoaded) return;
         const { address } = getValues();
+        console.log(address)
         const parts = [address.street, address.city, address.state, address.zip].filter(Boolean);
         if (parts.length === 0) return;
 
         setGeocoding(true);
-        try {
-            const encoded = encodeURIComponent(parts.join(", "));
-            const res = await fetch(
-                `https://maps.googleapis.com/maps/api/geocode/json?address=${encoded}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
-            );
-            const data = await res.json();
-            if (data.status === "OK" && data.results[0]) {
-                const { lat, lng } = data.results[0].geometry.location;
-                setValue("latitude", lat);
-                setValue("longitude", lng);
-                setMapCenter({ lat, lng });
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ address: parts.join(", ") }, (results, status) => {
+            if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
+                const loc = results[0].geometry.location;
+                setValue("latitude", loc.lat());
+                setValue("longitude", loc.lng());
+                setMapCenter({ lat: loc.lat(), lng: loc.lng() });
             }
-        } catch {
-            // silently fail
-        } finally {
             setGeocoding(false);
-        }
-    };
+        });
+    }, [isLoaded, getValues, setValue]);
 
     const clearCoords = () => {
         setValue("latitude", null);
@@ -140,10 +135,10 @@ export default function StoreDetailsStep({
 
     const handleAddressBlur = useCallback(() => {
         const { address } = getValues();
-        if (address.street && address.city && !geocoding && isLoaded) {
+        if (address.street && address.city && !geocoding) {
             handleGeocode();
         }
-    }, [getValues, geocoding, isLoaded]);
+    }, [getValues, geocoding, handleGeocode]);
 
     const inputClass = (hasError?: boolean) =>
         cn(
