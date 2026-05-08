@@ -1,0 +1,79 @@
+"use server";
+
+import React from 'react';
+import { createServiceRoleClient } from '../supabase/server';
+import { sendEmail, getRecipients } from './emailService';
+import InventoryAdjustmentRequest from '../../email/InventoryAdjustmentRequest';
+
+const appUrl = 'https://lazadessert.cafe';
+
+export async function sendInventoryAdjustmentNotification(requestId: string): Promise<void> {
+    try {
+        const supabase = createServiceRoleClient();
+
+        const { data: req, error } = await supabase
+            .from('inventory_update_requests')
+            .select(`
+                id,
+                org_id,
+                location_id,
+                storage_space_id,
+                item_id,
+                requested_by,
+                action_type,
+                new_quantity,
+                previous_quantity,
+                notes,
+                items ( name, unit_of_measure ),
+                storage_spaces ( name ),
+                locations ( name ),
+                users ( first_name, last_name )
+            `)
+            .eq('id', requestId)
+            .single();
+
+        if (error || !req) {
+            console.error('[sendInventoryAdjustmentNotification] fetch error:', error);
+            return;
+        }
+
+        const recipients = await getRecipients(req.org_id);
+        if (recipients.length === 0) {
+            console.warn('[sendInventoryAdjustmentNotification] no recipients configured for org', req.org_id);
+            return;
+        }
+
+        const userRow = Array.isArray(req.users) ? req.users[0] : req.users;
+        const employeeName =
+            [(userRow as any)?.first_name, (userRow as any)?.last_name].filter(Boolean).join(' ') ||
+            'An employee';
+        const itemName = (req.items as any)?.name ?? 'Unknown item';
+        const itemUnit = (req.items as any)?.unit_of_measure ?? '';
+        const locationName = (req.locations as any)?.name ?? '';
+        const storageSpaceName = (req.storage_spaces as any)?.name ?? null;
+
+        await sendEmail(req.org_id, 'inventory_adjustment_request', {
+            to: recipients,
+            subject: `[Laza] ${employeeName} requested an inventory adjustment — ${itemName}`,
+            react: React.createElement(InventoryAdjustmentRequest, {
+                employeeName,
+                itemName,
+                itemUnit,
+                locationName,
+                storageSpaceName,
+                actionType: req.action_type as 'count' | 'adjustment' | 'used',
+                previousQuantity: req.previous_quantity,
+                newQuantity: req.new_quantity,
+                notes: req.notes,
+                approvalUrl: `${appUrl}/admin/inventory`,
+            }),
+            metadata: {
+                requestId,
+                itemId: req.item_id,
+                locationId: req.location_id,
+            },
+        });
+    } catch (error) {
+        console.error('[sendInventoryAdjustmentNotification] unexpected error:', error);
+    }
+}
