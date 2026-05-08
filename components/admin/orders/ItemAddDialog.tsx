@@ -62,7 +62,7 @@ export function ItemAddDialog({
     const ppb = selectedConfig?.piecesPerBox ?? item.box_quantity;
     const displayBoxes = parseInt(inputVal) || 1;
     const unitPrice = item.warehouse_transfer_price ?? null;
-    const pricePerBox = unitPrice != null ? unitPrice * item.box_quantity : null;
+    const pricePerBox = unitPrice != null ? unitPrice * ppb : null;
 
     const handleInputChange = (val: string) => {
         if (val.includes(".")) return;

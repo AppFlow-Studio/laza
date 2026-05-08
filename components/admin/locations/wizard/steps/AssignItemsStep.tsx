@@ -2,7 +2,7 @@
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import ItemAssignmentStep from '@/components/admin/locations/ItemAssignmentStep';
-import { Snowflake, Thermometer, Sun } from 'lucide-react';
+import { Snowflake, Thermometer, Sun, AlertTriangle } from 'lucide-react';
 import type { WizardStorageSpace } from './StorageSpacesStep';
 
 export type ItemAssignmentData = {
@@ -11,10 +11,16 @@ export type ItemAssignmentData = {
     itemMinQuantityOverrides: Record<string, number | null>;
 };
 
+export type MissingAssignmentItem = { id: string; name: string };
+
 interface AssignItemsStepProps {
     storageSpaces: WizardStorageSpace[];
     itemAssignments: Record<string, ItemAssignmentData>;
     onAssignmentChange: (tempId: string, data: ItemAssignmentData) => void;
+    /** Catalog items that haven't been assigned to any storage space yet. */
+    missingItems?: MissingAssignmentItem[];
+    /** Total catalog item count, for the progress label. */
+    totalItemCount?: number;
 }
 
 const TEMP_ICONS = {
@@ -27,6 +33,8 @@ export default function AssignItemsStep({
     storageSpaces,
     itemAssignments,
     onAssignmentChange,
+    missingItems,
+    totalItemCount,
 }: AssignItemsStepProps) {
     const getAssignment = (tempId: string): ItemAssignmentData => {
         return itemAssignments[tempId] || {
@@ -112,11 +120,71 @@ export default function AssignItemsStep({
         });
     };
 
+    const totalAssigned = totalItemCount != null && missingItems
+        ? totalItemCount - missingItems.length
+        : null;
+    const hasMissing = (missingItems?.length ?? 0) > 0;
+
     return (
         <div className="space-y-4">
             <p className="text-sm text-zinc-500">
-                Select items and set initial quantities for each storage space. This step is optional — you can assign items later.
+                Every catalog item must be assigned to at least one storage space. The same item can live in more than one space if needed.
             </p>
+
+            {missingItems && totalItemCount != null && (
+                <div
+                    className={
+                        hasMissing
+                            ? "rounded-lg border border-amber-200 bg-amber-50 p-3"
+                            : "rounded-lg border border-green-200 bg-green-50 p-3"
+                    }
+                >
+                    <div className="flex items-start gap-2">
+                        <AlertTriangle
+                            className={
+                                hasMissing
+                                    ? "w-4 h-4 text-amber-600 mt-0.5 shrink-0"
+                                    : "w-4 h-4 text-green-600 mt-0.5 shrink-0"
+                            }
+                        />
+                        <div className="min-w-0 flex-1">
+                            <p
+                                className={
+                                    hasMissing
+                                        ? "text-sm font-semibold text-amber-900"
+                                        : "text-sm font-semibold text-green-800"
+                                }
+                            >
+                                {hasMissing
+                                    ? `${missingItems.length} of ${totalItemCount} item${totalItemCount === 1 ? "" : "s"} not yet assigned`
+                                    : `All ${totalItemCount} item${totalItemCount === 1 ? "" : "s"} assigned`}
+                            </p>
+                            {hasMissing && (
+                                <>
+                                    <p className="text-xs text-amber-800 mt-0.5">
+                                        Assigned: {totalAssigned} / {totalItemCount}. Add the items below to any storage space before continuing.
+                                    </p>
+                                    <ul className="mt-2 flex flex-wrap gap-1">
+                                        {missingItems.slice(0, 30).map((it) => (
+                                            <li
+                                                key={it.id}
+                                                className="px-2 py-0.5 rounded-full bg-white border border-amber-200 text-[11px] text-amber-900"
+                                            >
+                                                {it.name}
+                                            </li>
+                                        ))}
+                                        {missingItems.length > 30 && (
+                                            <li className="px-2 py-0.5 text-[11px] text-amber-700">
+                                                +{missingItems.length - 30} more
+                                            </li>
+                                        )}
+                                    </ul>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <Tabs defaultValue={storageSpaces[0]?.tempId}>
                 <TabsList className="w-full flex-wrap h-auto gap-1">

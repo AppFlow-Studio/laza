@@ -10,8 +10,18 @@ import {
     CheckCircle2, XCircle, Clock, Anchor,
     FileText, DollarSign, Calendar, Hash,
     Boxes, AlertCircle, Pencil, PackageCheck, Warehouse,
-    Layers, ChevronRight,
+    Layers, ChevronRight, AlertTriangle,
 } from "lucide-react";
+
+// ─── Discrepancy reason labels ────────────────────────────────────────────────
+
+const PARTIAL_REASON_LABEL: Record<string, string> = {
+    damaged_in_transit:       "Damaged in transit",
+    supplier_short_pack:      "Supplier short-pack",
+    miscount_pending_recount: "Miscount — pending recount",
+    sample_pulled_qc:         "Sample pulled for QC",
+    other:                    "Other",
+};
 import { usePurchaseOrder, useUpdatePurchaseOrderStatus, useDeletePurchaseOrder } from "@/lib/hooks/queries/usePurchaseOrders";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import toast from "react-hot-toast";
@@ -327,6 +337,113 @@ export default function PurchaseOrderDetailPage({
                     </div>
                 </div>
             </div>
+
+            {/* Receipt Discrepancies — only when something was held aside or short/over */}
+            {(() => {
+                const discrepancyLines = items
+                    .map((it: any) => {
+                        const ordered = Number(it.quantity_ordered ?? 0);
+                        const received = it.quantity_received != null ? Number(it.quantity_received) : null;
+                        const partial = Number(it.partial_box_units ?? 0);
+                        const fullBoxes = it.full_boxes_received != null ? Number(it.full_boxes_received) : null;
+                        const ppb = Number(it.pieces_per_box ?? 0);
+                        const fullBoxUnits = fullBoxes != null && ppb > 0 ? fullBoxes * ppb : null;
+                        const delta = received != null ? received - ordered : 0;
+                        const hasDiscrepancy = received != null && (partial > 0 || delta !== 0);
+                        return {
+                            name:      it?.items?.name ?? "—",
+                            sku:       it?.items?.sku ?? null,
+                            ordered,
+                            received,
+                            fullBoxes,
+                            fullBoxUnits,
+                            partial,
+                            reason:    it.partial_box_reason as string | null,
+                            note:      it.partial_box_note as string | null,
+                            overageAck: !!it.overage_acknowledged,
+                            delta,
+                            hasDiscrepancy,
+                        };
+                    })
+                    .filter((d) => d.hasDiscrepancy);
+
+                if (discrepancyLines.length === 0) return null;
+
+                const totalLooseUnits = discrepancyLines.reduce((s, d) => s + d.partial, 0);
+
+                return (
+                    <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-amber-100 bg-amber-50 flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-600" />
+                            <h2 className="text-sm font-semibold text-amber-900">
+                                Receipt Discrepancies
+                            </h2>
+                            <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-200/70 text-amber-800 text-xs">
+                                {discrepancyLines.length}
+                            </span>
+                            {totalLooseUnits > 0 && (
+                                <span className="ml-auto text-xs text-amber-800">
+                                    <span className="font-semibold">{totalLooseUnits.toLocaleString()}</span> loose pcs held aside (not in stock)
+                                </span>
+                            )}
+                        </div>
+                        <div className="divide-y divide-amber-50">
+                            {discrepancyLines.map((d, idx) => (
+                                <div key={idx} className="px-6 py-3.5">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-zinc-900">{d.name}</p>
+                                            {d.sku && <p className="text-xs text-zinc-400">{d.sku}</p>}
+                                        </div>
+                                        <div className="text-right text-xs tabular-nums shrink-0">
+                                            <p className="text-zinc-500">
+                                                Ordered <span className="font-semibold text-zinc-700">{d.ordered.toLocaleString()}</span>
+                                                {" · "}
+                                                Received <span className="font-semibold text-zinc-700">{d.received?.toLocaleString() ?? "—"}</span>
+                                            </p>
+                                            <p className="text-zinc-500 mt-0.5">
+                                                In stock <span className="font-semibold text-green-700">{d.fullBoxUnits?.toLocaleString() ?? "—"}</span>
+                                                {d.fullBoxes != null && (
+                                                    <span className="text-zinc-400"> ({d.fullBoxes} full {d.fullBoxes === 1 ? "box" : "boxes"})</span>
+                                                )}
+                                            </p>
+                                            {d.partial > 0 && (
+                                                <p className="text-amber-700 mt-0.5">
+                                                    Held aside <span className="font-semibold">{d.partial.toLocaleString()}</span> loose pcs
+                                                </p>
+                                            )}
+                                            {d.delta !== 0 && (
+                                                <p className={d.delta < 0 ? "text-red-600 mt-0.5" : "text-amber-600 mt-0.5"}>
+                                                    {d.delta > 0 ? "+" : ""}{d.delta.toLocaleString()} vs ordered
+                                                    {d.delta > 0 && d.overageAck && " (overage acknowledged)"}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {(d.reason || d.note) && (
+                                        <div className="mt-2 rounded-md border border-amber-100 bg-amber-50/60 px-3 py-2">
+                                            {d.reason && (
+                                                <p className="text-xs text-amber-900">
+                                                    <span className="font-semibold">Reason:</span>{" "}
+                                                    {PARTIAL_REASON_LABEL[d.reason] ?? d.reason}
+                                                </p>
+                                            )}
+                                            {d.note && (
+                                                <p className="text-xs text-amber-800 mt-0.5 italic">
+                                                    "{d.note}"
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="px-6 py-3 bg-amber-50/60 border-t border-amber-100 text-[11px] text-amber-800">
+                            Loose pcs are recorded against the PO line and logged as a <code className="font-mono bg-amber-100/70 px-1 rounded">discrepancy</code> entry in the inventory log, but are <strong>not</strong> added to warehouse stock.
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Notes */}
             {po.notes && (() => {

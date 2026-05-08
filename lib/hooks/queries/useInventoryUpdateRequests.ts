@@ -15,19 +15,22 @@ import { sendInventoryAdjustmentNotification } from "@/lib/services/inventoryAdj
 export const inventoryRequestKeys = {
   all:     ["inventory-update-requests"] as const,
   lists:   () => [...inventoryRequestKeys.all, "list"] as const,
-  byOrg:   (orgId: string, status?: string) =>
-    [...inventoryRequestKeys.lists(), orgId, status ?? "all"] as const,
+  byOrg:   (orgId: string, status?: string, locationId?: string) =>
+    [...inventoryRequestKeys.lists(), orgId, status ?? "all", locationId ?? "all"] as const,
   pending: (itemId: number, locationId: string, storageSpaceId: string | null) =>
     [...inventoryRequestKeys.all, "pending", itemId, locationId, storageSpaceId] as const,
 };
 
-export function useInventoryUpdateRequests(status?: "pending" | "approved" | "rejected") {
+export function useInventoryUpdateRequests(
+  status?: "pending" | "approved" | "rejected",
+  locationId?: string
+) {
   const { organization } = useOrganization();
   const orgId = organization?.id;
 
   return useQuery({
-    queryKey: inventoryRequestKeys.byOrg(orgId ?? "", status),
-    queryFn:  () => getInventoryUpdateRequests(orgId!, status),
+    queryKey: inventoryRequestKeys.byOrg(orgId ?? "", status, locationId),
+    queryFn:  () => getInventoryUpdateRequests(orgId!, status, locationId),
     enabled:  !!orgId,
     staleTime: 15_000,
   });

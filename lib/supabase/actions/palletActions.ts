@@ -207,10 +207,27 @@ export async function getPurchaseOrdersForPalletFilterAction(organizationId: str
 
 // ─── Phase A: Confirm PO Receipt ──────────────────────────────────────────────
 
+export type PartialBoxReason =
+    | 'damaged_in_transit'
+    | 'supplier_short_pack'
+    | 'miscount_pending_recount'
+    | 'sample_pulled_qc'
+    | 'other';
+
+export type ReceivedItemPayload = {
+    item_id: number;
+    quantity_received: number;
+    /** Required when received pcs aren't a whole multiple of pieces_per_box. */
+    partial_box_reason?: PartialBoxReason | null;
+    partial_box_note?: string | null;
+    /** Required when quantity_received > quantity_ordered. */
+    overage_acknowledged?: boolean;
+};
+
 export async function confirmPOReceiptAction(
     purchaseOrderId: string,
     userId: string,
-    receivedItems: { item_id: number; quantity_received: number }[],
+    receivedItems: ReceivedItemPayload[],
     actualArrivalDate: string,
 ) {
     const supabase = createServerSupabaseClient();

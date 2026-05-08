@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
@@ -55,6 +55,23 @@ export default function StoreSetupWizard() {
     // ── Invite state (separate from store creation) ───────────────────────────
     const [inviteStatus, setInviteStatus] = useState<InviteStatus>('idle');
     const [inviteError,  setInviteError]  = useState<string | null>(null);
+
+    // ── Catalog vs assignments — every item must be in at least one space ───
+    const missingItems = useMemo(() => {
+        if (!items) return [];
+        // selectedItems is typed as Set<string> but runtime values may be numbers
+        // (item.id is a bigint). Normalize both sides to string before comparing.
+        const assignedIds = new Set<string>();
+        for (const a of Object.values(itemAssignments)) {
+            for (const id of a.selectedItems) assignedIds.add(String(id));
+        }
+        return items
+            .filter((it) => !assignedIds.has(String(it.id)))
+            .map((it) => ({
+                id:   String(it.id),
+                name: (it as any).short_label ?? it.name ?? `Item #${it.id}`,
+            }));
+    }, [items, itemAssignments]);
 
     // ── Clone support ─────────────────────────────────────────────────────────
     const cloneSourceId = storeData?.clone_from_id ?? '';
@@ -133,6 +150,16 @@ export default function StoreSetupWizard() {
             return;
         }
         if (currentStep === 3) {
+            if (itemsLoading) {
+                toast.error('Catalog still loading — please wait.');
+                return;
+            }
+            if (missingItems.length > 0) {
+                toast.error(
+                    `${missingItems.length} item${missingItems.length === 1 ? "" : "s"} not yet assigned to any storage space. Assign all items before continuing.`,
+                );
+                return;
+            }
             markCompleted(3);
             goToStep(4);
             return;
@@ -303,11 +330,13 @@ export default function StoreSetupWizard() {
                 return (
                     <div>
                         <h2 className="text-lg font-semibold text-zinc-900 mb-1">Assign Items</h2>
-                        <p className="text-sm text-zinc-500 mb-6">Optionally assign catalog items and set initial quantities for each storage space.</p>
+                        <p className="text-sm text-zinc-500 mb-6">Assign every catalog item to at least one storage space and set initial quantities.</p>
                         <AssignItemsStep
                             storageSpaces={storageSpaces}
                             itemAssignments={itemAssignments}
                             onAssignmentChange={handleAssignmentChange}
+                            missingItems={missingItems}
+                            totalItemCount={items?.length ?? 0}
                         />
                     </div>
                 );

@@ -62,11 +62,14 @@ function reconstructPhaseAData(po: POForReceiving): PhaseAData {
         actualArrivalDate: po.actual_arrival ?? format(new Date(), "yyyy-MM-dd"),
         notes: "",
         lineItems: po.purchase_order_items.map((item) => ({
-            item_id:           item.item_id,
-            po_item_id:        item.id,
-            quantity_ordered:  item.quantity_ordered,
-            pieces_per_box:    item.pieces_per_box,
-            quantity_received: item.quantity_received ?? item.quantity_ordered,
+            item_id:             item.item_id,
+            po_item_id:          item.id,
+            quantity_ordered:    item.quantity_ordered,
+            pieces_per_box:      item.pieces_per_box,
+            quantity_received:   item.quantity_received ?? item.quantity_ordered,
+            partial_box_reason:  null,
+            partial_box_note:    "",
+            overage_acknowledged: false,
         })),
     };
 }
@@ -111,8 +114,11 @@ export function ReceivingWizard({
                 await confirmReceipt.mutateAsync({
                     purchaseOrderId:   po.id,
                     receivedItems:     phaseAData!.lineItems.map((li) => ({
-                        item_id:           li.item_id,
-                        quantity_received: li.quantity_received,
+                        item_id:              li.item_id,
+                        quantity_received:    li.quantity_received,
+                        partial_box_reason:   li.partial_box_reason ?? null,
+                        partial_box_note:     li.partial_box_note ?? null,
+                        overage_acknowledged: li.overage_acknowledged ?? false,
                     })),
                     actualArrivalDate: phaseAData!.actualArrivalDate,
                 });

@@ -85,6 +85,13 @@ function totalUnitsForItem(
 
 // ─── Build default pallet ──────────────────────────────────────────────────
 
+/** Whole-box units available for palletizing (loose remainder is excluded). */
+function palletizableUnits(li: PhaseAData["lineItems"][number]): number {
+    const ppb = li.pieces_per_box;
+    if (ppb <= 0) return li.quantity_received;
+    return Math.floor(li.quantity_received / ppb) * ppb;
+}
+
 function buildDefaultPallet(
     po: POForPhaseB,
     phaseAData: PhaseAData,
@@ -106,7 +113,8 @@ function buildDefaultPallet(
                     item_name:
                         poItem?.items?.short_label ?? poItem?.items?.name ?? "—",
                     max_boxes: maxBoxes,
-                    max_units: li.quantity_received,
+                    // Only whole-box units are palletizable; loose remainder stays out.
+                    max_units: palletizableUnits(li),
                     default_pieces_per_box: ppb,
                     box_configs: [{ pieces_per_box: ppb, box_count: maxBoxes }],
                 };
@@ -129,7 +137,9 @@ function UnassignedPanel({
     const rows = phaseAData.lineItems
         .map((li) => {
             const poItem = poItems.find((i) => i.item_id === li.item_id);
-            const totalUnits = li.quantity_received;
+            // Whole-box-only — loose remainder is held aside (see badge below).
+            const totalUnits  = palletizableUnits(li);
+            const looseUnits  = li.quantity_received - totalUnits;
             const assignedUnits = watchedPallets.reduce((sum, p) => {
                 const match = p.items.find((i) => i.item_id === li.item_id);
                 if (!match) return sum;
@@ -141,9 +151,11 @@ function UnassignedPanel({
                 total: totalUnits,
                 assigned: assignedUnits,
                 remaining,
+                looseUnits,
+                partialReason: li.partial_box_reason ?? null,
             };
         })
-        .filter((r) => r.total > 0);
+        .filter((r) => r.total > 0 || r.looseUnits > 0);
 
     const allAssigned = rows.every((r) => r.remaining === 0);
     const anyOver = rows.some((r) => r.remaining < 0);
@@ -161,34 +173,41 @@ function UnassignedPanel({
             </div>
             <div className="divide-y divide-zinc-50">
                 {rows.map((row) => (
-                    <div
-                        key={row.name}
-                        className="flex items-center justify-between px-4 py-2.5"
-                    >
-                        <span className="text-xs text-zinc-700 truncate max-w-[100px]">
-                            {row.name}
-                        </span>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs tabular-nums text-zinc-400">
-                                {row.assigned.toLocaleString()}/{row.total.toLocaleString()} pcs
+                    <div key={row.name} className="px-4 py-2.5 space-y-1">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs text-zinc-700 truncate max-w-[100px]">
+                                {row.name}
                             </span>
-                            <span
-                                className={cn(
-                                    "text-xs font-semibold tabular-nums",
-                                    row.remaining === 0
-                                        ? "text-green-600"
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs tabular-nums text-zinc-400">
+                                    {row.assigned.toLocaleString()}/{row.total.toLocaleString()} pcs
+                                </span>
+                                <span
+                                    className={cn(
+                                        "text-xs font-semibold tabular-nums",
+                                        row.remaining === 0
+                                            ? "text-green-600"
+                                            : row.remaining < 0
+                                                ? "text-red-600"
+                                                : "text-amber-600"
+                                    )}
+                                >
+                                    {row.remaining === 0
+                                        ? "✓"
                                         : row.remaining < 0
-                                            ? "text-red-600"
-                                            : "text-amber-600"
-                                )}
-                            >
-                                {row.remaining === 0
-                                    ? "✓"
-                                    : row.remaining < 0
-                                        ? `${row.remaining} over`
-                                        : `${row.remaining.toLocaleString()} left`}
-                            </span>
+                                            ? `${row.remaining} over`
+                                            : `${row.remaining.toLocaleString()} left`}
+                                </span>
+                            </div>
                         </div>
+                        {row.looseUnits > 0 && (
+                            <p className="text-[10px] text-amber-600">
+                                Held aside: {row.looseUnits.toLocaleString()} loose pcs
+                                {row.partialReason
+                                    ? ` (${row.partialReason.replace(/_/g, " ")})`
+                                    : ""}
+                            </p>
+                        )}
                     </div>
                 ))}
             </div>
@@ -521,25 +540,29 @@ export function PhaseBStep({ po, phaseAData, onSubmit, onValidityChange }: Phase
                 if (!match) return sum;
                 return sum + totalUnitsForItem(match.box_configs ?? []);
             }, 0);
-            return { li, assignedUnits };
+            return { li, assignedUnits, palletizable: palletizableUnits(li) };
         });
 
-        const overItems = itemTotals.filter(({ li, assignedUnits }) => assignedUnits > li.quantity_received);
+        const overItems = itemTotals.filter(
+            ({ assignedUnits, palletizable }) => assignedUnits > palletizable,
+        );
         if (overItems.length > 0) {
-            alert("Some items have more boxes assigned than were received. Please fix the highlighted rows.");
+            alert("Some items have more boxes assigned than were received as full boxes. Please fix the highlighted rows.");
             return;
         }
 
-        const underItems = itemTotals.filter(({ li, assignedUnits }) => assignedUnits !== li.quantity_received);
+        const underItems = itemTotals.filter(
+            ({ assignedUnits, palletizable }) => assignedUnits !== palletizable,
+        );
         if (underItems.length > 0) {
             alert(
-                `${underItems.length} item${underItems.length !== 1 ? "s" : ""} still have unassigned units:\n\n` +
-                underItems.map(({ li, assignedUnits }) => {
+                `${underItems.length} item${underItems.length !== 1 ? "s" : ""} still have unassigned full boxes:\n\n` +
+                underItems.map(({ li, assignedUnits, palletizable }) => {
                     const po = data.pallets[0]?.items.find((i) => i.item_id === li.item_id);
                     const name = po?.item_name ?? `Item ${li.item_id}`;
-                    return `• ${name}: assigned ${assignedUnits} of ${li.quantity_received} pcs`;
+                    return `• ${name}: assigned ${assignedUnits} of ${palletizable} pcs (full boxes)`;
                 }).join("\n") +
-                "\n\nAll received units must be assigned to pallets before proceeding."
+                "\n\nAll full-box units must be assigned to pallets before proceeding. Loose pieces are held aside automatically."
             );
             return;
         }

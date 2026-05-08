@@ -207,11 +207,11 @@ export default function AdminLayout({
     const { user } = useUser();
     const { selectedLocationId } = useAdminStore();
     const { data: orderCount }      = useActiveTicketCountForLocation(selectedLocationId ?? undefined);
-    const { data: pendingRequests } = useInventoryUpdateRequests("pending");
+    const { data: pendingRequests } = useInventoryUpdateRequests("pending", selectedLocationId ?? undefined);
 
     const badgeCounts: Record<string, number> = {
         "/admin/orders":    orderCount ?? 0,
-        "/admin/purchases": pendingRequests?.length ?? 0,
+        "/admin/inventory": pendingRequests?.length ?? 0,
     };
 
     const currentNav = navigation.find(

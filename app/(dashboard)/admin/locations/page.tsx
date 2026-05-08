@@ -39,10 +39,14 @@ export default function LocationsPage() {
     }) || [];
 
     const handleDelete = async (locationId: string) => {
-        if (!confirm('Are you sure you want to delete this location?')) return;
+        if (!confirm('Delete this location? If it has orders or purchases, it will be archived instead.')) return;
         try {
-            await deleteMutation.mutateAsync(locationId);
-            toast.success('Location deleted successfully');
+            const result = await deleteMutation.mutateAsync(locationId);
+            toast.success(
+                result === 'archived'
+                    ? 'Location archived (had referenced records)'
+                    : 'Location deleted',
+            );
         } catch (error: any) {
             toast.error(error.message || 'Failed to delete location');
         }

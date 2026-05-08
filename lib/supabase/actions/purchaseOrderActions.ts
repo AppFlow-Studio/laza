@@ -28,7 +28,12 @@ const PO_ITEM_FULL = `
     allocated_shipping_fee,
     total_cost_after,
     unit_cost_after,
-    quantity_received
+    quantity_received,
+    full_boxes_received,
+    partial_box_units,
+    partial_box_reason,
+    partial_box_note,
+    overage_acknowledged
 ` as const;
 
 // ─── Reads (service role — bypasses RLS, safe for SELECT) ─────────────────────

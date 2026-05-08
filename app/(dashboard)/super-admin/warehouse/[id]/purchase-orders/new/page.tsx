@@ -350,10 +350,10 @@ export default function NewPurchaseOrderPage({ params }: { params: Promise<{ id:
                 const totalBefore   = qty * unitPrice;
                 const cbm           = l.cbm ? parseFloat(l.cbm) : null;
                 const cbmShare      = cbm && totalCBM > 0 ? cbm / totalCBM : null;
-                const allocOffice   = cbmShare != null ? cbmShare * offFee  : null;
-                const allocShipping = cbmShare != null ? cbmShare * shipFee : null;
-                const totalAfter    = totalBefore + (allocOffice ?? 0) + (allocShipping ?? 0);
-                const unitAfter     = qty > 0 ? totalAfter / qty : null;
+                const allocOffice   = cbmShare != null ? cbmShare * offFee  : 0;
+                const allocShipping = cbmShare != null ? cbmShare * shipFee : 0;
+                const totalAfter    = totalBefore + allocOffice + allocShipping;
+                const unitAfter     = qty > 0 ? totalAfter / qty : 0;
                 const ppb           = l.pieces_per_box ? parseInt(l.pieces_per_box) : null;
                 const cartons       = ppb && qty ? qty / ppb : null;
 

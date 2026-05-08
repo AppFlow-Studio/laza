@@ -30,6 +30,7 @@ export async function getAllLocations(organizationId: string) {
             )
         `)
         .eq('organization_id', organizationId)
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -239,14 +240,36 @@ export async function updateLocation(id: string, updates: Partial<Location>) {
     return data as Location;
 }
 
-export async function deleteLocation(id: string) {
+/**
+ * Hard-delete a location if nothing references it; otherwise soft-archive
+ * (`is_active = false`) so historical orders, purchases, etc. stay intact.
+ *
+ * Returns `'deleted' | 'archived'` so the UI can confirm what happened.
+ */
+export async function deleteLocation(id: string): Promise<'deleted' | 'archived'> {
     const supabase = await createServerSupabaseClient();
-    const { error } = await supabase
+
+    const { error: delError } = await supabase
         .from('locations')
         .delete()
         .eq('id', id);
 
-    if (error) throw error;
+    if (!delError) return 'deleted';
+
+    // 23503 = foreign_key_violation — fall back to archive
+    const isFkConflict =
+        (delError as { code?: string })?.code === '23503' ||
+        /foreign key/i.test(delError.message ?? '');
+
+    if (!isFkConflict) throw delError;
+
+    const { error: archiveError } = await supabase
+        .from('locations')
+        .update({ is_active: false })
+        .eq('id', id);
+
+    if (archiveError) throw archiveError;
+    return 'archived';
 }
 
 export async function deactivateLocation(locationId: string, adminUserId: string) {

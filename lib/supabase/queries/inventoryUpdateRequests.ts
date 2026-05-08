@@ -56,7 +56,8 @@ export async function createInventoryUpdateRequest(
 
 export async function getInventoryUpdateRequests(
   orgId: string,
-  status?: "pending" | "approved" | "rejected"
+  status?: "pending" | "approved" | "rejected",
+  locationId?: string
 ) {
   const supabase = createServerSupabaseClient();
   let query = supabase
@@ -85,6 +86,10 @@ export async function getInventoryUpdateRequests(
 
   if (status) {
     query = query.eq("status", status);
+  }
+
+  if (locationId) {
+    query = query.eq("location_id", locationId);
   }
 
   const { data, error } = await query;

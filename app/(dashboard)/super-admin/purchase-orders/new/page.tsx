@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import {
     useCreatePurchaseOrder,
+    useDeletePurchaseOrder,
     useUpsertPurchaseOrderItems,
     useWarehouseLocations,
 } from "@/lib/hooks/queries/usePurchaseOrders";
@@ -256,6 +257,7 @@ export default function NewPurchaseOrderGlobalPage() {
     const { data: warehouses    = [], isLoading: warehousesLoading } = useWarehouseLocations(organization?.id);
 
     const createPO     = useCreatePurchaseOrder();
+    const deletePO     = useDeletePurchaseOrder();
     const upsertItems  = useUpsertPurchaseOrderItems();
     const isSubmitting = createPO.isPending || upsertItems.isPending;
 
@@ -288,7 +290,20 @@ export default function NewPurchaseOrderGlobalPage() {
             toast.error("Fix box division errors before submitting");
             return;
         }
+        if (!officeFee.trim() || !Number.isFinite(parseFloat(officeFee)) || parseFloat(officeFee) <= 0) {
+            toast.error("Office / agent fee is required and must be greater than 0. Costs cannot be allocated without it.");
+            return;
+        }
+        if (!shippingFee.trim() || !Number.isFinite(parseFloat(shippingFee)) || parseFloat(shippingFee) <= 0) {
+            toast.error("Shipping fee is required and must be greater than 0. Costs cannot be allocated without it.");
+            return;
+        }
+        if (validLines.some((l) => !l.cbm || parseFloat(l.cbm) <= 0)) {
+            toast.error("Each line item needs a CBM value so office and shipping fees can be allocated.");
+            return;
+        }
 
+        let createdPoId: string | null = null;
         try {
             const po = await createPO.mutateAsync({
                 organization_id:       organization.id,
@@ -305,6 +320,7 @@ export default function NewPurchaseOrderGlobalPage() {
                 created_by:            user.id,
                 warehouse_location_id: warehouseId,   // ← from dropdown
             });
+            createdPoId = po.id;
 
             const poItems = validLines.map((l) => {
                 const qty           = parseFloat(l.quantity_ordered);
@@ -312,10 +328,10 @@ export default function NewPurchaseOrderGlobalPage() {
                 const totalBefore   = qty * unitPrice;
                 const cbm           = l.cbm ? parseFloat(l.cbm) : null;
                 const cbmShare      = cbm && totalCBM > 0 ? cbm / totalCBM : null;
-                const allocOffice   = cbmShare != null ? cbmShare * offFee  : null;
-                const allocShipping = cbmShare != null ? cbmShare * shipFee : null;
-                const totalAfter    = totalBefore + (allocOffice ?? 0) + (allocShipping ?? 0);
-                const unitAfter     = qty > 0 ? totalAfter / qty : null;
+                const allocOffice   = cbmShare != null ? cbmShare * offFee  : 0;
+                const allocShipping = cbmShare != null ? cbmShare * shipFee : 0;
+                const totalAfter    = totalBefore + allocOffice + allocShipping;
+                const unitAfter     = qty > 0 ? totalAfter / qty : 0;
                 const ppb           = l.pieces_per_box ? parseInt(l.pieces_per_box) : null;
                 const cartons       = ppb && qty ? qty / ppb : null;
                 return {
@@ -331,6 +347,15 @@ export default function NewPurchaseOrderGlobalPage() {
             toast.success(saveAsDraft ? "Draft saved" : "Purchase order submitted");
             router.push(`/super-admin/purchase-orders/${po.id}`);
         } catch (err: unknown) {
+            // If the PO header was created but items failed, roll back the header
+            // so the user can retry with the same PO number.
+            if (createdPoId) {
+                try {
+                    await deletePO.mutateAsync(createdPoId);
+                } catch (cleanupErr) {
+                    console.error("Failed to roll back PO after items error:", cleanupErr);
+                }
+            }
             toast.error(err instanceof Error ? err.message : "Something went wrong");
         }
     }

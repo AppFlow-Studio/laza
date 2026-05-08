@@ -5,6 +5,7 @@ import {
     confirmPOReceiptAction,
     assignShipmentToPalletsAction,
     PalletAssignment,
+    ReceivedItemPayload,
 } from '@/lib/supabase/actions/palletActions';
 import { purchaseOrderKeys } from '@/lib/hooks/queries/usePurchaseOrders';
 import { palletKeys } from '@/lib/hooks/queries/usePallets';
@@ -42,7 +43,7 @@ export function useConfirmPOReceipt() {
                          actualArrivalDate,
                      }: {
             purchaseOrderId: string;
-            receivedItems: { item_id: number; quantity_received: number }[];
+            receivedItems: ReceivedItemPayload[];
             actualArrivalDate: string;
         }) =>
             confirmPOReceiptAction(

@@ -38,6 +38,7 @@ import {
     useCreateTicket,
     useSubmitTicket,
     useConfirmTicket,
+    ticketKeys,
 } from "@/lib/hooks/queries/useOrderTickets";
 import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
 import { useWarehouseLocation } from "@/lib/hooks/queries/useWarehouse";
@@ -248,9 +249,10 @@ function TitleEditor({ ticket }: { ticket: Ticket }) {
 
     const { mutate: saveTitle, isPending } = useMutation({
         mutationFn: async (newTitle: string) => {
+            const trimmed = newTitle.trim() || null;
             const { data, error } = await supabase
                 .from("order_tickets")
-                .update({ title: newTitle.trim() || null })
+                .update({ title: trimmed })
                 .eq("id", ticket.id)
                 .select("id, title");
             if (error) throw error;
@@ -260,9 +262,15 @@ function TitleEditor({ ticket }: { ticket: Ticket }) {
                     "Update blocked — check RLS policy on order_tickets UPDATE",
                 );
             }
+            return trimmed;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["ticket", ticket.id] });
+        onSuccess: (newTitle) => {
+            queryClient.setQueryData<Ticket | undefined>(
+                ticketKeys.detail(ticket.id),
+                (prev) => (prev ? { ...prev, title: newTitle } : prev),
+            );
+            queryClient.invalidateQueries({ queryKey: ticketKeys.detail(ticket.id) });
+            queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
             toast.success("Title saved");
             setEditing(false);
         },

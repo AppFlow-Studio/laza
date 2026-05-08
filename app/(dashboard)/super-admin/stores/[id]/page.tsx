@@ -678,9 +678,9 @@ export default function SuperAdminStoreDetailPage() {
             <AlertDialog open={showDeleteStoreDialog} onOpenChange={setShowDeleteStoreDialog}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete store?</AlertDialogTitle>
+                        <AlertDialogTitle>Delete or archive store?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            <strong>{location.name}</strong> will be permanently deleted along with all its storage spaces and inventory records. This cannot be undone.
+                            <strong>{location.name}</strong> will be permanently deleted if it has no orders or purchases referencing it. Otherwise it will be <strong>archived</strong> (hidden from selectors) so historical records stay intact.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -688,8 +688,12 @@ export default function SuperAdminStoreDetailPage() {
                         <AlertDialogAction
                             onClick={() => {
                                 deleteLocation.mutate(locationId, {
-                                    onSuccess: () => {
-                                        toast.success(`"${location.name}" deleted successfully`);
+                                    onSuccess: (result) => {
+                                        if (result === 'archived') {
+                                            toast.success(`"${location.name}" archived (had referenced records)`);
+                                        } else {
+                                            toast.success(`"${location.name}" deleted`);
+                                        }
                                         router.push("/super-admin/stores");
                                     },
                                     onError: () => {
@@ -700,7 +704,7 @@ export default function SuperAdminStoreDetailPage() {
                             className="bg-red-600 hover:bg-red-700 text-white"
                             disabled={deleteLocation.isPending}
                         >
-                            {deleteLocation.isPending ? "Deleting…" : "Delete Store"}
+                            {deleteLocation.isPending ? "Working…" : "Delete or Archive"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

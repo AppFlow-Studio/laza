@@ -7,6 +7,7 @@ import {
   useApproveInventoryUpdateRequest,
   useRejectInventoryUpdateRequest,
 } from "@/lib/hooks/queries/useInventoryUpdateRequests";
+import { useAdminStore } from "@/lib/stores/adminStore";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -19,14 +20,15 @@ type Tab = "pending" | "history";
 
 export default function PendingRequestsPanel() {
   const { user } = useUser();
+  const { selectedLocationId } = useAdminStore();
   const [tab, setTab] = useState<Tab>("pending");
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
 
   const { data: pendingRequests, isLoading: pendingLoading } =
-    useInventoryUpdateRequests("pending");
+    useInventoryUpdateRequests("pending", selectedLocationId ?? undefined);
   const { data: allRequests, isLoading: allLoading } =
-    useInventoryUpdateRequests();
+    useInventoryUpdateRequests(undefined, selectedLocationId ?? undefined);
 
   const approveMutation = useApproveInventoryUpdateRequest();
   const rejectMutation  = useRejectInventoryUpdateRequest();
