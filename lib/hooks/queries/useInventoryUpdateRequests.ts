@@ -10,6 +10,7 @@ import {
   rejectInventoryUpdateRequest,
   type CreateInventoryUpdateRequestInput,
 } from "@/lib/supabase/queries/inventoryUpdateRequests";
+import { sendInventoryAdjustmentNotification } from "@/lib/services/inventoryAdjustmentNotification";
 
 export const inventoryRequestKeys = {
   all:     ["inventory-update-requests"] as const,
@@ -51,8 +52,8 @@ export function useCreateInventoryUpdateRequest() {
   return useMutation({
     mutationFn: (input: CreateInventoryUpdateRequestInput) =>
       createInventoryUpdateRequest(input),
-    onSuccess: () => {
-      // Invalidate root key so both list queries AND usePendingRequestForItem refresh
+    onSuccess: (data) => {
+      sendInventoryAdjustmentNotification(data.id).catch(console.error);
       queryClient.invalidateQueries({ queryKey: inventoryRequestKeys.all });
     },
   });
