@@ -339,15 +339,17 @@ const LazaWelcomeEmail: React.FC<LazaWelcomeEmailProps> = ({ customerData }) => 
                         gap: '15px',
                         marginBottom: '20px'
                     }}>
-                        <img
-                            src="/insta.png"
-                            alt="Instagram"
-                            style={{
-                                width: '40px',
-                                height: '40px',
-                                cursor: 'pointer'
-                            }}
-                        />
+                        <a href="https://www.instagram.com/lazacafe/?hl=en">
+                            <img
+                                src="/insta.png"
+                                alt="Instagram"
+                                style={{
+                                    width: '40px',
+                                    height: '40px',
+                                    cursor: 'pointer'
+                                }}
+                            />
+                        </a>
                         <img
                             src="/tiktok.png"
                             alt="TikTok"
