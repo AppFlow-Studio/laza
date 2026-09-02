@@ -363,7 +363,7 @@ export const LazaFranchiseInquiry: React.FC<{ inquiryData: JoinUsForm }> = ({ in
                         {/* <Section style={{ textAlign: 'center', marginBottom: '25px' }}>
                             <Row style={socialRow}>
                                 <Column style={socialColumn}>
-                                    <Link href="https://www.instagram.com/laza.cafe">
+                                    <Link href="https://www.instagram.com/lazacafe/?hl=en">
                                         <Img
                                             src="https://lazadessert.cafe/insta.png"
                                             width="40"

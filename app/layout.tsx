@@ -121,7 +121,7 @@ export const metadata: Metadata = {
     title: 'Laza Dessert Cafe - Premium Middle Eastern Desserts & Drinks',
     description: 'Indulge in premium Middle Eastern desserts at Laza Dessert Cafe. Fresh kunafa, crepes, shakes, and more.',
     images: [`${baseUrl}/default_og.png`],
-    creator: '@laza.cafe',
+    creator: '@lazacafe',
     site: '@lazacafe',
   },
   robots: {
