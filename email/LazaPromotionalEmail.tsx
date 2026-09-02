@@ -380,15 +380,17 @@ const LazaPromotionalEmail: React.FC<LazaPromotionalEmailProps> = ({ promotionDa
                         gap: '15px',
                         marginBottom: '20px'
                     }}>
-                        <img
-                            src="/insta.png"
-                            alt="Instagram"
-                            style={{
-                                width: '45px',
-                                height: '45px',
-                                cursor: 'pointer'
-                            }}
-                        />
+                        <a href="https://www.instagram.com/lazacafe/?hl=en">
+                            <img
+                                src="/insta.png"
+                                alt="Instagram"
+                                style={{
+                                    width: '45px',
+                                    height: '45px',
+                                    cursor: 'pointer'
+                                }}
+                            />
+                        </a>
                         <img
                             src="/tiktok.png"
                             alt="TikTok"
