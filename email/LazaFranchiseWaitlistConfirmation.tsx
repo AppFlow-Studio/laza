@@ -133,7 +133,7 @@ export default function LazaFranchiseWaitlistConfirmation({ waitlistData }: { wa
 
                         <Row style={socialRow}>
                             <Column style={socialColumn}>
-                                <Link href="https://www.instagram.com/laza.cafe" style={socialButton}>
+                                <Link href="https://www.instagram.com/lazacafe/?hl=en" style={socialButton}>
                                     📷 Instagram
                                 </Link>
                             </Column>

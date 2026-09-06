@@ -81,7 +81,7 @@ export function getCafeSchema(location: {
     "servesCuisine": ["Middle Eastern", "Desserts", "Coffee", "Shakes"],
     "hasMenu": `${baseUrl}/menu`,
     "sameAs": [
-      "https://www.instagram.com/laza.cafe",
+      "https://www.instagram.com/lazacafe/?hl=en",
       "https://www.tiktok.com/@lazacafe"
     ]
   }
