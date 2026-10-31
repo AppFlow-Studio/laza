@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import MenuItemDialog from './MenuItemDialog';
-import { useInView } from 'framer-motion';
+import { useInView } from 'motion/react';
 // Sample data for the carousel items
 const products = [
     {

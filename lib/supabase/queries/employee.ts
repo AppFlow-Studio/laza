@@ -6,15 +6,18 @@ import { Location, StorageSpace } from '../types';
 export async function getEmployeeLocation(userId: string) {
     const supabase = await createServerSupabaseClient();
 
-    // Get user's assigned location
-    const { data: user, error: userError } = await supabase
-        .from('users')
-        .select('assigned_location_id')
-        .eq('id', userId)
+    // Get a user's assigned location from the junction table
+    const { data: assignment, error: assignmentError } = await supabase
+        .from('user_location_assignments')
+        .select('location_id')
+        .eq('user_id', userId)
+        .limit(1)
         .single();
 
-    if (userError) throw userError;
-    if (!user?.assigned_location_id) {
+    console.log(assignment)
+
+    if (assignmentError) throw assignmentError;
+    if (!assignment?.location_id) {
         throw new Error('No location assigned to employee');
     }
 
@@ -22,7 +25,7 @@ export async function getEmployeeLocation(userId: string) {
     const { data: location, error: locationError } = await supabase
         .from('locations')
         .select('*')
-        .eq('id', user.assigned_location_id)
+        .eq('id', assignment.location_id)
         .single();
 
     if (locationError) {
@@ -43,6 +46,27 @@ export async function getEmployeeStorageSpaces(locationId: string) {
 
     if (error) throw error;
     return data as StorageSpace[];
+}
+
+export async function getEmployeeStorageSpacesWithCounts(locationId: string) {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase
+        .from('storage_spaces')
+        .select(`
+            *,
+            item_locations (
+                current_quantity,
+                min_quantity_override,
+                items (
+                    min_quantity
+                )
+            )
+        `)
+        .eq('location_id', locationId)
+        .order('name', { ascending: true });
+
+    if (error) throw error;
+    return data as any[];
 }
 
 export async function getStorageSpaceById(storageSpaceId: string) {
@@ -146,7 +170,7 @@ export async function getEmployeeStats(userId: string, locationId: string) {
         .eq('location_id', locationId)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
     // Get items managed count
     const { count: itemsManaged } = await supabase

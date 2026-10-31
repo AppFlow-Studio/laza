@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Plus, MapPin, Users, Package } from 'lucide-react';
 import { useIsMobile } from '@/lib/hooks/useMediaQuery';
 import { useAdminStore } from '@/lib/stores/adminStore';

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Package, Edit, Trash2, Check, AlertTriangle } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Package, Edit, Trash2, Check, AlertTriangle, Warehouse } from 'lucide-react';
 import { Item } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';
+import { BarChart2 } from 'lucide-react';
 import {
     Table,
     TableBody,
@@ -28,6 +29,7 @@ interface ItemGridProps {
     items: Item[];
     onEdit?: (item: Item) => void;
     onDelete?: (item: Item) => void;
+    onViewHistory?: (item: Item) => void;
     viewMode?: 'grid' | 'list';
     selectedItems?: Set<string>;
     onItemToggle?: (itemId: string) => void;
@@ -38,6 +40,7 @@ export default function ItemGrid({
     items,
     onEdit,
     onDelete,
+    onViewHistory,
     viewMode = 'grid',
     selectedItems = new Set(),
     onItemToggle,
@@ -125,7 +128,6 @@ export default function ItemGrid({
                                 <TableHead>Category</TableHead>
                                 <TableHead>Unit</TableHead>
                                 <TableHead>Min Quantity</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -166,9 +168,17 @@ export default function ItemGrid({
                                             {item.sku || '-'}
                                         </TableCell>
                                         <TableCell>
-                                            <span className={cn("px-2 py-1 rounded-full text-xs font-medium", getCategoryColor(getCategoryName(item)))}>
-                                                {getCategoryName(item)}
-                                            </span>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={cn("px-2 py-1 rounded-full text-xs font-medium", getCategoryColor(getCategoryName(item)))}>
+                                                    {getCategoryName(item)}
+                                                </span>
+                                                {(item as any).is_warehouse_item && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600">
+                                                        <Warehouse size={10} />
+                                                        Warehouse
+                                                    </span>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-zinc-600">
                                             {item.unit_of_measure}
@@ -178,6 +188,15 @@ export default function ItemGrid({
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-2">
+                                                {onViewHistory && (
+                                                    <button
+                                                        onClick={() => onViewHistory(item)}
+                                                        className="p-2 text-zinc-500 hover:bg-zinc-50 rounded-lg transition-colors"
+                                                        title="View history"
+                                                    >
+                                                        <BarChart2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                                 {onEdit && (
                                                     <button
                                                         onClick={() => onEdit(item)}
@@ -279,8 +298,16 @@ export default function ItemGrid({
                                         <Package className="w-5 h-5 text-indigo-600" />
                                     </div>
                                 </div>
-                                <div className={cn("px-2 py-1 rounded-full text-xs font-medium", getCategoryColor(getCategoryName(item)))}>
-                                    {getCategoryName(item)}
+                                <div className="flex items-center gap-1.5">
+                                    <div className={cn("px-2 py-1 rounded-full text-xs font-medium", getCategoryColor(getCategoryName(item)))}>
+                                        {getCategoryName(item)}
+                                    </div>
+                                    {(item as any).is_warehouse_item && (
+                                        <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600">
+                                            <Warehouse size={10} />
+                                            Warehouse
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -293,6 +320,15 @@ export default function ItemGrid({
                             </p>
 
                             <div className="flex items-center gap-2 pt-3 border-t border-zinc-200">
+                                {onViewHistory && (
+                                    <button
+                                        onClick={() => onViewHistory(item)}
+                                        className="flex items-center justify-center gap-2 px-3 py-2 bg-zinc-50 text-zinc-500 rounded-lg hover:bg-zinc-100 transition-colors"
+                                        title="View history"
+                                    >
+                                        <BarChart2 className="w-4 h-4" />
+                                    </button>
+                                )}
                                 {onEdit && (
                                     <button
                                         onClick={() => onEdit(item)}

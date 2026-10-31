@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const isAdminRoute = createRouteMatcher(['/admin(.*)'])
 const isEmployeeRoute = createRouteMatcher(['/employee(.*)'])
+const isSuperAdminRoute = createRouteMatcher(['/super-admin(.*)'])
 const isPublicRoute = createRouteMatcher([
     '/',
     '/menu(.*)',
@@ -11,6 +12,7 @@ const isPublicRoute = createRouteMatcher([
     '/join-us',
     '/sign-in(.*)',
     '/sign-up(.*)',
+    '/auth-redirect',
     '/privacy-policy',
     '/terms-conditions',
 ])
@@ -19,10 +21,26 @@ export default clerkMiddleware(async (auth, req) => {
     const { userId, sessionClaims } = await auth();
     const role = (sessionClaims as any)?.o?.rol as string | undefined;
     // console.log('sessionClaims', sessionClaims);
-    // Protect admin routes - only admins can access
+    
+    
+    // Protect /super-admin/* — only super_admin can access
+    if (isSuperAdminRoute(req)) {
+        if (!userId) {
+            return NextResponse.redirect(new URL('/sign-in', req.url));
+        }
+        if (role !== 'super_admin') {
+            return new Response('Unauthorized', { status: 403 });
+        }
+        return NextResponse.next();
+    }
+
+    // Protect admin routes - only store admins can access (super_admin redirects to their dashboard)
     if (isAdminRoute(req)) {
         if (!userId) {
             return NextResponse.redirect(new URL('/sign-in', req.url));
+        }
+        if (role === 'super_admin') {
+            return NextResponse.redirect(new URL('/super-admin', req.url));
         }
         if (role !== 'admin') {
             return new Response('Unauthorized', { status: 403 })
@@ -35,7 +53,7 @@ export default clerkMiddleware(async (auth, req) => {
         if (!userId) {
             return NextResponse.redirect(new URL('/sign-in', req.url));
         }
-        if (role !== 'member' && role !== 'admin') {
+        if (role !== 'member' && role !== 'admin' && role !== 'super_admin') {
             return new Response('Unauthorized', { status: 403 })
         }
         return NextResponse.next();

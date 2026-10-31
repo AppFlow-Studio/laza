@@ -1,6 +1,6 @@
 "use client"
 import { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 

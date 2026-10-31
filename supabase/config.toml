@@ -53,3 +53,9 @@ entrypoint = "./functions/clerk-webhooks-prod/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/clerk-webhooks-prod/*.html" ]
+
+[functions.send-order-notification]
+enabled = true
+verify_jwt = true
+import_map = "./functions/send-order-notification/deno.json"
+entrypoint = "./functions/send-order-notification/index.ts"

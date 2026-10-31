@@ -11,10 +11,11 @@ import toast from 'react-hot-toast';
 
 interface LowStockAlertPreferencesProps {
     organizationId: string;
+    locationId?: string;
 }
 
-export default function LowStockAlertPreferences({ organizationId }: LowStockAlertPreferencesProps) {
-    const { data: preferences, isLoading } = useNotificationPreferences(organizationId);
+export default function LowStockAlertPreferences({ organizationId, locationId }: LowStockAlertPreferencesProps) {
+    const { data: preferences, isLoading } = useNotificationPreferences(organizationId, locationId);
     const updateMutation = useUpdateNotificationPreferences();
 
     const [lowStockAlertsEnabled, setLowStockAlertsEnabled] = useState(true);
@@ -37,6 +38,7 @@ export default function LowStockAlertPreferences({ organizationId }: LowStockAle
         try {
             await updateMutation.mutateAsync({
                 organizationId,
+                locationId,
                 updates: {
                     low_stock_alerts_enabled: lowStockAlertsEnabled,
                     low_stock_delivery_mode: deliveryMode,
@@ -192,4 +194,3 @@ export default function LowStockAlertPreferences({ organizationId }: LowStockAle
         </Card>
     );
 }
-

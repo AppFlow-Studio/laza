@@ -34,7 +34,6 @@ interface LocationFormProps {
 export default function LocationForm({ location, organizationId, onSuccess }: LocationFormProps) {
     const createMutation = useCreateLocation();
     const updateMutation = useUpdateLocation();
-
     const {
         register,
         handleSubmit,
@@ -57,7 +56,6 @@ export default function LocationForm({ location, organizationId, onSuccess }: Lo
             is_active: location?.is_active ?? true,
         },
     });
-
     const onSubmit = async (data: LocationFormData) => {
         try {
             if (location) {
@@ -160,7 +158,7 @@ export default function LocationForm({ location, organizationId, onSuccess }: Lo
                 <Button
                     type="submit"
                     disabled={createMutation.isPending || updateMutation.isPending}
-                    className="flex-1"
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]"
                 >
                     {createMutation.isPending || updateMutation.isPending ? 'Saving...' : location ? 'Update' : 'Create'}
                 </Button>

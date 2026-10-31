@@ -12,7 +12,9 @@ import { useUpdateQuantity } from '@/lib/hooks/queries/useInventory';
 import { useUser } from '@clerk/nextjs';
 import toast from 'react-hot-toast';
 import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
-import { User2 } from 'lucide-react';
+import { User2, Clock } from 'lucide-react';
+import { useCreateInventoryUpdateRequest, usePendingRequestForItem } from "@/lib/hooks/queries/useInventoryUpdateRequests";
+import { useOrganization } from "@clerk/nextjs";
 
 const quantitySchema = z.object({
     new_quantity: z.number().min(0),
@@ -46,6 +48,18 @@ export default function QuantityUpdateModal({
 }: QuantityUpdateModalProps) {
     const { data: userInfo } = useUserInfo();
     const updateMutation = useUpdateQuantity();
+    const { organization } = useOrganization();
+    const requestMutation = useCreateInventoryUpdateRequest();
+
+    // Check if acting user is employee (role = 'employee' in users table)
+    const isEmployee = userInfo?.role === "employee";
+
+    const { data: pendingRequests } = usePendingRequestForItem(
+        itemId ? Number(itemId) : undefined,
+        locationId,
+        storageSpaceId ?? null
+    );
+    const hasPendingRequest = (pendingRequests?.length ?? 0) > 0;
     const {
         register,
         handleSubmit,
@@ -69,27 +83,45 @@ export default function QuantityUpdateModal({
 
     const onSubmit = async (data: QuantityFormData) => {
         try {
-            await updateMutation.mutateAsync({
-                itemId: itemId,
-                locationId: locationId,
-                storageSpaceId: storageSpaceId,
-                newQuantity: data.new_quantity,
-                userId: userInfo?.id || '',
-                actionType: data.action_type,
-                notes: data.notes,
-                minQuantityOverride: data.min_quantity_override ?? null,
-                isOverride: data.is_override || false,
-                overrideReason: data.override_reason || null,
-                overrideAdminId: data.is_override ? userInfo?.id || '' : null,
-            });
-            toast.success(
-                data.is_override
-                    ? 'Quantity updated with admin override'
-                    : 'Quantity updated successfully'
-            );
-            onSuccess();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to update quantity');
+            if (isEmployee) {
+                await requestMutation.mutateAsync({
+                    orgId:            organization?.id ?? "",
+                    locationId:       locationId,
+                    storageSpaceId:   storageSpaceId ?? null,
+                    itemId:           Number(itemId),
+                    requestedBy:      userInfo?.id ?? "",
+                    actionType:       data.action_type as "count" | "adjustment" | "used",
+                    newQuantity:      data.new_quantity,
+                    previousQuantity: currentQuantity ?? 0,
+                    notes:            data.notes || null,
+                });
+                toast.success("Update submitted for admin approval");
+                onSuccess();
+            } else {
+                // Admin path — existing direct update
+                await updateMutation.mutateAsync({
+                    itemId: itemId,
+                    locationId: locationId,
+                    storageSpaceId: storageSpaceId,
+                    newQuantity: data.new_quantity,
+                    userId: userInfo?.id || '',
+                    actionType: data.action_type,
+                    notes: data.notes,
+                    minQuantityOverride: data.min_quantity_override ?? null,
+                    isOverride: data.is_override || false,
+                    overrideReason: data.override_reason || null,
+                    overrideAdminId: data.is_override ? userInfo?.id || '' : null,
+                });
+                toast.success(
+                    data.is_override
+                        ? 'Quantity updated with admin override'
+                        : 'Quantity updated successfully'
+                );
+                onSuccess();
+            }
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Failed to update quantity";
+            toast.error(message);
         }
     };
 
@@ -196,12 +228,23 @@ export default function QuantityUpdateModal({
                 </div>
             </div>
 
+            {isEmployee && hasPendingRequest && (
+                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
+                    <Clock className="h-4 w-4 shrink-0" />
+                    <span>You have a pending update request for this item awaiting admin approval.</span>
+                </div>
+            )}
+
             <Button
                 type="submit"
                 className="w-full"
-                disabled={updateMutation.isPending}
+                disabled={updateMutation.isPending || requestMutation.isPending}
             >
-                {updateMutation.isPending ? 'Updating...' : 'Update Quantity'}
+                {(updateMutation.isPending || requestMutation.isPending)
+                    ? "Saving…"
+                    : isEmployee
+                    ? "Submit for Approval"
+                    : "Update Quantity"}
             </Button>
         </form>
     );

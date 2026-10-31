@@ -5,6 +5,7 @@ import {
     getNotificationPreferences,
     createNotificationPreferences,
     updateNotificationPreferences,
+    getAllLocationNotificationPreferences,
     getLowStockThresholds,
     createLowStockThreshold,
     updateLowStockThreshold,
@@ -16,11 +17,22 @@ import {
     type DailySummaryPreferences,
 } from '@/lib/supabase/queries/notificationPreferences';
 
-// Notification Preferences Hooks
-export function useNotificationPreferences(organizationId: string | null) {
+// ─── Notification Preferences ─────────────────────────────────────────────────
+
+/**
+ * Fetch the preferences row for a given scope.
+ *
+ * Admin usage:      useNotificationPreferences(orgId, locationId)
+ * Super admin:      useNotificationPreferences(orgId)          ← org-wide default
+ * Original callers: useNotificationPreferences(orgId)          ← unchanged behaviour
+ */
+export function useNotificationPreferences(
+    organizationId: string | null,
+    locationId?: string | null,
+) {
     return useQuery({
-        queryKey: ['notification-preferences', organizationId],
-        queryFn: () => getNotificationPreferences(organizationId!),
+        queryKey: ['notification-preferences', organizationId, locationId ?? 'org'],
+        queryFn: () => getNotificationPreferences(organizationId!, locationId),
         enabled: !!organizationId,
     });
 }
@@ -29,14 +41,24 @@ export function useUpdateNotificationPreferences() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({
-            organizationId,
-            updates,
-        }: {
+                         organizationId,
+                         updates,
+                         locationId,
+                     }: {
             organizationId: string;
             updates: Partial<Omit<NotificationPreferences, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>;
-        }) => updateNotificationPreferences(organizationId, updates),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['notification-preferences', variables.organizationId] });
+            locationId?: string | null;
+        }) => updateNotificationPreferences(organizationId, updates, locationId),
+        onSuccess: (_, { organizationId, locationId }) => {
+            // Invalidate both the specific scoped key and any broader org key
+            queryClient.invalidateQueries({
+                queryKey: ['notification-preferences', organizationId],
+            });
+            if (locationId) {
+                queryClient.invalidateQueries({
+                    queryKey: ['all-location-notification-preferences', organizationId],
+                });
+            }
         },
     });
 }
@@ -45,19 +67,38 @@ export function useCreateNotificationPreferences() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({
-            organizationId,
-            data,
-        }: {
+                         organizationId,
+                         data,
+                         locationId,
+                     }: {
             organizationId: string;
             data: Partial<Omit<NotificationPreferences, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>;
-        }) => createNotificationPreferences(organizationId, data),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['notification-preferences', variables.organizationId] });
+            locationId?: string | null;
+        }) => createNotificationPreferences(organizationId, data, locationId),
+        onSuccess: (_, { organizationId }) => {
+            queryClient.invalidateQueries({
+                queryKey: ['notification-preferences', organizationId],
+            });
         },
     });
 }
 
-// Low Stock Thresholds Hooks
+/**
+ * Super Admin: all location-specific preference rows joined with location name.
+ */
+export function useAllLocationNotificationPreferences(
+    organizationId: string | null,
+) {
+    return useQuery({
+        queryKey: ['all-location-notification-preferences', organizationId],
+        queryFn: () => getAllLocationNotificationPreferences(organizationId!),
+        enabled: !!organizationId,
+        staleTime: 60_000,
+    });
+}
+
+// ─── Low Stock Thresholds (call signatures unchanged) ─────────────────────────
+
 export function useLowStockThresholds(
     organizationId: string | null,
     filters?: {
@@ -69,7 +110,7 @@ export function useLowStockThresholds(
 ) {
     return useQuery({
         queryKey: ['low-stock-thresholds', organizationId, filters],
-        queryFn: () => getLowStockThresholds(organizationId!, filters),
+        queryFn: () => getLowStockThresholds(organizationId!, filters as any),
         enabled: !!organizationId,
     });
 }
@@ -89,9 +130,9 @@ export function useUpdateLowStockThreshold() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({
-            id,
-            updates,
-        }: {
+                         id,
+                         updates,
+                     }: {
             id: string;
             updates: Partial<Omit<LowStockThreshold, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>;
         }) => updateLowStockThreshold(id, updates),
@@ -111,11 +152,20 @@ export function useDeleteLowStockThreshold() {
     });
 }
 
-// Daily Summary Preferences Hooks
-export function useDailySummaryPreferences(organizationId: string | null) {
+// ─── Daily Summary Preferences ────────────────────────────────────────────────
+
+/**
+ * Admin usage:      useDailySummaryPreferences(orgId, locationId)
+ * Super admin:      useDailySummaryPreferences(orgId)
+ * Original callers: useDailySummaryPreferences(orgId)          ← unchanged
+ */
+export function useDailySummaryPreferences(
+    organizationId: string | null,
+    locationId?: string | null,
+) {
     return useQuery({
-        queryKey: ['daily-summary-preferences', organizationId],
-        queryFn: () => getDailySummaryPreferences(organizationId!),
+        queryKey: ['daily-summary-preferences', organizationId, locationId ?? 'org'],
+        queryFn: () => getDailySummaryPreferences(organizationId!, locationId),
         enabled: !!organizationId,
     });
 }
@@ -124,15 +174,18 @@ export function useUpdateDailySummaryPreferences() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({
-            organizationId,
-            updates,
-        }: {
+                         organizationId,
+                         updates,
+                         locationId,
+                     }: {
             organizationId: string;
             updates: Partial<Omit<DailySummaryPreferences, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>;
-        }) => updateDailySummaryPreferences(organizationId, updates),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['daily-summary-preferences', variables.organizationId] });
+            locationId?: string | null;
+        }) => updateDailySummaryPreferences(organizationId, updates, locationId),
+        onSuccess: (_, { organizationId }) => {
+            queryClient.invalidateQueries({
+                queryKey: ['daily-summary-preferences', organizationId],
+            });
         },
     });
 }
-

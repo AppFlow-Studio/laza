@@ -7,10 +7,7 @@ export async function getAllCategories(organizationId: string) {
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
         .from('category')
-        .select(`
-            *,
-            items(id)
-        `)
+        .select("*, items(id, name, sku, unit_of_measure, min_quantity)")
         .eq('organization_id', organizationId)
         .order('name', { ascending: true });
     if (error) throw error;

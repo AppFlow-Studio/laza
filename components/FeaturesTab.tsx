@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { ChevronRight } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 
 const FeatureTabs: React.FC<{ features: any[] }> = ({ features }) => {
   const [activeIndex, setActiveIndex] = useState(0);

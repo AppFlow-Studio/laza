@@ -16,8 +16,10 @@ import FilterDropdown from '@/components/admin/shared/FilterDropdown';
 import { Grid, List } from 'lucide-react';
 import CategoryFilter from './CategoryFilter';
 import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
+import { useLocationCatalog } from '@/lib/hooks/queries/useLocationCatalog';
 
 interface ItemAssignmentStepProps {
+    locationId: string;
     selectedItems: Set<string>;
     itemQuantities: Record<string, number>;
     itemMinQuantityOverrides?: Record<string, number | null>;
@@ -31,6 +33,7 @@ interface ItemAssignmentStepProps {
 }
 
 export default function ItemAssignmentStep({
+    locationId,
     selectedItems,
     itemQuantities,
     itemMinQuantityOverrides = {},
@@ -42,7 +45,17 @@ export default function ItemAssignmentStep({
     onDeselectAll,
     isLoading,
 }: ItemAssignmentStepProps) {
-    const { data: items, isLoading: itemsLoading } = useItems();
+    const { data: userInfo } = useUserInfo();
+    const isSuperAdmin = userInfo?.role === 'super_admin';
+
+    const { data: allItems, isLoading: allItemsLoading } = useItems();
+    const { data: catalogItems, isLoading: catalogLoading } = useLocationCatalog(locationId);
+
+    const items = isSuperAdmin
+        ? allItems
+        : catalogItems?.map((c: any) => c.items).filter(Boolean) as Item[] | undefined;
+    const itemsLoading = isSuperAdmin ? allItemsLoading : catalogLoading;
+
     const { data: categories } = useCategories();
     const { viewMode, setViewMode } = useAdminStore();
     const [searchQuery, setSearchQuery] = useState('');
@@ -211,8 +224,11 @@ export default function ItemAssignmentStep({
             <div className="flex-1 overflow-y-auto min-h-0 -mx-4 px-4">
                 {filteredItems.length === 0 ? (
                     <div className="text-center py-12 bg-white rounded-xl border border-zinc-200">
+                        <Package className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
                         <p className="text-zinc-500">
-                            {selectedItems.size > 0 && items && items.length === selectedItems.size
+                            {!isSuperAdmin && (!items || items.length === 0)
+                                ? 'No items have been assigned to this location by a super admin yet.'
+                                : selectedItems.size > 0 && items && items.length === selectedItems.size
                                 ? 'All items are already selected'
                                 : 'No items found'}
                         </p>

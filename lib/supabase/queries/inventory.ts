@@ -91,6 +91,7 @@ export async function updateQuantity({
         storage_space_id: storageSpaceId,
         current_quantity: newQuantity,
         last_updated: new Date().toISOString(),
+        ...(organizationId ? { organization_id: organizationId } : {}),
     };
 
     // Include min_quantity_override if provided
@@ -256,7 +257,7 @@ export async function getAlerts(filters?: {
     return enrichedAlerts;
 }
 
-export async function getLowStockItems(groupBy: 'location' | 'item' = 'location') {
+export async function getLowStockItems(organizationId: string, groupBy: 'location' | 'item' = 'location') {
     const supabase = await createServerSupabaseClient();
 
     // Query item_locations with effective min quantity calculation
@@ -268,6 +269,7 @@ export async function getLowStockItems(groupBy: 'location' | 'item' = 'location'
             locations (*),
             storage_spaces (*)
         `)
+        .eq('organization_id', organizationId)
         .not('storage_space_id', 'is', null);
 
     if (error) throw error;
@@ -324,9 +326,30 @@ export async function bulkAssignItemsToStorage(
     storageSpaceId: string,
     items: Array<{ itemId: string; quantity: number; minQuantityOverride?: number | null }>,
     userId: string,
-    organizationId: string
+    organizationId: string,
+    callerRole: 'super_admin' | 'admin' | 'employee'  // added
 ) {
     const supabase = await createServerSupabaseClient();
+
+    // If caller is admin, verify all items are approved for this location
+    if (callerRole === 'admin') {
+        const { data: catalogItems, error: catalogError } = await supabase
+            .from('location_catalog')
+            .select('item_id')
+            .eq('location_id', locationId)
+            .in('item_id', items.map(i => i.itemId));
+
+        if (catalogError) throw catalogError;
+
+        const allowedItemIds = new Set(catalogItems?.map(c => String(c.item_id)));
+        const unauthorized = items.filter(i => !allowedItemIds.has(String(i.itemId)));
+
+        if (unauthorized.length > 0) {
+            throw new Error(
+                `These items have not been assigned to this location by a super admin: ${unauthorized.map(i => i.itemId).join(', ')}`
+            );
+        }
+    }
 
     // Prepare item_locations records
     const itemLocations = items.map(({ itemId, quantity, minQuantityOverride }) => ({
@@ -336,6 +359,7 @@ export async function bulkAssignItemsToStorage(
         current_quantity: quantity,
         min_quantity_override: minQuantityOverride !== undefined ? minQuantityOverride : null,
         last_updated: new Date().toISOString(),
+        organization_id: organizationId,
     }));
 
     // Bulk upsert item_locations
@@ -434,6 +458,7 @@ export async function bulkUpdateInventory(
             storage_space_id: itemLoc.storageSpaceId,
             current_quantity: newQuantity,
             last_updated: new Date().toISOString(),
+            ...(organizationId ? { organization_id: organizationId } : {}),
         };
 
         if (itemLoc.minQuantityOverride !== undefined) {

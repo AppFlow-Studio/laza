@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { Plus, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory } from '@/lib/hooks/queries/useCategories';
+import { useCategories, useUpdateCategory, useDeleteCategory } from '@/lib/hooks/queries/useCategories';
 import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import SearchBar from '@/components/admin/shared/SearchBar';
 import CategoryList from '@/components/admin/categories/CategoryList';
@@ -21,20 +19,17 @@ import {
 } from '@/components/ui/alert-dialog';
 import toast from 'react-hot-toast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
-import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 
 export default function CategoriesPage() {
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const { data: userInfo } = useUserInfo();
-    const [editingCategory, setEditingCategory] = useState<any | null>(null);
-    const [deletingCategory, setDeletingCategory] = useState<any | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 300);
+    const [editingCategory, setEditingCategory] = useState<any | null>(null);
+    const [deletingCategory, setDeletingCategory] = useState<any | null>(null);
 
     const { data: categories, isLoading } = useCategories();
-    const createMutation = useCreateCategory();
     const updateMutation = useUpdateCategory();
     const deleteMutation = useDeleteCategory();
+
     const filteredCategories = useMemo(() => {
         if (!categories) return [];
         if (!debouncedSearch) return categories;
@@ -45,20 +40,6 @@ export default function CategoriesPage() {
             return name.includes(queryLower) || description.includes(queryLower);
         });
     }, [categories, debouncedSearch]);
-
-    const handleCreate = async (data: { name: string; description?: string | undefined }) => {
-        try {
-            await createMutation.mutateAsync({
-                name: data.name,
-                organization_id: userInfo?.members.organization_id,
-                description: data.description || undefined,
-            });
-            toast.success('Category created successfully');
-            setShowCreateForm(false);
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to create category');
-        }
-    };
 
     const handleUpdate = async (data: { name: string; description?: string | undefined }) => {
         if (!editingCategory) return;
@@ -90,19 +71,11 @@ export default function CategoriesPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-semibold text-zinc-900">Categories</h1>
-                    <p className="text-sm text-zinc-600 mt-1">Manage item categories</p>
-                </div>
-                <Button onClick={() => setShowCreateForm(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Category
-                </Button>
+            <div>
+                <h1 className="text-2xl font-semibold text-zinc-900">Categories</h1>
+                <p className="text-sm text-zinc-600 mt-1">View your inventory categories</p>
             </div>
 
-            {/* Search */}
             <div className="flex-1">
                 <SearchBar
                     placeholder="Search categories..."
@@ -110,7 +83,6 @@ export default function CategoriesPage() {
                 />
             </div>
 
-            {/* Categories List */}
             {isLoading ? (
                 <div className="space-y-2">
                     <LoadingSkeleton className="h-20 w-full" />
@@ -120,25 +92,11 @@ export default function CategoriesPage() {
             ) : (
                 <CategoryList
                     categories={filteredCategories}
+                    isLoading={isLoading}
                     onEdit={(category) => setEditingCategory(category)}
                     onDelete={(category) => setDeletingCategory(category)}
-                    isLoading={isLoading}
                 />
             )}
-
-            {/* Create Category Modal */}
-            <MobileSheet
-                isOpen={showCreateForm}
-                onClose={() => setShowCreateForm(false)}
-                title="Create Category"
-                snapPoints={[0, 0.5, 0.7,1]}
-            >
-                <CategoryForm
-                    onSubmit={handleCreate}
-                    onCancel={() => setShowCreateForm(false)}
-                    isLoading={createMutation.isPending}
-                />
-            </MobileSheet>
 
             {/* Edit Category Modal */}
             {editingCategory && (
@@ -192,4 +150,3 @@ export default function CategoriesPage() {
         </div>
     );
 }
-

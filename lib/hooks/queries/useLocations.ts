@@ -8,12 +8,15 @@ import {
     createLocation,
     updateLocation,
     deleteLocation,
+    deactivateLocation,
+    reactivateLocation,
 } from '@/lib/supabase/queries/locations';
 import { useUserInfo } from './useUserInfo';
 
 export function useLocations() {
     const { data: userInfo } = useUserInfo();
     const organizationId = userInfo?.members?.organization_id;
+
     return useQuery({
         queryKey: ['locations', organizationId],
         queryFn: () => getAllLocations(organizationId!),
@@ -69,3 +72,35 @@ export function useDeleteLocation() {
     });
 }
 
+export function useDeactivateLocation() {
+    const queryClient = useQueryClient();
+    const { data: userInfo } = useUserInfo();
+
+    return useMutation({
+        mutationFn: (locationId: string) => {
+            if (!userInfo?.id) throw new Error('User not authenticated');
+            if (userInfo.role !== 'super_admin') throw new Error('Only super admin can deactivate locations');
+            return deactivateLocation(locationId, userInfo.id);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['locations'] });
+            queryClient.invalidateQueries({ queryKey: ['alerts'] });
+        },
+    });
+}
+
+export function useReactivateLocation() {
+    const queryClient = useQueryClient();
+    const { data: userInfo } = useUserInfo();
+
+    return useMutation({
+        mutationFn: (locationId: string) => {
+            if (!userInfo?.id) throw new Error('User not authenticated');
+            if (userInfo.role !== 'super_admin') throw new Error('Only super admin can reactivate locations');
+            return reactivateLocation(locationId, userInfo.id);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['locations'] });
+        },
+    });
+}

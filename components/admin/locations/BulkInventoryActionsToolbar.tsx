@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Settings, Trash2, X, Package } from 'lucide-react';
+import { Settings, X, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BulkInventoryActionsToolbarProps {
@@ -9,7 +9,6 @@ interface BulkInventoryActionsToolbarProps {
     onSetQuantity: () => void;
     onSetMinOverride: () => void;
     onBulkUpdate: () => void;
-    onRemoveFromStorage: () => void;
     onClearSelection: () => void;
     isLoading?: boolean;
 }
@@ -19,7 +18,6 @@ export default function BulkInventoryActionsToolbar({
     onSetQuantity,
     onSetMinOverride,
     onBulkUpdate,
-    onRemoveFromStorage,
     onClearSelection,
     isLoading = false,
 }: BulkInventoryActionsToolbarProps) {
@@ -79,16 +77,6 @@ export default function BulkInventoryActionsToolbar({
                     >
                         <Settings className="w-4 h-4 mr-1" />
                         Bulk Update
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onRemoveFromStorage}
-                        disabled={isLoading}
-                        className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Remove from Storage
                     </Button>
                 </div>
             </div>

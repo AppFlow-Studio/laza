@@ -1,19 +1,42 @@
 "use server";
 
-import { createServerSupabaseClient } from '../server';
+import { auth } from '@clerk/nextjs/server';
+import { createServiceRoleClient } from '../server';
 import { User, OrgInvite } from '../types';
 
 export async function getOrganizationUsers(organizationId: string) {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServiceRoleClient();
 
-    // Get users through members table join with location info
+    const { userId } = await auth();
+    if (!userId) return [];
+
+    // Look up caller's role — bypasses RLS entirely
+    const { data: caller } = await supabase
+        .from('users')
+        .select('id, role')
+        .eq('id', userId)
+        .single();
+
+    const callerRole = caller?.role;
+
+    // Get caller's location from junction table
+    const { data: callerAssignments } = await supabase
+        .from('user_location_assignments')
+        .select('location_id')
+        .eq('user_id', userId);
+
+    const callerLocationId = callerAssignments?.[0]?.location_id ?? null;
+
+    // Fetch all org members, joining junction table for display and filtering
     const { data: members, error: membersError } = await supabase
         .from('members')
         .select(`
             *,
             users (
                 *,
-                assigned_location:locations (*)
+                user_location_assignments (
+                    locations (id, name, address, location_type)
+                )
             ),
             organizations (*)
         `)
@@ -21,30 +44,92 @@ export async function getOrganizationUsers(organizationId: string) {
 
     if (membersError) throw membersError;
 
-    // Extract users from members and flatten structure
-    const users = members
+    const allUsers = members
         ?.map((member: any) => {
             if (!member.users) return null;
+
+            const assigned_locations: any[] =
+                member.users.user_location_assignments
+                    ?.map((a: any) => a.locations)
+                    .filter(Boolean) ?? [];
+
             return {
                 ...member.users,
-                assigned_location: member.users.assigned_location || null,
+                assigned_locations,
             };
         })
-        .filter(Boolean) || [];
+        .filter(Boolean) ?? [];
 
-    return users as (User & { assigned_location?: any })[];
+    // Super admin — sees everyone
+    if (callerRole === 'super_admin') {
+        return allUsers as UserWithAssignments[];
+    }
+
+    // Admin — sees users who share their location
+    if (callerRole === 'admin' && callerLocationId) {
+        const filtered = allUsers.filter((u: any) => {
+            if (u.id === caller?.id) return true;
+            if (u.role === 'employee' || u.role === 'admin') {
+                return u.assigned_locations?.some((l: any) => l.id === callerLocationId);
+            }
+            return false;
+        });
+        return filtered as UserWithAssignments[];
+    }
+
+    // Fallback — only self
+    return allUsers.filter((u: any) => u.id === userId) as UserWithAssignments[];
+}
+
+type UserWithAssignments = User & {
+    assigned_locations: any[];
+};
+
+/** Returns the location IDs assigned to a user from the junction table. */
+export async function getUserLocationAssignments(userId: string) {
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+        .from('user_location_assignments')
+        .select('location_id')
+        .eq('user_id', userId);
+
+    if (error) throw error;
+    return (data ?? []).map((row: { location_id: string }) => row.location_id);
 }
 
 export async function getPendingInvitations(organizationId: string) {
-    const supabase = await createServerSupabaseClient();
-    const { data, error } = await supabase
+    const supabase = createServiceRoleClient();
+
+    const { userId } = await auth();
+    if (!userId) return [];
+
+    const { data: caller } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+    let query = supabase
         .from('org_invites')
         .select('*')
         .eq('organization_id', organizationId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
+    // Admin: scope to invitations assigned to their locations
+    if (caller?.role === 'admin') {
+        const { data: assignments } = await supabase
+            .from('user_location_assignments')
+            .select('location_id')
+            .eq('user_id', userId);
+
+        const assignedIds = assignments?.map((a: any) => a.location_id) ?? [];
+        if (assignedIds.length > 0) {
+            query = query.in('assigned_location_id', assignedIds);
+        }
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     return data as OrgInvite[];
 }
-

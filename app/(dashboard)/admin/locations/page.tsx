@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useLocations } from '@/lib/hooks/queries/useLocations';
 import LocationCard from '@/components/admin/locations/LocationCard';
 import LocationForm from '@/components/admin/locations/LocationForm';
@@ -18,8 +19,7 @@ import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 export default function LocationsPage() {
     const { data: userInfo } = useUserInfo();
     const organizationId = userInfo?.members?.organization_id;
-    const { data: locations, isLoading } = useLocations(organizationId);
-    const [showAddForm, setShowAddForm] = useState(false);
+    const { data: locations, isLoading } = useLocations();
     const [editingLocation, setEditingLocation] = useState<any>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 300);
@@ -39,10 +39,14 @@ export default function LocationsPage() {
     }) || [];
 
     const handleDelete = async (locationId: string) => {
-        if (!confirm('Are you sure you want to delete this location?')) return;
+        if (!confirm('Delete this location? If it has orders or purchases, it will be archived instead.')) return;
         try {
-            await deleteMutation.mutateAsync(locationId);
-            toast.success('Location deleted successfully');
+            const result = await deleteMutation.mutateAsync(locationId);
+            toast.success(
+                result === 'archived'
+                    ? 'Location archived (had referenced records)'
+                    : 'Location deleted',
+            );
         } catch (error: any) {
             toast.error(error.message || 'Failed to delete location');
         }
@@ -72,10 +76,6 @@ export default function LocationsPage() {
                             <List className="w-4 h-4" />
                         </button>
                     </div>
-                    <Button onClick={() => setShowAddForm(true)}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Location
-                    </Button>
                 </div>
             </div>
 
@@ -103,7 +103,7 @@ export default function LocationsPage() {
                     ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
                     : "space-y-4"
                 }>
-                    {filteredLocations.map((location) => (
+                    {filteredLocations?.map((location) => (
                         <LocationCard
                             key={location.id}
                             location={location}
@@ -114,22 +114,16 @@ export default function LocationsPage() {
                 </div>
             )}
 
-            {/* Add/Edit Form */}
+            {/* Edit Form */}
             <MobileSheet
-                isOpen={showAddForm || !!editingLocation}
-                onClose={() => {
-                    setShowAddForm(false);
-                    setEditingLocation(null);
-                }}
-                title={editingLocation ? 'Edit Location' : 'Add Location'}
+                isOpen={!!editingLocation}
+                onClose={() => setEditingLocation(null)}
+                title="Edit Location"
             >
                 <LocationForm
                     location={editingLocation}
                     organizationId={organizationId}
-                    onSuccess={() => {
-                        setShowAddForm(false);
-                        setEditingLocation(null);
-                    }}
+                    onSuccess={() => setEditingLocation(null)}
                 />
             </MobileSheet>
         </div>

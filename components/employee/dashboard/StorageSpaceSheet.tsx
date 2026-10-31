@@ -6,7 +6,7 @@ import { StorageSpace } from '@/lib/supabase/types';
 import { useStorageSpaceItems, useStorageSpaceLogs } from '@/lib/hooks/queries/useEmployee';
 import { Package, History, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import ItemCard from '@/components/employee/inventory/ItemCard';
 import InventoryLogCard from '@/components/employee/inventory/InventoryLogCard';
 import SearchBar from '@/components/admin/shared/SearchBar';

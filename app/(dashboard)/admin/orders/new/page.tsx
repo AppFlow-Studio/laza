@@ -1,0 +1,1351 @@
+"use client";
+
+/**
+ * TASK 3.2 — Store Admin: New Order Creation
+ * File: app/(dashboard)/admin/orders/new/page.tsx
+ */
+
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+    ArrowLeft,
+    Search,
+    Package,
+    ShoppingCart,
+    X,
+    AlertCircle,
+    Boxes,
+    CheckCircle2,
+    Loader2,
+    Truck,
+    Store,
+    Warehouse,
+    ChevronDown,
+    ChevronUp,
+} from "lucide-react";
+import { Sheet } from "react-modal-sheet";
+import { toast } from "react-hot-toast";
+import { motion } from "motion/react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+import { useWarehouseCatalog } from "@/lib/hooks/queries/useWarehouse";
+import { useCategories } from "@/lib/hooks/queries/useCategories";
+import { useCreateTicket } from "@/lib/hooks/queries/useOrderTickets";
+import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
+import { WarehouseCatalogItem } from "@/lib/supabase/queries/warehouse";
+import { CreateTicketInput } from "@/lib/supabase/queries/orderTickets";
+import { useOrganization } from "@clerk/nextjs";
+import { useWarehouses } from "@/lib/hooks/queries/useWarehouse";
+import {
+    getItemShipmentHistory,
+    type ShipmentBoxConfig,
+} from "@/lib/supabase/queries/itemShipmentHistory";
+import {
+    getFriendlyErrorMessage,
+    isNetworkError,
+} from "@/lib/utils/errorMessages";
+import { useAdminStore } from "@/lib/stores/adminStore";
+import { ItemAddDialog } from "@/components/admin/orders/ItemAddDialog";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type DeliveryType = "company" | "self";
+
+type CartEntry = {
+    item: WarehouseCatalogItem & { box_quantity: number };
+    boxes: number;
+    selectedConfig: ShipmentBoxConfig | null;
+    unitPrice: number | null;
+};
+
+// ─── Validation ───────────────────────────────────────────────────────────────
+function validateBoxQty(val: string | number): {
+    ok: boolean;
+    value?: number;
+    error?: string;
+} {
+    const n = Number(val);
+    if (val === "" || val === null || val === undefined)
+        return { ok: false, error: "Required" };
+    if (!Number.isInteger(n))
+        return { ok: false, error: "Whole boxes only — no decimals" };
+    if (n < 1) return { ok: false, error: "Minimum 1 box" };
+    if (n > 999) return { ok: false, error: "Maximum 999 boxes" };
+    return { ok: true, value: n };
+}
+
+function effectivePiecesPerBox(
+    item: WarehouseCatalogItem & { box_quantity: number },
+    config: ShipmentBoxConfig | null,
+): number {
+    return config?.piecesPerBox ?? item.box_quantity;
+}
+
+// ─── useItemShipmentConfigs ───────────────────────────────────────────────────
+function useItemShipmentConfigs(
+    itemId: number | null,
+    organizationId: string,
+): { configs: ShipmentBoxConfig[]; loading: boolean } {
+    const [configs, setConfigs] = useState<ShipmentBoxConfig[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!itemId || !organizationId) return;
+        setLoading(true);
+        getItemShipmentHistory(itemId, organizationId)
+            .then((result) => setConfigs(result))
+            .finally(() => setLoading(false));
+    }, [itemId, organizationId]);
+
+    return { configs, loading };
+}
+
+// ─── ShipmentConfigPicker ─────────────────────────────────────────────────────
+function ShipmentConfigPicker({
+    item,
+    organizationId,
+    selectedConfig,
+    hasError,
+    onSelect,
+}: {
+    item: WarehouseCatalogItem & { box_quantity: number };
+    organizationId: string;
+    selectedConfig: ShipmentBoxConfig | null;
+    hasError?: boolean;
+    onSelect: (config: ShipmentBoxConfig | null) => void;
+}) {
+    const { configs, loading } = useItemShipmentConfigs(
+        item.id,
+        organizationId,
+    );
+
+    if (loading) {
+        return (
+            <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-2 py-1">
+                <Loader2 size={9} className="animate-spin" /> Loading shipment
+                configs…
+            </div>
+        );
+    }
+
+    if (configs.length === 0) {
+        return (
+            <div className="flex items-center gap-1 mt-2 text-[10px] text-gray-400 py-1">
+                <Boxes size={9} className="text-gray-300" />
+                {item.box_quantity} {item.unit_of_measure}/box (default)
+            </div>
+        );
+    }
+
+    const tabs = configs.map((cfg) => ({
+        key: cfg.id,
+        label:
+            cfg.poNumber ??
+            (cfg.poDate
+                ? new Date(cfg.poDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      year: "numeric",
+                  })
+                : `${cfg.piecesPerBox}/box`),
+        sub: `${cfg.piecesPerBox} ${item.unit_of_measure}/box`,
+        config: cfg,
+    }));
+
+    const activeKey = selectedConfig?.id ?? null;
+
+    return (
+        <div className="mt-2">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+                Box config
+            </p>
+            <div className="flex gap-1 flex-wrap">
+                {tabs.map((tab) => {
+                    const isActive = activeKey === tab.key;
+                    return (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => onSelect(tab.config)}
+                            className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all ${
+                                isActive
+                                    ? "border-indigo-400 bg-indigo-50 text-indigo-700"
+                                    : hasError
+                                      ? "border-red-300 bg-red-50 hover:border-red-400"
+                                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                            }`}
+                        >
+                            <span
+                                className={`text-[11px] font-semibold leading-tight ${isActive ? "text-indigo-700" : "text-gray-700"}`}
+                            >
+                                {tab.label}
+                            </span>
+                            <span
+                                className={`text-[10px] mt-0.5 leading-tight ${isActive ? "text-indigo-500" : "text-gray-400"}`}
+                            >
+                                {tab.sub}
+                            </span>
+                            {isActive && (
+                                <div className="w-1 h-1 rounded-full bg-indigo-500 mt-1" />
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {hasError && (
+                <p className="mt-1.5 text-[11px] text-red-500 font-medium flex items-center gap-1">
+                    <AlertCircle size={10} /> Choose a box config to proceed
+                </p>
+            )}
+
+            {selectedConfig &&
+                (selectedConfig.supplierName || selectedConfig.poDate) && (
+                    <p className="text-[10px] text-gray-400 mt-1.5">
+                        {[
+                            selectedConfig.supplierName,
+                            selectedConfig.poDate &&
+                                new Date(
+                                    selectedConfig.poDate,
+                                ).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    year: "numeric",
+                                }),
+                        ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                    </p>
+                )}
+        </div>
+    );
+}
+
+// ─── DeliveryTypeSelector ─────────────────────────────────────────────────────
+function DeliveryTypeSelector({
+    value,
+    onChange,
+}: {
+    value: DeliveryType;
+    onChange: (v: DeliveryType) => void;
+}) {
+    const options: {
+        value: DeliveryType;
+        label: string;
+        sublabel: string;
+        icon: React.ReactNode;
+    }[] = [
+        {
+            value: "company",
+            label: "Company delivery",
+            sublabel: "Warehouse delivers to your store",
+            icon: <Truck size={15} className="flex-shrink-0" />,
+        },
+        {
+            value: "self",
+            label: "Self-pickup",
+            sublabel: "You collect directly from the warehouse",
+            icon: <Store size={15} className="flex-shrink-0" />,
+        },
+    ];
+
+    return (
+        <div className="flex flex-col gap-2">
+            <label className="text-[11px] font-semibold text-gray-500">
+                Delivery method
+            </label>
+            <div className="grid grid-cols-1 gap-2">
+                {options.map((opt) => {
+                    const active = value === opt.value;
+                    return (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => onChange(opt.value)}
+                            className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all duration-100 ${
+                                active
+                                    ? "border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100"
+                                    : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                            }`}
+                        >
+                            <div
+                                className={`mt-0.5 ${active ? "text-indigo-600" : "text-gray-400"}`}
+                            >
+                                {opt.icon}
+                            </div>
+                            <div className="min-w-0">
+                                <div
+                                    className={`text-xs font-semibold leading-tight ${active ? "text-indigo-700" : "text-gray-700"}`}
+                                >
+                                    {opt.label}
+                                </div>
+                                <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">
+                                    {opt.sublabel}
+                                </div>
+                                {opt.value === "self" && active && (
+                                    <div className="text-[10px] text-emerald-600 font-semibold mt-1">
+                                        No delivery cost
+                                    </div>
+                                )}
+                                {opt.value === "company" && active && (
+                                    <div className="text-[10px] text-amber-600 font-medium mt-1">
+                                        Cost calculated at fulfillment
+                                    </div>
+                                )}
+                            </div>
+                            <div
+                                className={`ml-auto mt-0.5 w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 transition-all ${
+                                    active
+                                        ? "border-indigo-500 bg-indigo-500"
+                                        : "border-gray-300 bg-white"
+                                }`}
+                            />
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+// ─── CatalogItemRow ───────────────────────────────────────────────────────────
+function CatalogItemRow({
+    item,
+    cartEntry,
+    organizationId,
+    onAdd,
+    onRemove,
+    onQtyChange,
+    onConfigChange,
+}: {
+    item: WarehouseCatalogItem & { box_quantity: number };
+    cartEntry?: CartEntry;
+    organizationId: string;
+    onAdd: (
+        item: WarehouseCatalogItem & { box_quantity: number },
+        boxes: number,
+        config: ShipmentBoxConfig | null,
+    ) => void;
+    onRemove: (itemId: number) => void;
+    onQtyChange: (itemId: number, boxes: number) => void;
+    onConfigChange: (itemId: number, config: ShipmentBoxConfig | null) => void;
+}) {
+    const [dialogOpen, setDialogOpen] = useState(false);
+
+    const { configs, loading: configsLoading } = useItemShipmentConfigs(
+        item.id,
+        organizationId,
+    );
+
+    const unitPrice = item.warehouse_transfer_price ?? null;
+    const missingPrice = unitPrice == null;
+    const pricePerBox = unitPrice != null && item.box_quantity != null
+        ? unitPrice * item.box_quantity
+        : null;
+    const inCart = !!cartEntry;
+    const ppb = effectivePiecesPerBox(item, cartEntry?.selectedConfig ?? null);
+
+    const handleConfirm = (boxes: number, config: ShipmentBoxConfig | null) => {
+        if (inCart) {
+            onQtyChange(item.id, boxes);
+            onConfigChange(item.id, config);
+        } else {
+            onAdd(item, boxes, config);
+        }
+    };
+
+    return (
+        <>
+            <div
+                className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-100 ${
+                    missingPrice
+                        ? "border-gray-100 bg-gray-50 opacity-60 pointer-events-none"
+                        : inCart
+                          ? "border-indigo-300 bg-indigo-50/40"
+                          : "border-gray-200 bg-white hover:border-violet-200 hover:shadow-[0_1px_6px_rgba(99,102,241,0.07)]"
+                }`}
+            >
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-gray-900">
+                            {item.name}
+                        </span>
+                        {inCart && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded-full">
+                                <CheckCircle2 size={9} /> In order
+                            </span>
+                        )}
+                    </div>
+                    {item.sku && (
+                        <div className="mt-1">
+                            <span
+                                style={{ fontFamily: "var(--font-mono, monospace)" }}
+                                className="text-[10px] text-gray-400"
+                            >
+                                {item.sku}
+                            </span>
+                        </div>
+                    )}
+                    {missingPrice ? (
+                        <div className="mt-1 text-[11px] text-amber-600 font-medium flex items-center gap-1">
+                            <AlertCircle size={10} /> Price not yet set — ask super admin to enable ordering
+                        </div>
+                    ) : (
+                        <div className="mt-1 text-[11px] text-gray-500">
+                            {formatCurrency(unitPrice!)} / unit
+                            {pricePerBox != null && (
+                                <span className="ml-1 text-indigo-600 font-semibold">
+                                    · {formatCurrency(pricePerBox)} / box
+                                </span>
+                            )}
+                        </div>
+                    )}
+                    {inCart && cartEntry && (
+                        <div className="mt-1 text-[11px] text-gray-500 flex items-center gap-1">
+                            <Boxes size={10} className="text-gray-300" />
+                            {cartEntry.boxes} box{cartEntry.boxes !== 1 ? "es" : ""} · {cartEntry.boxes * ppb} {item.unit_of_measure}
+                            {cartEntry.selectedConfig && (
+                                <span className="ml-1 text-indigo-500 font-semibold">
+                                    · {cartEntry.selectedConfig.poNumber ?? "Custom shipment"}
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    {inCart ? (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setDialogOpen(true)}
+                                className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-lg transition-colors"
+                            >
+                                Edit
+                            </button>
+                            <button
+                                onClick={() => onRemove(item.id)}
+                                className="text-[11px] font-semibold text-red-400 hover:text-red-600 flex items-center gap-1 transition-colors"
+                            >
+                                <X size={10} /> Remove
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => setDialogOpen(true)}
+                            className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-lg transition-colors"
+                        >
+                            Add to order
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <ItemAddDialog
+                open={dialogOpen}
+                onOpenChange={setDialogOpen}
+                item={item}
+                initialBoxes={cartEntry?.boxes ?? 1}
+                initialConfig={cartEntry?.selectedConfig ?? null}
+                configs={configs}
+                configsLoading={configsLoading}
+                onConfirm={handleConfirm}
+            />
+        </>
+    );
+}
+
+// ─── CartRow ──────────────────────────────────────────────────────────────────
+function CartRow({
+    entry,
+    onRemove,
+}: {
+    entry: CartEntry;
+    onRemove: () => void;
+}) {
+    const ppb = effectivePiecesPerBox(entry.item, entry.selectedConfig);
+    return (
+        <div className="flex items-center gap-2.5 p-2.5 bg-white border border-gray-200 rounded-lg">
+            <div className="w-6 h-6 rounded-md bg-violet-100 flex items-center justify-center flex-shrink-0">
+                <Package size={11} className="text-violet-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-gray-800 truncate">
+                    {entry.item.name}
+                </div>
+                <div className="text-[11px] text-gray-400 mt-0.5">
+                    {entry.boxes} box{entry.boxes !== 1 ? "es" : ""} ·{" "}
+                    <span className="text-indigo-600 font-semibold">
+                        {entry.boxes * ppb} {entry.item.unit_of_measure}
+                    </span>
+                    {entry.selectedConfig && (
+                        <span className="ml-1 text-[10px] text-indigo-400">
+                            · {entry.selectedConfig.piecesPerBox}/box
+                        </span>
+                    )}
+                </div>
+            </div>
+            <button
+                onClick={onRemove}
+                className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 rounded transition-all"
+            >
+                <X size={11} />
+            </button>
+        </div>
+    );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+export default function NewOrderPage() {
+    const router = useRouter();
+
+    const { data: userInfo } = useUserInfo();
+    const { selectedLocationId: requestingLocationId } = useAdminStore();
+    const requestedBy = userInfo?.id ?? "";
+
+    const { organization } = useOrganization();
+    const organizationId = organization?.id ?? "";
+
+    // ── Warehouse selector ─────────────────────────────────────────────────────
+    const { data: warehouseLocations } = useWarehouses();
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
+    const warehouseLocationId = selectedWarehouseId;
+
+    const { data: rawCatalogItems, isLoading: catalogLoading } =
+        useWarehouseCatalog();
+    const { data: categories } = useCategories();
+    const { mutate: createTicket, isPending: isSubmitting } = useCreateTicket();
+
+    const [title, setTitle] = useState("");
+    const [search, setSearch] = useState("");
+    const [categoryFilter, setCategoryFilter] = useState<number | "">("");
+    const [cart, setCart] = useState<Record<number, CartEntry>>({});
+    const [notes, setNotes] = useState("");
+    const [deliveryType, setDeliveryType] = useState<DeliveryType>("company");
+    const [reviewSheetOpen, setReviewSheetOpen] = useState(false);
+    const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
+
+    // ── Restore local draft on mount (network failure recovery) ──────────────
+    // If a previous submit attempt failed due to network issues, the cart was
+    // saved to localStorage. Restore it once the catalog has loaded so we can
+    // re-hydrate items with their full WarehouseCatalogItem data.
+    useEffect(() => {
+        if (!rawCatalogItems || rawCatalogItems.length === 0) return;
+        try {
+            const raw = localStorage.getItem("laza_order_draft");
+            if (!raw) return;
+            const draft = JSON.parse(raw) as {
+                cart: Record<
+                    string,
+                    { boxes: number; configId: string | null }
+                >;
+                notes: string;
+                deliveryType: DeliveryType;
+            };
+            const restored: Record<number, CartEntry> = {};
+            for (const [id, entry] of Object.entries(draft.cart ?? {})) {
+                const item = rawCatalogItems.find((i) => i.id === Number(id));
+                if (
+                    item &&
+                    item.box_quantity != null &&
+                    item.box_quantity > 0
+                ) {
+                    restored[Number(id)] = {
+                        item: item as WarehouseCatalogItem & {
+                            box_quantity: number;
+                        },
+                        boxes: entry.boxes,
+                        selectedConfig: null,
+                        unitPrice: item.warehouse_transfer_price ?? null,
+                    };
+                }
+            }
+            if (Object.keys(restored).length > 0) {
+                setCart(restored);
+                setNotes(draft.notes ?? "");
+                setDeliveryType(draft.deliveryType ?? "company");
+                toast.success("Restored your previously saved draft.", {
+                    duration: 4000,
+                });
+            }
+        } catch {
+            /* ignore corrupt drafts */
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rawCatalogItems]);
+
+    // ── Filter: only items with box_quantity set are orderable ──────────────────
+    const orderableItems = useMemo(
+        () =>
+            (rawCatalogItems ?? []).filter(
+                (
+                    item,
+                ): item is WarehouseCatalogItem & { box_quantity: number } =>
+                    item.box_quantity !== null && item.box_quantity > 0,
+            ),
+        [rawCatalogItems],
+    );
+
+    const filteredItems = useMemo(() => {
+        const q = search.toLowerCase();
+        return orderableItems.filter((item) => {
+            const matchSearch =
+                !q ||
+                item.name.toLowerCase().includes(q) ||
+                (item.sku ?? "").toLowerCase().includes(q);
+            const matchCat =
+                !categoryFilter ||
+                item.category?.some((c) => c.id === categoryFilter);
+            return matchSearch && matchCat;
+        });
+    }, [orderableItems, search, categoryFilter]);
+
+    const cartEntries = Object.values(cart);
+    const totalItems = cartEntries.length;
+    const totalBoxes = cartEntries.reduce((s, e) => s + e.boxes, 0);
+    const hasItems = totalItems > 0;
+
+    const subtotal = cartEntries.reduce((sum, e) => {
+        if (e.unitPrice == null || e.item.box_quantity == null) return sum;
+        return sum + e.unitPrice * e.item.box_quantity * e.boxes;
+    }, 0);
+
+    const hasMissingPrice = cartEntries.some((e) => e.unitPrice == null);
+
+    const handleConfigChange = useCallback(
+        (itemId: number, config: ShipmentBoxConfig | null) => {
+            setCart((prev) =>
+                prev[itemId]
+                    ? {
+                          ...prev,
+                          [itemId]: { ...prev[itemId], selectedConfig: config },
+                      }
+                    : prev,
+            );
+        },
+        [],
+    );
+
+    const handleAdd = useCallback(
+        (
+            item: WarehouseCatalogItem & { box_quantity: number },
+            boxes: number,
+            config: ShipmentBoxConfig | null,
+        ) => {
+            setCart((prev) => ({
+                ...prev,
+                [item.id]: {
+                    item,
+                    boxes,
+                    selectedConfig: config,
+                    unitPrice: item.warehouse_transfer_price ?? null,
+                },
+            }));
+        },
+        [],
+    );
+
+    const handleRemove = useCallback((itemId: number) => {
+        setCart((prev) => {
+            const next = { ...prev };
+            delete next[itemId];
+            return next;
+        });
+    }, []);
+
+    const handleQtyChange = useCallback((itemId: number, boxes: number) => {
+        setCart((prev) =>
+            prev[itemId]
+                ? { ...prev, [itemId]: { ...prev[itemId], boxes } }
+                : prev,
+        );
+    }, []);
+
+    const buildPayload = (
+        status: "draft" | "submitted",
+    ): CreateTicketInput => ({
+        organizationId,
+        requestingLocationId: requestingLocationId || "",
+        warehouseLocationId,
+        requestedBy,
+        initialStatus: status,
+        deliveryType,
+        title: title.trim() || undefined,
+        notes: notes.trim() || undefined,
+        items: cartEntries.map((e) => ({
+            itemId: e.item.id,
+            quantityBoxes: e.boxes,
+            quantityUnits:
+                e.boxes * effectivePiecesPerBox(e.item, e.selectedConfig),
+        })),
+    });
+
+    const missingContext =
+        !organizationId || !requestingLocationId || !warehouseLocationId;
+
+    // ── Local draft save/restore for network failure recovery ──────────────────
+    const DRAFT_KEY = "laza_order_draft";
+
+    const saveDraftLocally = () => {
+        try {
+            const draft = {
+                cart: Object.fromEntries(
+                    cartEntries.map((e) => [
+                        e.item.id,
+                        {
+                            boxes: e.boxes,
+                            configId: e.selectedConfig?.id ?? null,
+                        },
+                    ]),
+                ),
+                notes,
+                deliveryType,
+                savedAt: new Date().toISOString(),
+            };
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        } catch {
+            /* localStorage may be unavailable */
+        }
+    };
+
+    const clearLocalDraft = () => {
+        try {
+            localStorage.removeItem(DRAFT_KEY);
+        } catch {}
+    };
+
+    // ── Validate before submission ───────────────────────────────────────────
+    const validateOrder = (): boolean => {
+        if (!hasItems) {
+            toast.error("Add at least one item to your order.");
+            return false;
+        }
+        // Check for invalid box quantities in cart
+        for (const entry of cartEntries) {
+            const v = validateBoxQty(entry.boxes);
+            if (!v.ok) {
+                toast.error(`${entry.item.name}: ${v.error}`);
+                return false;
+            }
+        }
+        return true;
+    };
+
+    // ── Actions ──────────────────────────────────────────────────────────────────
+    const handleDraft = async () => {
+        if (missingContext) {
+            toast.error(
+                !warehouseLocationId
+                    ? "Select a warehouse first"
+                    : "Missing location context — try refreshing",
+            );
+            return;
+        }
+        try {
+            await createTicket(buildPayload("draft"));
+            clearLocalDraft();
+            toast.success("Draft saved");
+            router.push("/admin/orders");
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "";
+            if (isNetworkError(msg)) {
+                saveDraftLocally();
+                toast.error(
+                    "Connection lost. Your draft has been saved locally — it will be restored when you return.",
+                    { duration: 5000 },
+                );
+            } else {
+                toast.error(getFriendlyErrorMessage(err));
+            }
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (missingContext) {
+            toast.error(
+                !warehouseLocationId
+                    ? "Select a warehouse first"
+                    : "Missing location context — try refreshing",
+            );
+            return;
+        }
+        if (!validateOrder()) return;
+
+        try {
+            await createTicket(buildPayload("submitted"));
+            clearLocalDraft();
+            toast.success("Order submitted to warehouse");
+            router.push("/admin/orders");
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "";
+            if (isNetworkError(msg)) {
+                saveDraftLocally();
+                toast.error(
+                    "Connection lost. Your order has been saved as a local draft. Please try submitting again when your connection is restored.",
+                    { duration: 6000 },
+                );
+            } else {
+                toast.error(getFriendlyErrorMessage(err));
+            }
+        }
+    };
+
+    return (
+        <div className="flex flex-col h-screen bg-white">
+            {/* ── Top bar ── */}
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                <button
+                    onClick={() => router.back()}
+                    className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg transition-all"
+                >
+                    <ArrowLeft size={12} /> Orders
+                </button>
+                <div>
+                    <h1 className="text-lg font-bold text-gray-900 tracking-tight">
+                        New Order
+                    </h1>
+                    <p className="text-[11px] text-gray-400">
+                        Browse the warehouse catalog and build your order
+                    </p>
+                </div>
+                {!warehouseLocationId && !catalogLoading && (
+                    <div className="ml-auto flex items-center gap-1.5 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg">
+                        <AlertCircle size={11} /> Select a warehouse to continue
+                    </div>
+                )}
+            </div>
+
+            {/* ── Two-column layout ── */}
+            <div className="flex flex-1 min-h-0">
+                {/* ── LEFT: Catalog (full-width on mobile, 1fr on desktop) ── */}
+                <div className="flex-1 flex flex-col md:border-r border-gray-100 overflow-hidden">
+                    {/* ── Warehouse selector banner ── */}
+                    <div className="flex items-center gap-3 px-5 py-3 mx-5 mt-4 mb-1 rounded-xl bg-indigo-50 border border-indigo-100 flex-shrink-0">
+                        <Warehouse
+                            size={13}
+                            className="text-indigo-500 flex-shrink-0"
+                        />
+                        <span className="text-xs font-medium text-indigo-800 whitespace-nowrap">
+                            Source warehouse:
+                        </span>
+                        <select
+                            value={selectedWarehouseId}
+                            onChange={(e) =>
+                                setSelectedWarehouseId(e.target.value)
+                            }
+                            className="flex-1 max-w-xs border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option value="" disabled hidden>
+                                Select a warehouse
+                            </option>
+                            {warehouseLocations?.map((loc) => (
+                                <option key={loc.id} value={loc.id}>
+                                    {loc.name}
+                                </option>
+                            ))}
+                        </select>
+                        {selectedWarehouseId && (
+                            <span className="text-[10px] text-indigo-600 font-semibold flex items-center gap-1">
+                                <CheckCircle2 size={10} /> Selected
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 px-4 sm:px-5 py-3.5 border-b border-gray-100 flex-shrink-0">
+                        <div className="relative flex-1">
+                            <Search
+                                size={13}
+                                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none"
+                            />
+                            <input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search by name or SKU…"
+                                className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 sm:py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                            />
+                        </div>
+                        <select
+                            value={categoryFilter}
+                            onChange={(e) =>
+                                setCategoryFilter(
+                                    e.target.value
+                                        ? Number(e.target.value)
+                                        : "",
+                                )
+                            }
+                            className="py-2.5 sm:py-2 px-3 text-xs border border-gray-200 rounded-lg outline-none focus:border-indigo-400 bg-white text-gray-600 cursor-pointer transition-all"
+                        >
+                            <option value="">All categories</option>
+                            {(categories ?? []).map((c) => (
+                                <option key={c.id} value={c.id}>
+                                    {c.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="px-4 sm:px-5 py-2 text-[11px] text-gray-300 flex-shrink-0">
+                        {filteredItems.length} item
+                        {filteredItems.length !== 1 ? "s" : ""} available to
+                        order
+                    </div>
+
+                    {/* Extra bottom padding on mobile so last item clears the sticky bar */}
+                    <div className="flex-1 overflow-y-auto px-4 sm:px-5 pb-28 md:pb-5">
+                        {catalogLoading ? (
+                            <div className="flex items-center justify-center py-16 gap-2 text-gray-400">
+                                <Loader2 size={16} className="animate-spin" />
+                                <span className="text-sm">
+                                    Loading catalog…
+                                </span>
+                            </div>
+                        ) : filteredItems.length === 0 &&
+                          orderableItems.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-center">
+                                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mb-3">
+                                    <Package
+                                        size={18}
+                                        className="text-gray-300"
+                                    />
+                                </div>
+                                <p className="text-sm font-semibold text-gray-500">No orderable items yet</p>
+                                <p className="text-xs text-gray-400 mt-1 max-w-xs">
+                                    Your super admin hasn&apos;t flagged any items as &quot;warehouse items.&quot;
+                                    Reach out to them to set up the catalog.
+                                </p>
+                            </div>
+                        ) : filteredItems.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-center">
+                                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mb-3">
+                                    <Search
+                                        size={18}
+                                        className="text-gray-300"
+                                    />
+                                </div>
+                                <p className="text-sm font-medium text-gray-400">
+                                    No items match
+                                </p>
+                                <p className="text-xs text-gray-300 mt-1">
+                                    Try a different search or category
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-2 pt-1">
+                                {filteredItems.map((item) => (
+                                    <CatalogItemRow
+                                        key={item.id}
+                                        item={item}
+                                        organizationId={organizationId}
+                                        cartEntry={cart[item.id]}
+                                        onAdd={handleAdd}
+                                        onRemove={handleRemove}
+                                        onQtyChange={handleQtyChange}
+                                        onConfigChange={handleConfigChange}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* ── RIGHT: Order summary — hidden on mobile, visible md+ ── */}
+                <div className="hidden md:flex w-[420px] flex-col flex-shrink-0 bg-gray-50/50 border-l border-gray-100">
+                    {/* Stats header */}
+                    <div className="px-5 pt-5 pb-4 border-b border-gray-100 bg-white flex-shrink-0">
+                        <div className="flex items-center gap-2 mb-4">
+                            <ShoppingCart
+                                size={15}
+                                className="text-indigo-500"
+                            />
+                            <span className="text-base font-bold text-gray-900">
+                                Order summary
+                            </span>
+                            {hasItems && (
+                                <span className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
+                                    {totalItems} item
+                                    {totalItems !== 1 ? "s" : ""}
+                                </span>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            {[
+                                { val: totalItems, label: "Line items" },
+                                { val: totalBoxes, label: "Total boxes" },
+                            ].map(({ val, label }) => (
+                                <div
+                                    key={label}
+                                    className="bg-gray-100 rounded-xl px-4 py-3"
+                                >
+                                    <div className="text-2xl font-bold text-gray-900 tracking-tight">
+                                        {val}
+                                    </div>
+                                    <div className="text-xs text-gray-400 mt-0.5">
+                                        {label}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        {hasItems && (
+                            <motion.div
+                                key={subtotal}
+                                animate={{ scale: [1, 1.02, 1] }}
+                                transition={{ duration: 0.08 }}
+                                className="mt-3 flex items-center justify-between px-4 py-2.5 bg-indigo-50 rounded-xl"
+                            >
+                                <span className="text-xs font-semibold text-indigo-700">Subtotal</span>
+                                <span className="text-sm font-bold text-indigo-700">{formatCurrency(subtotal)}</span>
+                            </motion.div>
+                        )}
+                    </div>
+
+                    {/* Cart items — scrollable middle section */}
+                    <div className="flex-1 overflow-y-auto px-5 py-4">
+                        {!hasItems ? (
+                            <div className="flex flex-col items-center justify-center h-full text-center py-10">
+                                <ShoppingCart
+                                    size={28}
+                                    className="text-gray-200 mb-3"
+                                />
+                                <p className="text-sm font-medium text-gray-400">
+                                    No items added yet
+                                </p>
+                                <p className="text-xs text-gray-300 mt-1">
+                                    Browse the catalog and add box quantities
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-2">
+                                {cartEntries.map((entry) => (
+                                    <CartRow
+                                        key={entry.item.id}
+                                        entry={entry}
+                                        onRemove={() =>
+                                            handleRemove(entry.item.id)
+                                        }
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Delivery + title + notes + actions — fixed bottom */}
+                    <div className="px-5 pb-5 pt-4 border-t border-gray-100 bg-white flex-shrink-0 flex flex-col gap-4">
+                        <DeliveryTypeSelector
+                            value={deliveryType}
+                            onChange={setDeliveryType}
+                        />
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                    Order Title{" "}
+                                    <span className="font-normal text-gray-300">
+                                        (optional)
+                                    </span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    placeholder="e.g. Nutella restock…"
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                    Notes{" "}
+                                    <span className="font-normal text-gray-300">
+                                        (optional)
+                                    </span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    placeholder="e.g. Prioritize Nutella…"
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleDraft}
+                                disabled={
+                                    !hasItems || isSubmitting || missingContext
+                                }
+                                className="flex-1 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 text-sm font-semibold transition-all"
+                            >
+                                Save Draft
+                            </button>
+                            <button
+                                onClick={() => setConfirmSubmitOpen(true)}
+                                disabled={
+                                    !hasItems || isSubmitting || missingContext || hasMissingPrice
+                                }
+                                className="flex-[2] py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all hover:enabled:-translate-y-px hover:enabled:shadow-[0_4px_12px_rgba(99,102,241,.3)] flex items-center justify-center gap-2"
+                            >
+                                {isSubmitting && (
+                                    <Loader2
+                                        size={13}
+                                        className="animate-spin"
+                                    />
+                                )}
+                                Submit Order
+                            </button>
+                        </div>
+
+                        <p className="text-[10px] text-gray-300 text-center leading-relaxed">
+                            Submitting sends this order to the warehouse for
+                            fulfillment.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Mobile sticky cart bar (hidden on md+) ── */}
+            <div className="md:hidden flex-shrink-0 border-t border-gray-200 bg-white px-4 py-3 safe-area-bottom">
+                {hasItems ? (
+                    <div className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-gray-900 truncate">
+                                {totalItems} item{totalItems !== 1 ? "s" : ""} ·{" "}
+                                {totalBoxes} box
+                                {totalBoxes !== 1 ? "es" : ""}
+                            </p>
+                            <p className="text-[11px] text-indigo-600 font-semibold">
+                                {formatCurrency(subtotal)}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setReviewSheetOpen(true)}
+                            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 text-white text-sm font-semibold shadow-[0_2px_12px_rgba(99,102,241,.35)] active:scale-95 transition-transform"
+                        >
+                            <ShoppingCart size={15} />
+                            Review
+                            <ChevronUp size={14} className="opacity-70" />
+                        </button>
+                    </div>
+                ) : (
+                    <p className="text-xs text-gray-400 text-center py-1">
+                        Add items from the catalog to start your order
+                    </p>
+                )}
+            </div>
+
+            {/* ── Mobile order-review bottom sheet ── */}
+            <Sheet
+                isOpen={reviewSheetOpen}
+                onClose={() => setReviewSheetOpen(false)}
+                snapPoints={[0, 0.92, 1]}
+                initialSnap={1}
+                className="md:hidden"
+            >
+                <Sheet.Container>
+                    <Sheet.Header />
+                    <Sheet.Content>
+                        <div className="overflow-y-auto px-4 pb-10">
+                            <div className="flex items-center gap-2 mb-4">
+                                <ShoppingCart
+                                    size={16}
+                                    className="text-indigo-500"
+                                />
+                                <span className="text-base font-bold text-gray-900">
+                                    Order Summary
+                                </span>
+                                <span className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
+                                    {totalItems} item
+                                    {totalItems !== 1 ? "s" : ""}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mb-4">
+                                {[
+                                    { val: totalItems, label: "Line items" },
+                                    { val: totalBoxes, label: "Total boxes" },
+                                ].map(({ val, label }) => (
+                                    <div
+                                        key={label}
+                                        className="bg-gray-100 rounded-xl px-4 py-3"
+                                    >
+                                        <div className="text-xl font-bold text-gray-900 tracking-tight">
+                                            {val}
+                                        </div>
+                                        <div className="text-[11px] text-gray-400 mt-0.5">
+                                            {label}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="flex flex-col gap-1.5 mb-5">
+                                {cartEntries.map((entry) => (
+                                    <CartRow
+                                        key={entry.item.id}
+                                        entry={entry}
+                                        onRemove={() => {
+                                            handleRemove(entry.item.id);
+                                            if (Object.keys(cart).length <= 1) {
+                                                setReviewSheetOpen(false);
+                                            }
+                                        }}
+                                    />
+                                ))}
+                            </div>
+
+                            <div className="border-t border-gray-100 mb-4" />
+
+                            {/* Warehouse selector in sheet */}
+                            <div className="flex items-center gap-3 px-4 py-2.5 mb-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                                <Warehouse
+                                    size={13}
+                                    className="text-indigo-500 flex-shrink-0"
+                                />
+                                <span className="text-xs font-medium text-indigo-800 whitespace-nowrap">
+                                    Warehouse:
+                                </span>
+                                <select
+                                    value={selectedWarehouseId}
+                                    onChange={(e) =>
+                                        setSelectedWarehouseId(e.target.value)
+                                    }
+                                    className="flex-1 border border-indigo-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="" disabled hidden>
+                                        Select a warehouse
+                                    </option>
+                                    {warehouseLocations?.map((loc) => (
+                                        <option key={loc.id} value={loc.id}>
+                                            {loc.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex flex-col gap-4 mb-5">
+                                <DeliveryTypeSelector
+                                    value={deliveryType}
+                                    onChange={setDeliveryType}
+                                />
+
+                                <div>
+                                    <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                        Order Title{" "}
+                                        <span className="font-normal text-gray-300">
+                                            (optional)
+                                        </span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={title}
+                                        onChange={(e) =>
+                                            setTitle(e.target.value)
+                                        }
+                                        placeholder="e.g. Nutella for Bay Ridge…"
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-[11px] font-semibold text-gray-500 block mb-1.5">
+                                        Notes{" "}
+                                        <span className="font-normal text-gray-300">
+                                            (optional)
+                                        </span>
+                                    </label>
+                                    <textarea
+                                        value={notes}
+                                        onChange={(e) =>
+                                            setNotes(e.target.value)
+                                        }
+                                        rows={2}
+                                        placeholder="e.g. Please prioritize Nutella…"
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={() => {
+                                        setReviewSheetOpen(false);
+                                        setConfirmSubmitOpen(true);
+                                    }}
+                                    disabled={
+                                        !hasItems ||
+                                        isSubmitting ||
+                                        missingContext ||
+                                        hasMissingPrice
+                                    }
+                                    className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-[0_2px_12px_rgba(99,102,241,.3)]"
+                                >
+                                    {isSubmitting && (
+                                        <Loader2
+                                            size={14}
+                                            className="animate-spin"
+                                        />
+                                    )}
+                                    Submit Order
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setReviewSheetOpen(false);
+                                        handleDraft();
+                                    }}
+                                    disabled={
+                                        !hasItems ||
+                                        isSubmitting ||
+                                        missingContext
+                                    }
+                                    className="w-full py-3.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 text-sm font-semibold transition-all"
+                                >
+                                    Save as Draft
+                                </button>
+                            </div>
+
+                            <p className="text-[10px] text-gray-300 text-center mt-3 leading-relaxed">
+                                Submitting sends this order to the warehouse for
+                                fulfillment.
+                            </p>
+                        </div>
+                    </Sheet.Content>
+                </Sheet.Container>
+                <Sheet.Backdrop onTap={() => setReviewSheetOpen(false)} />
+            </Sheet>
+
+            {/* Submit confirmation modal */}
+            <AlertDialog open={confirmSubmitOpen} onOpenChange={setConfirmSubmitOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm order submission</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Submit order for <strong>{formatCurrency(subtotal)}</strong>?
+                            Prices lock at submission and won&apos;t change if the warehouse updates them later.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                setConfirmSubmitOpen(false);
+                                handleSubmit();
+                            }}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                            Confirm &amp; Submit
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+    );
+}

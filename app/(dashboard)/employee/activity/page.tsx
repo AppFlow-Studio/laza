@@ -1,10 +1,9 @@
 "use client";
 
-import { useUser } from '@clerk/nextjs';
 import { useEmployeeLocation, useEmployeeInventoryLogs } from '@/lib/hooks/queries/useEmployee';
 import { useState, useMemo } from 'react';
 import { format, startOfDay, endOfDay, isToday, isYesterday, subDays, isWithinInterval } from 'date-fns';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import InventoryLogCard from '@/components/employee/inventory/InventoryLogCard';
 import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
 import { Clock } from 'lucide-react';
@@ -13,10 +12,9 @@ import { cn } from '@/lib/utils';
 type DateFilter = 'today' | 'week' | 'month' | 'all';
 
 export default function ActivityPage() {
-    const { user } = useUser();
     const { data: location } = useEmployeeLocation();
     const { data: logs, isLoading: logsLoading } = useEmployeeInventoryLogs(location?.id || null, 100);
-    const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+    const [dateFilter, setDateFilter] = useState<DateFilter>('today');
 
     const dateFilters = [
         { value: 'today' as DateFilter, label: 'Today' },
@@ -99,7 +97,16 @@ export default function ActivityPage() {
                 transition={{ duration: 0.3 }}
             >
                 <h1 className="text-3xl font-bold text-zinc-900 mb-1">Activity</h1>
-                <p className="text-zinc-600 text-sm">Recent inventory updates</p>
+                <p className="text-zinc-600 text-sm">
+                    {filteredLogs.length} update{filteredLogs.length !== 1 ? 's' : ''}
+                    {dateFilter !== 'all' && (
+                        <span className="text-zinc-400">
+                            {dateFilter === 'today' && ' today'}
+                            {dateFilter === 'week' && ' this week'}
+                            {dateFilter === 'month' && ' this month'}
+                        </span>
+                    )}
+                </p>
             </motion.div>
 
             {/* Date Filter Chips */}

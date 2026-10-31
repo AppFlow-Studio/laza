@@ -4,28 +4,109 @@ import { createServerSupabaseClient } from '../server';
 import { Location, StorageSpace } from '../types';
 
 export async function getAllLocations(organizationId: string) {
-    const supabase = await createServerSupabaseClient();
+    const { auth } = await import('@clerk/nextjs/server');
+    const { createServiceRoleClient } = await import('../server');
+
+    const { userId } = await auth();
+    if (!userId) return [];
+
+    const supabase = createServiceRoleClient();
+
+    // Get caller role and location assignments
+    const { data: caller } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
     const { data, error } = await supabase
         .from('locations')
-        .select(
-            `
+        .select(`
             *,
             storage_spaces (id),
             employees:users (
                 id,
                 assigned_location:locations (id)
             )
-            `
-        )
+        `)
         .eq('organization_id', organizationId)
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data as Location[];
+    if (!data) return [];
+
+    const callerRole = caller?.role;
+    console.log(callerRole)
+    // Super admin sees everything
+    if (callerRole === 'super_admin') return data as Location[];
+
+    // Admin: scope to assigned locations, or all if unscoped
+    if (callerRole === 'admin') {
+        const { data: assignments } = await supabase
+            .from('user_location_assignments')
+            .select('location_id')
+            .eq('user_id', userId);
+
+        const assignedIds = assignments?.map((a: any) => a.location_id) ?? [];
+
+        console.log(data, assignedIds)
+        // No assignments = unscoped admin, sees all
+        if (assignedIds.length === 0) return data as Location[];
+
+        return data.filter((l: any) => assignedIds.includes(l.id)) as Location[];
+    }
+
+    // Employee: only their assigned location (from junction table)
+    if (callerRole === 'employee') {
+        const { data: empAssignments } = await supabase
+            .from('user_location_assignments')
+            .select('location_id')
+            .eq('user_id', userId);
+
+        const empLocationId = empAssignments?.[0]?.location_id ?? null;
+        if (!empLocationId) return [];
+        return data.filter((l: any) => l.id === empLocationId) as Location[];
+    }
+
+    return [];
+}
+
+async function assertLocationAccess(supabase: any, userId: string, locationId: string) {
+    const { data: caller } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+    if (caller?.role === 'super_admin') return; // full access
+
+    if (caller?.role === 'admin') {
+        const { data: assignments } = await supabase
+            .from('user_location_assignments')
+            .select('location_id')
+            .eq('user_id', userId);
+
+        const assignedIds = assignments?.map((a: any) => a.location_id) ?? [];
+        if (assignedIds.length > 0 && !assignedIds.includes(locationId)) {
+            throw new Error('Unauthorized: location not assigned to this admin');
+        }
+        return;
+    }
+
+    throw new Error('Unauthorized');
 }
 
 export async function getLocationById(id: string) {
-    const supabase = await createServerSupabaseClient();
+    const { auth } = await import('@clerk/nextjs/server');
+    const { createServiceRoleClient } = await import('../server');
+
+    const { userId } = await auth();
+    if (!userId) throw new Error('Unauthorized');
+
+    const supabase = createServiceRoleClient();
+    await assertLocationAccess(supabase, userId, id);
+
     const { data, error } = await supabase
         .from('locations')
         .select(
@@ -46,7 +127,15 @@ export async function getLocationById(id: string) {
 }
 
 export async function getLocationWithDetails(id: string) {
-    const supabase = await createServerSupabaseClient();
+    const { auth } = await import('@clerk/nextjs/server');
+    const { createServiceRoleClient } = await import('../server');
+
+    const { userId } = await auth();
+    if (!userId) throw new Error('Unauthorized');
+
+    const supabase = createServiceRoleClient();
+    await assertLocationAccess(supabase, userId, id);
+
     const { data: location, error: locationError } = await supabase
         .from('locations')
         .select(
@@ -72,10 +161,10 @@ export async function getLocationWithDetails(id: string) {
     if (storageError) throw storageError;
 
     const { data: employees, error: employeesError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('assigned_location_id', id)
-        .eq('is_active', true);
+        .from('user_location_assignments')
+        .select('user_id, users!inner(id, is_active)')
+        .eq('location_id', id)
+        .eq('users.is_active', true);
 
     if (employeesError) throw employeesError;
 
@@ -97,7 +186,13 @@ export async function createLocation(location: {
         country?: string;
     };
     is_active?: boolean;
+    latitude?: number | null;
+    longitude?: number | null;
+    location_type?: string;
 }) {
+    const { auth } = await import('@clerk/nextjs/server');
+    const { userId } = await auth();
+
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
         .from('locations')
@@ -106,6 +201,29 @@ export async function createLocation(location: {
         .single();
 
     if (error) throw error;
+
+    // Pre-populate location_catalog with all org items so the new location
+    // has access to every item without manual super-admin assignment
+    const { data: items } = await supabase
+        .from('items')
+        .select('id')
+        .eq('organization_id', location.organization_id);
+
+    if (items && items.length > 0 && userId) {
+        const catalogRecords = items.map((item: { id: string | number }) => ({
+            location_id: data.id,
+            item_id: item.id,
+            assigned_by: userId,
+            assigned_at: new Date().toISOString(),
+        }));
+
+        const { error: catalogError } = await supabase
+            .from('location_catalog')
+            .upsert(catalogRecords, { onConflict: 'location_id,item_id' });
+
+        if (catalogError) throw catalogError;
+    }
+
     return data as Location;
 }
 
@@ -122,14 +240,60 @@ export async function updateLocation(id: string, updates: Partial<Location>) {
     return data as Location;
 }
 
-export async function deleteLocation(id: string) {
+/**
+ * Hard-delete a location if nothing references it; otherwise soft-archive
+ * (`is_active = false`) so historical orders, purchases, etc. stay intact.
+ *
+ * Returns `'deleted' | 'archived'` so the UI can confirm what happened.
+ */
+export async function deleteLocation(id: string): Promise<'deleted' | 'archived'> {
     const supabase = await createServerSupabaseClient();
-    const { error } = await supabase
+
+    const { error: delError } = await supabase
         .from('locations')
         .delete()
         .eq('id', id);
 
+    if (!delError) return 'deleted';
+
+    // 23503 = foreign_key_violation — fall back to archive
+    const isFkConflict =
+        (delError as { code?: string })?.code === '23503' ||
+        /foreign key/i.test(delError.message ?? '');
+
+    if (!isFkConflict) throw delError;
+
+    const { error: archiveError } = await supabase
+        .from('locations')
+        .update({ is_active: false })
+        .eq('id', id);
+
+    if (archiveError) throw archiveError;
+    return 'archived';
+}
+
+export async function deactivateLocation(locationId: string, adminUserId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase.rpc('deactivate_location', {
+        p_location_id: locationId,
+        p_admin_user_id: adminUserId,
+    });
+
     if (error) throw error;
+    return data;
+}
+
+export async function reactivateLocation(locationId: string, adminUserId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase.rpc('reactivate_location', {
+        p_location_id: locationId,
+        p_admin_user_id: adminUserId,
+    });
+
+    if (error) throw error;
+    return data;
 }
 
 export async function getStorageSpacesByLocation(locationId: string) {
@@ -206,4 +370,3 @@ export async function getStorageSpaceById(id: string) {
         location: location as Location,
     };
 }
-

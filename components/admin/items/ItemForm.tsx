@@ -1,23 +1,23 @@
 "use client";
 
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { useCreateItem, useUpdateItem } from '@/lib/hooks/queries/useItems';
-import { useCategories } from '@/lib/hooks/queries/useCategories';
-import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
-import toast from 'react-hot-toast';
+import { useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { cn } from "@/lib/utils";
+import { useCreateItem, useUpdateItem } from "@/lib/hooks/queries/useItems";
+import { useCategories } from "@/lib/hooks/queries/useCategories";
+import { useUserInfo } from "@/lib/hooks/queries/useUserInfo";
+import { Switch } from "@/components/ui/switch";
+import toast from "react-hot-toast";
 
 const itemSchema = z.object({
-    name: z.string().min(1, 'Name is required'),
+    name: z.string().min(1, "Name is required"),
     sku: z.string().optional().nullable(),
     category: z.number().optional().nullable(),
-    unit_of_measure: z.enum(['pcs', 'kg', 'liters', 'lbs', 'oz']),
+    unit_of_measure: z.enum(["pcs", "kg", "liters", "lbs", "oz"]),
     min_quantity: z.number().min(0),
+    is_warehouse_item: z.boolean().default(false),
 });
 
 type ItemFormData = z.infer<typeof itemSchema>;
@@ -32,8 +32,9 @@ interface ItemFormProps {
             id: number;
             name: string;
         } | null;
-        unit_of_measure: 'pcs' | 'kg' | 'liters' | 'lbs' | 'oz';
+        unit_of_measure: "pcs" | "kg" | "liters" | "lbs" | "oz";
         min_quantity: number;
+        is_warehouse_item?: boolean | null;
     } | null;
     onSuccess?: () => void;
     onCancel?: () => void;
@@ -48,46 +49,49 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
     const {
         register,
         handleSubmit,
+        control,
         formState: { errors },
         reset,
     } = useForm<ItemFormData>({
         resolver: zodResolver(itemSchema),
         defaultValues: {
-            name: '',
-            sku: '',
+            name: "",
+            sku: "",
             category: null,
-            unit_of_measure: 'pcs',
+            unit_of_measure: "pcs",
             min_quantity: 0,
+            is_warehouse_item: false,
         },
     });
 
-    // Reset form when item changes
     useEffect(() => {
         if (item && categories) {
-            // Extract category ID from item
-            // Item can have category_id directly or category object
             let categoryId: number | null = null;
-
             if (item.category_id) {
                 categoryId = item.category_id;
-            } else if (item.category && typeof item.category === 'object' && 'id' in item.category) {
+            } else if (
+                item.category &&
+                typeof item.category === "object" &&
+                "id" in item.category
+            ) {
                 categoryId = item.category.id;
             }
-
             reset({
-                name: item.name || '',
-                sku: item.sku || '',
+                name: item.name || "",
+                sku: item.sku || "",
                 category: categoryId,
-                unit_of_measure: item.unit_of_measure || 'pcs',
+                unit_of_measure: item.unit_of_measure || "pcs",
                 min_quantity: item.min_quantity || 0,
+                is_warehouse_item: item.is_warehouse_item ?? false,
             });
         } else if (!item) {
             reset({
-                name: '',
-                sku: '',
+                name: "",
+                sku: "",
                 category: null,
-                unit_of_measure: 'pcs',
+                unit_of_measure: "pcs",
                 min_quantity: 0,
+                is_warehouse_item: false,
             });
         }
     }, [item, categories, reset]);
@@ -96,12 +100,11 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
         try {
             const organizationId = userInfo?.members.organization_id;
             if (!organizationId) {
-                toast.error('Organization not found');
+                toast.error("Organization not found");
                 return;
             }
 
             if (item) {
-                // Update existing item
                 await updateMutation.mutateAsync({
                     id: String(item.id),
                     updates: {
@@ -110,11 +113,11 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                         category_id: data.category || null,
                         unit_of_measure: data.unit_of_measure,
                         min_quantity: data.min_quantity,
+                        is_warehouse_item: data.is_warehouse_item,
                     },
                 });
-                toast.success('Item updated successfully');
+                toast.success("Item updated successfully");
             } else {
-                // Create new item
                 await createMutation.mutateAsync({
                     item: {
                         organization_id: organizationId,
@@ -123,48 +126,87 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                         category_id: data.category || null,
                         unit_of_measure: data.unit_of_measure,
                         min_quantity: data.min_quantity,
-                    }
+                        is_warehouse_item: data.is_warehouse_item,
+                    },
                 });
-                toast.success('Item created successfully');
+                toast.success("Item created successfully");
             }
 
             onSuccess?.();
         } catch (error: any) {
-            toast.error(error.message || 'An error occurred');
+            toast.error(error.message || "An error occurred");
         }
     };
 
+    const isPending = createMutation.isPending || updateMutation.isPending;
+
+    const selectClass =
+        "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed appearance-none";
+
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            {/* Item Name */}
             <div>
-                <Label htmlFor="name">Item Name</Label>
-                <Input
+                <label
+                    htmlFor="name"
+                    className="block text-sm font-medium text-gray-700 mb-1.5"
+                >
+                    Item Name <span className="text-rose-500">*</span>
+                </label>
+                <input
                     id="name"
-                    {...register('name')}
-                    className={errors.name ? 'border-red-500' : ''}
+                    {...register("name")}
+                    placeholder="e.g. Nutella, Paper Bags"
+                    disabled={isPending}
+                    className={cn(
+                        "w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all",
+                        errors.name
+                            ? "border-rose-400 focus:ring-rose-500"
+                            : "border-gray-200 focus:ring-indigo-500",
+                    )}
                 />
                 {errors.name && (
-                    <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
+                    <p className="text-xs text-rose-500 font-medium mt-1">
+                        {errors.name.message}
+                    </p>
                 )}
             </div>
 
+            {/* SKU */}
             <div>
-                <Label htmlFor="sku">SKU (Optional)</Label>
-                <Input
+                <label
+                    htmlFor="sku"
+                    className="block text-sm font-medium text-gray-700 mb-1.5"
+                >
+                    SKU{" "}
+                    <span className="text-gray-400 font-normal">
+                        (Optional)
+                    </span>
+                </label>
+                <input
                     id="sku"
-                    {...register('sku')}
+                    {...register("sku")}
+                    placeholder="e.g. NUT-001"
+                    disabled={isPending}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 />
             </div>
 
+            {/* Category */}
             <div>
-                <Label htmlFor="category">Category</Label>
+                <label
+                    htmlFor="category"
+                    className="block text-sm font-medium text-gray-700 mb-1.5"
+                >
+                    Category
+                </label>
                 <select
                     id="category"
-                    {...register('category', {
-                        setValueAs: (v) => (v === '' ? null : Number(v))
+                    {...register("category", {
+                        setValueAs: (v) => (v === "" ? null : Number(v)),
                     })}
-                    className="w-full px-3 py-2 border border-zinc-200 rounded-lg"
-                    disabled={categoriesLoading}
+                    disabled={categoriesLoading || isPending}
+                    className={selectClass}
                 >
                     <option value="">Select a category</option>
                     {categories?.map((category) => (
@@ -174,16 +216,25 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                     ))}
                 </select>
                 {errors.category && (
-                    <p className="text-sm text-red-500 mt-1">{errors.category.message}</p>
+                    <p className="text-xs text-rose-500 font-medium mt-1">
+                        {errors.category.message}
+                    </p>
                 )}
             </div>
 
+            {/* Unit of Measure */}
             <div>
-                <Label htmlFor="unit_of_measure">Unit of Measure</Label>
+                <label
+                    htmlFor="unit_of_measure"
+                    className="block text-sm font-medium text-gray-700 mb-1.5"
+                >
+                    Unit of Measure
+                </label>
                 <select
                     id="unit_of_measure"
-                    {...register('unit_of_measure')}
-                    className="w-full px-3 py-2 border border-zinc-200 rounded-lg"
+                    {...register("unit_of_measure")}
+                    disabled={isPending}
+                    className={selectClass}
                 >
                     <option value="pcs">Pieces</option>
                     <option value="kg">Kilograms</option>
@@ -193,45 +244,86 @@ export default function ItemForm({ item, onSuccess, onCancel }: ItemFormProps) {
                 </select>
             </div>
 
+            {/* Minimum Quantity */}
             <div>
-                <Label htmlFor="min_quantity">Minimum Quantity</Label>
-                <Input
+                <label
+                    htmlFor="min_quantity"
+                    className="block text-sm font-medium text-gray-700 mb-1.5"
+                >
+                    Minimum Quantity
+                </label>
+                <input
                     id="min_quantity"
                     type="number"
                     step="0.01"
-                    {...register('min_quantity', { valueAsNumber: true })}
-                    className={errors.min_quantity ? 'border-red-500' : ''}
+                    min="0"
+                    {...register("min_quantity", { valueAsNumber: true })}
+                    disabled={isPending}
+                    className={cn(
+                        "w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all",
+                        errors.min_quantity
+                            ? "border-rose-400 focus:ring-rose-500"
+                            : "border-gray-200 focus:ring-indigo-500",
+                    )}
                 />
                 {errors.min_quantity && (
-                    <p className="text-sm text-red-500 mt-1">{errors.min_quantity.message}</p>
+                    <p className="text-xs text-rose-500 font-medium mt-1">
+                        {errors.min_quantity.message}
+                    </p>
                 )}
             </div>
 
-            <div className="flex gap-2">
+            {/* Warehouse Item */}
+            <div className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3">
+                <div>
+                    <p className="text-sm font-medium text-gray-700">Warehouse Item</p>
+                    <p className="text-xs text-gray-400 mt-0.5">This item can be ordered from the warehouse.</p>
+                </div>
+                <Controller
+                    name="is_warehouse_item"
+                    control={control}
+                    render={({ field }) => (
+                        <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={isPending}
+                        />
+                    )}
+                />
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
                 {onCancel && (
-                    <Button
+                    <button
                         type="button"
-                        variant="outline"
-                        className="flex-1"
                         onClick={onCancel}
-                        disabled={createMutation.isPending || updateMutation.isPending}
+                        disabled={isPending}
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         Cancel
-                    </Button>
+                    </button>
                 )}
-                <Button
+                <button
                     type="submit"
-                    className={onCancel ? "flex-1" : "w-full"}
-                    disabled={createMutation.isPending || updateMutation.isPending}
+                    disabled={isPending}
+                    className={cn(
+                        "px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
+                        onCancel ? "flex-1" : "w-full",
+                    )}
                 >
-                    {createMutation.isPending || updateMutation.isPending
-                        ? 'Saving...'
-                        : item
-                            ? 'Update'
-                            : 'Create'}
-                </Button>
+                    {isPending ? (
+                        <span className="flex items-center justify-center gap-2">
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                            Saving…
+                        </span>
+                    ) : item ? (
+                        "Update Item"
+                    ) : (
+                        "Create Item"
+                    )}
+                </button>
             </div>
         </form>
     );
 }
-

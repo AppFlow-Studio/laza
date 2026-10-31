@@ -2,7 +2,7 @@
 import React, {JSX, useRef, useEffect } from "react"
 import Image from "next/image"
 import JamalLawMeeting from '@/public/JamalLawMeeting.jpeg'
-import { motion, useInView, useAnimation } from 'framer-motion'
+import { motion, useInView, useAnimation } from 'motion/react'
 interface SlidingDivProps {
     className : string
     position: "left" | "right"

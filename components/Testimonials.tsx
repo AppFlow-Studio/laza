@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import Google from "./icons/google";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 
 // Google Reviews Data - 5-star reviews only
 // Filter for 5-star reviews only

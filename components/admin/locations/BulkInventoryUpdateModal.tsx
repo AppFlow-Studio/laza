@@ -91,7 +91,6 @@ export default function BulkInventoryUpdateModal({
                 minQuantityOverride: showMinOverride ? (data.minQuantityOverride ?? null) : undefined,
                 actionType: data.actionType,
                 notes: data.notes || undefined,
-                organizationId: organizationId,
             };
         });
 

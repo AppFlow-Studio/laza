@@ -1,7 +1,7 @@
 'use client'
 import React, { useState } from 'react'
 import { Minus, Plus } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence } from "motion/react"
 import Image from 'next/image'
 const faqs = [
     {

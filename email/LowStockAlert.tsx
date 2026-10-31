@@ -34,7 +34,7 @@ export default function LowStockAlert({ alertData }: LowStockAlertProps) {
         <Html>
             <Head />
             <Preview>
-                {urgencyInfo.label}: {alertData.item.name} at {alertData.location.name}
+                {alertData.isWarehouse ? '[Warehouse] ' : ''}{urgencyInfo.label}: {alertData.item.name} at {alertData.location.name}
             </Preview>
             <Body style={main}>
                 <Container style={container}>
@@ -48,11 +48,16 @@ export default function LowStockAlert({ alertData }: LowStockAlertProps) {
                             style={logo}
                         />
                         <Heading style={headerTitle}>
-                            {urgencyInfo.emoji} {urgencyInfo.label} Alert
+                            {urgencyInfo.emoji} {alertData.isWarehouse ? 'Warehouse ' : ''}{urgencyInfo.label} Alert
                         </Heading>
                         <Text style={headerSubtitle}>
                             Action required for {alertData.item.name}
                         </Text>
+                        {alertData.isWarehouse && (
+                            <Text style={warehouseBadge}>
+                                WAREHOUSE ALERT
+                            </Text>
+                        )}
                     </Section>
 
                     {/* Alert Details */}
@@ -96,17 +101,22 @@ export default function LowStockAlert({ alertData }: LowStockAlertProps) {
                         {/* Action Buttons */}
                         <Section style={actionSection}>
                             <Button
-                                href={`${url}/admin/inventory?item=${alertData.item.id}&location=${alertData.location.id}`}
+                                href={alertData.isWarehouse
+                                    ? `${url}/super-admin/warehouse/${alertData.location.id}`
+                                    : `${url}/admin/inventory?item=${alertData.item.id}&location=${alertData.location.id}`
+                                }
                                 style={primaryButton}
                             >
-                                View Item in App
+                                {alertData.isWarehouse ? 'View Warehouse Inventory' : 'View Item in App'}
                             </Button>
-                            <Button
-                                href={`${url}/admin/inventory?item=${alertData.item.id}&location=${alertData.location.id}&action=update`}
-                                style={secondaryButton}
-                            >
-                                Update Inventory
-                            </Button>
+                            {!alertData.isWarehouse && (
+                                <Button
+                                    href={`${url}/admin/inventory?item=${alertData.item.id}&location=${alertData.location.id}&action=update`}
+                                    style={secondaryButton}
+                                >
+                                    Update Inventory
+                                </Button>
+                            )}
                         </Section>
 
                         {/* Additional Info */}
@@ -176,6 +186,19 @@ const headerSubtitle = {
     color: '#e0e7ff',
     fontSize: '16px',
     margin: '0',
+    textAlign: 'center' as const,
+};
+
+const warehouseBadge = {
+    display: 'inline-block',
+    backgroundColor: '#fbbf24',
+    color: '#78350f',
+    fontSize: '11px',
+    fontWeight: 'bold' as const,
+    letterSpacing: '1px',
+    padding: '4px 12px',
+    borderRadius: '4px',
+    margin: '10px auto 0',
     textAlign: 'center' as const,
 };
 

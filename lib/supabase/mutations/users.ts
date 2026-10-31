@@ -7,8 +7,9 @@ import { User, OrgInvite } from '../types';
 interface CreateInvitationInput {
     organizationId: string;
     email: string;
-    role: 'admin' | 'employee';
+    role: 'admin' | 'employee' | 'super_admin';
     assigned_location_id?: string | null;
+    assigned_location_ids?: string[];
     first_name?: string;
     last_name?: string;
 }
@@ -18,12 +19,10 @@ export async function createInvitation(input: CreateInvitationInput) {
         const supabase = await createServerSupabaseClient();
         const clerk = await clerkClient();
 
-        // Validate employee has location
         if (input.role === 'employee' && !input.assigned_location_id) {
             throw new Error('Location is required for employees');
         }
 
-        // Check if email is already invited
         const { data: existingInvite } = await supabase
             .from('org_invites')
             .select('id')
@@ -36,7 +35,6 @@ export async function createInvitation(input: CreateInvitationInput) {
             throw new Error('An invitation has already been sent to this email');
         }
 
-        // Check if user already exists
         const { data: existingUser } = await supabase
             .from('users')
             .select('id')
@@ -47,21 +45,24 @@ export async function createInvitation(input: CreateInvitationInput) {
             throw new Error('A user with this email already exists');
         }
 
-        // Create Clerk invitation
+        // super_admin and admin both map to org:admin in Clerk.
+        // Fine-grained role is stored in our DB only.
+        const clerkRole = input.role === 'employee' ? 'org:member' : 'org:admin';
+
         const clerkInvite = await clerk.organizations.createOrganizationInvitation({
             organizationId: input.organizationId,
             emailAddress: input.email,
-            role: input.role == 'admin' ? 'org:admin' : 'org:member',
+            role: clerkRole,
             publicMetadata: {
                 organizationId: input.organizationId,
                 role: input.role,
                 assigned_location_id: input.assigned_location_id || null,
+                assigned_location_ids: input.assigned_location_ids || [],
                 first_name: input.first_name || null,
                 last_name: input.last_name || null,
             },
         });
 
-        // Insert into org_invites table
         const { data: invite, error: inviteError } = await supabase
             .from('org_invites')
             .insert({
@@ -93,35 +94,27 @@ export async function createInvitation(input: CreateInvitationInput) {
 
 interface UpdateUserInput {
     userId: string;
-    role?: 'admin' | 'employee';
-    assigned_location_id?: string | null;
+    role?: 'admin' | 'employee' | 'super_admin';
+    assigned_location_id?: string | null;       // employees only (one row in junction table)
+    assigned_location_ids?: string[];           // admins only (multiple rows in junction table)
     is_active?: boolean;
 }
 
 export async function updateUser(input: UpdateUserInput) {
-    console.log('updateUser', input);
     try {
-        const supabase = createServerSupabaseClient();
+        const supabase = await createServerSupabaseClient();
 
         const updates: Partial<User> = {};
 
         if (input.role !== undefined) {
             updates.role = input.role;
-            // Clear location if changing to admin
-            if (input.role === 'admin') {
-                updates.assigned_location_id = null;
-            }
-        }
-
-        if (input.assigned_location_id !== undefined) {
-            updates.assigned_location_id = input.assigned_location_id;
         }
 
         if (input.is_active !== undefined) {
             updates.is_active = input.is_active;
         }
 
-        console.log('updates', updates);
+        // Update the users table (location is stored in user_location_assignments, not here)
         const { data, error } = await supabase
             .from('users')
             .update(updates)
@@ -129,6 +122,66 @@ export async function updateUser(input: UpdateUserInput) {
             .select('*');
 
         if (error) throw error;
+
+        // Sync role change to Clerk so session claims reflect the new role immediately
+        if (input.role !== undefined) {
+            const clerk = await clerkClient();
+
+            // 1. Update publicMetadata.role — picked up by the JWT template → sessionClaims.o.rol
+            await clerk.users.updateUser(input.userId, {
+                publicMetadata: { role: input.role },
+            });
+
+            // 2. Update the Clerk org membership role (org:admin vs org:member)
+            //    Fetch organizationId from the members table since it's not in the input
+            const { data: member } = await supabase
+                .from('members')
+                .select('organization_id')
+                .eq('user_id', input.userId)
+                .single();
+
+            if (member?.organization_id) {
+                const clerkOrgRole = input.role === 'employee' ? 'org:member' : 'org:admin';
+                await clerk.organizations.updateOrganizationMembership({
+                    organizationId: member.organization_id,
+                    userId: input.userId,
+                    role: clerkOrgRole,
+                });
+            }
+        }
+
+        // Clear all existing location assignments, then re-insert based on role
+        const { error: deleteError } = await supabase
+            .from('user_location_assignments')
+            .delete()
+            .eq('user_id', input.userId);
+
+        if (deleteError) throw deleteError;
+
+        if (input.role === 'employee' && input.assigned_location_id) {
+            // Employee: exactly one row in the junction table
+            const { error: insertError } = await supabase
+                .from('user_location_assignments')
+                .insert({ user_id: input.userId, location_id: input.assigned_location_id });
+
+            if (insertError) throw insertError;
+        } else if (input.role === 'admin') {
+            // Admin: one row per assigned location
+            const locationIds = input.assigned_location_ids ?? [];
+            if (locationIds.length > 0) {
+                const rows = locationIds.map((location_id) => ({
+                    user_id: input.userId,
+                    location_id,
+                }));
+
+                const { error: insertError } = await supabase
+                    .from('user_location_assignments')
+                    .insert(rows);
+
+                if (insertError) throw insertError;
+            }
+        }
+        // super_admin: no junction rows (cleared above)
 
         return {
             success: true,
@@ -149,11 +202,10 @@ interface CancelInvitationInput {
 }
 
 export async function cancelInvitation(input: CancelInvitationInput) {
-    console.log('cancelInvitation', input);
     try {
         const supabase = await createServerSupabaseClient();
         const clerk = await clerkClient();
-        // Get invitation to get organizationId
+
         const { data: invite, error: inviteError } = await supabase
             .from('org_invites')
             .select('organization_id')
@@ -164,27 +216,24 @@ export async function cancelInvitation(input: CancelInvitationInput) {
             throw new Error('Invitation not found');
         }
 
-        // Revoke Clerk invitation
         try {
             await clerk.organizations.revokeOrganizationInvitation({
                 organizationId: invite.organization_id,
                 invitationId: input.clerkInviteId,
             });
         } catch (clerkError: any) {
-            // If invitation already revoked or doesn't exist, continue
             console.warn('Clerk invitation revocation warning:', clerkError.message);
         }
 
-        return {
-            success: true,
-            message: 'Invitation cancelled successfully!',
-        };
+        await supabase
+            .from('org_invites')
+            .update({ status: 'cancelled' })
+            .eq('clerk_invite_id', input.clerkInviteId);
+
+        return { success: true, message: 'Invitation cancelled successfully!' };
     } catch (error: any) {
         console.error('Error cancelling invitation:', error);
-        return {
-            success: false,
-            message: error.message || 'Failed to cancel invitation',
-        };
+        return { success: false, message: error.message || 'Failed to cancel invitation' };
     }
 }
 
@@ -192,7 +241,7 @@ export async function resendInvitation(invitationId: string) {
     try {
         const supabase = await createServerSupabaseClient();
         const clerk = await clerkClient();
-        // Get existing invitation
+
         const { data: invite, error: inviteError } = await supabase
             .from('org_invites')
             .select('*')
@@ -203,7 +252,6 @@ export async function resendInvitation(invitationId: string) {
             throw new Error('Invitation not found');
         }
 
-        // Cancel old invitation first
         if (invite.clerk_invite_id) {
             try {
                 await clerk.organizations.revokeOrganizationInvitation({
@@ -215,11 +263,12 @@ export async function resendInvitation(invitationId: string) {
             }
         }
 
-        // Create new Clerk invitation
+        const clerkRole = invite.role === 'employee' ? 'org:member' : 'org:admin';
+
         const clerkInvite = await clerk.organizations.createOrganizationInvitation({
             organizationId: invite.organization_id,
             emailAddress: invite.email,
-            role: invite.role == 'admin' ? 'org:admin' : 'org:member',
+            role: clerkRole,
             publicMetadata: {
                 organizationId: invite.organization_id,
                 role: invite.role,
@@ -227,7 +276,6 @@ export async function resendInvitation(invitationId: string) {
             },
         });
 
-        // Update org_invites with new clerk_invite_id
         const { error: updateError } = await supabase
             .from('org_invites')
             .update({
@@ -239,16 +287,9 @@ export async function resendInvitation(invitationId: string) {
 
         if (updateError) throw updateError;
 
-        return {
-            success: true,
-            message: 'Invitation resent successfully!',
-        };
+        return { success: true, message: 'Invitation resent successfully!' };
     } catch (error: any) {
         console.error('Error resending invitation:', error);
-        return {
-            success: false,
-            message: error.message || 'Failed to resend invitation',
-        };
+        return { success: false, message: error.message || 'Failed to resend invitation' };
     }
 }
-

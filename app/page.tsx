@@ -1,3 +1,5 @@
+import { auth } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
 import EmblaCarousel from "@/components/carousel/emblacarousel";
 import DessertMenu from "@/components/DessertMenu";
 import FadeIn from "@/components/FadeIn";
@@ -95,6 +97,11 @@ const categories = [
 // ];
 
 export default async function Home() {
+  const { sessionClaims } = await auth();
+  const role = (sessionClaims as any)?.o?.rol as string | undefined;
+  if (role === 'admin') redirect('/admin');
+  if (role === 'member') redirect('/employee');
+
   const reviews = await getPlaceReviews()
   return (
     <>

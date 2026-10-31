@@ -5,13 +5,16 @@ import { useMemo, useState } from 'react';
 import { AlertTriangle, Package, MapPin, Warehouse } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LoadingSkeleton } from '@/components/admin/shared/LoadingSkeleton';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import MobileSheet from '@/components/admin/shared/MobileSheet';
 import QuantityUpdateModal from '@/components/admin/inventory/QuantityUpdateModal';
 import EditStorageSpaceModal from '../locations/EditStorageSpaceModal';
+import {useAdminStore} from "@/lib/stores/adminStore";
 
 export default function ImmediateActions() {
-    const { data: alerts, isLoading } = useAlerts({ resolved: false });
+    const { selectedLocationId } = useAdminStore();
+
+    const { data: alerts, isLoading } = useAlerts({ resolved: false, locationId:selectedLocationId });
     const [editingAlert, setEditingAlert] = useState<{
         alertId: string;
         itemId: string;
@@ -77,6 +80,7 @@ export default function ImmediateActions() {
                     const locationAlerts = groupedAlerts[locationId];
                     const location = locationAlerts[0]?.locations;
                     const locationName = location?.name || 'Unknown Location';
+                    console.log(locationAlerts)
 
                     return (
                         <motion.div
