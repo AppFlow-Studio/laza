@@ -1,13 +1,14 @@
 // /super-admin/warehouse/pallets/reorganize
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { usePalletsForReorganization } from "@/lib/hooks/queries/useReorganize";
 import { ReorganizePanel } from "@/components/super-admin/pallets/ReorganizePanel";
 import { LoadingSkeleton } from "@/components/admin/shared/LoadingSkeleton";
 import { MoveRight } from "lucide-react";
 
-export default function PalletReorganizePage() {
+function PalletReorganizeContent() {
     const router         = useRouter();
     const searchParams   = useSearchParams();
     const sourceParam    = searchParams.get("source");
@@ -57,5 +58,14 @@ export default function PalletReorganizePage() {
                 }}
             />
         </div>
+    );
+}
+
+// useSearchParams() requires a Suspense boundary for this statically prerendered route.
+export default function PalletReorganizePage() {
+    return (
+        <Suspense fallback={<LoadingSkeleton className="m-6 h-8 w-48" />}>
+            <PalletReorganizeContent />
+        </Suspense>
     );
 }
