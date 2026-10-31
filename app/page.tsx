@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+import { resolveEffectiveRole } from '@/lib/auth/effectiveRole';
 import EmblaCarousel from "@/components/carousel/emblacarousel";
 import DessertMenu from "@/components/DessertMenu";
 import FadeIn from "@/components/FadeIn";
@@ -97,8 +98,9 @@ const categories = [
 // ];
 
 export default async function Home() {
-  const { sessionClaims } = await auth();
-  const role = (sessionClaims as any)?.o?.rol as string | undefined;
+  const { userId, sessionClaims } = await auth();
+  const role = await resolveEffectiveRole(userId, (sessionClaims as any)?.o?.rol as string | undefined);
+  // Super admins may browse the public site; store admins go to their dashboard
   if (role === 'admin') redirect('/admin');
   if (role === 'member') redirect('/employee');
 
