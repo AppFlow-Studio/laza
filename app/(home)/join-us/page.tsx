@@ -248,7 +248,7 @@ export default function JoinUsPage() {
                         "url": "https://lazadessert.cafe/join-us",
                         "logo": "https://lazadessert.cafe/lazabluelogo.png",
                         "sameAs": [
-                            "https://www.instagram.com/laza.cafe",
+                            "https://www.instagram.com/lazacafe/?hl=en",
                             "https://www.tiktok.com/@lazacafe"
                         ]
                     })
@@ -377,7 +377,7 @@ export default function JoinUsPage() {
                         </p>
                         <div className="flex justify-center space-x-6">
                             <a
-                                href="https://www.instagram.com/laza.cafe"
+                                href="https://www.instagram.com/lazacafe/?hl=en"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-gray-600 hover:text-[#2C4B7E] transition-colors"

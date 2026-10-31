@@ -141,7 +141,7 @@ export default function Menu() {
               }
             ],
             "sameAs": [
-              "https://www.instagram.com/laza.cafe",
+              "https://www.instagram.com/lazacafe/?hl=en",
               "https://www.tiktok.com/@lazacafe"
             ]
           })

@@ -141,7 +141,7 @@ export default async function Home() {
             "servesCuisine": ["Middle Eastern", "Desserts", "Coffee", "Shakes"],
             "hasMenu": `${baseUrl}/menu`,
             "sameAs": [
-              "https://www.instagram.com/laza.cafe",
+              "https://www.instagram.com/lazacafe/?hl=en",
               "https://www.tiktok.com/@lazacafe"
             ],
             /* Location section commented out until /brooklyn and /queens pages exist
@@ -261,7 +261,7 @@ export default async function Home() {
             "paymentAccepted": ["Cash", "Credit Card", "Debit Card", "Digital Wallet"],
             "currenciesAccepted": "USD",
             "sameAs": [
-              "https://www.instagram.com/laza.cafe",
+              "https://www.instagram.com/lazacafe/?hl=en",
               "https://www.tiktok.com/@lazacafe"
             ]
           })
@@ -350,7 +350,7 @@ export default async function Home() {
             "paymentAccepted": ["Cash", "Credit Card", "Debit Card", "Digital Wallet"],
             "currenciesAccepted": "USD",
             "sameAs": [
-              "https://www.instagram.com/laza.cafe",
+              "https://www.instagram.com/lazacafe/?hl=en",
               "https://www.tiktok.com/@lazacafe"
             ]
           })
@@ -428,7 +428,7 @@ export default async function Home() {
               "geoRadius": "50000"
             },
             "sameAs": [
-              "https://www.instagram.com/laza.cafe",
+              "https://www.instagram.com/lazacafe/?hl=en",
               "https://www.tiktok.com/@lazacafe"
             ],
             "location": [
