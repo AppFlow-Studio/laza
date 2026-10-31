@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { resolveEffectiveRole } from '@/lib/auth/effectiveRole'
 
 const isAdminRoute = createRouteMatcher(['/admin(.*)'])
 const isEmployeeRoute = createRouteMatcher(['/employee(.*)'])
@@ -19,10 +20,16 @@ const isPublicRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, req) => {
     const { userId, sessionClaims } = await auth();
-    const role = (sessionClaims as any)?.o?.rol as string | undefined;
-    // console.log('sessionClaims', sessionClaims);
-    
-    
+    const clerkRole = (sessionClaims as any)?.o?.rol as string | undefined;
+
+    // Only routes that branch on role pay for the Supabase lookup
+    const needsRole =
+        isSuperAdminRoute(req) || isAdminRoute(req) || isEmployeeRoute(req) ||
+        new URL(req.url).pathname === '/';
+    // Clerk admin + Supabase super_admin => super admin (see lib/auth/effectiveRole.ts)
+    const role = needsRole ? await resolveEffectiveRole(userId, clerkRole) : clerkRole;
+
+
     // Protect /super-admin/* — only super_admin can access
     if (isSuperAdminRoute(req)) {
         if (!userId) {
