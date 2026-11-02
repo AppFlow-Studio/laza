@@ -7,10 +7,11 @@ import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
 import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
-import { useCreateLocation, useLocationWithDetails } from '@/lib/hooks/queries/useLocations';
-import { useCreateStorageSpace, useBulkAssignItems } from '@/lib/hooks/queries/useStorageSetup';
+import { useCreateStoreWithSetup } from '@/lib/hooks/queries/useStorageSetup';
 import { useCreateInvitation } from '@/lib/hooks/queries/useUsers';
 import { useItems } from '@/lib/hooks/queries/useItems';
+import { getAllItems } from '@/lib/supabase/queries/items';
+import { getStoreTemplate } from '@/lib/supabase/queries/storeSetup';
 import StoreWizardSidebar from './StoreWizardSidebar';
 import StoreDetailsStep from './steps/StoreDetailsStep';
 import type { StoreFormData } from './steps/StoreDetailsStep';
@@ -32,9 +33,7 @@ export default function StoreSetupWizard() {
     const organizationId = userInfo?.members?.organization_id;
     const userId = userInfo?.id;
 
-    const createLocationMutation      = useCreateLocation();
-    const createStorageSpaceMutation  = useCreateStorageSpace();
-    const bulkAssignMutation          = useBulkAssignItems();
+    const createStoreMutation         = useCreateStoreWithSetup();
     const createInvitationMutation    = useCreateInvitation();
     const { data: items, isLoading: itemsLoading } = useItems();
 
@@ -51,6 +50,11 @@ export default function StoreSetupWizard() {
 
     const [isSubmitting,      setIsSubmitting]      = useState(false);
     const [createdLocationId, setCreatedLocationId] = useState<string | null>(null);
+
+    // Which source the current layout was cloned from ("<locationId>:<withItems>"),
+    // so revisiting step 1 doesn't wipe edits unless the clone choice changed.
+    const [clonedKey,         setClonedKey]         = useState<string | null>(null);
+    const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
 
     // ── Invite state (separate from store creation) ───────────────────────────
     const [inviteStatus, setInviteStatus] = useState<InviteStatus>('idle');
@@ -73,10 +77,6 @@ export default function StoreSetupWizard() {
             }));
     }, [items, itemAssignments]);
 
-    // ── Clone support ─────────────────────────────────────────────────────────
-    const cloneSourceId = storeData?.clone_from_id ?? '';
-    const { data: cloneSource } = useLocationWithDetails(cloneSourceId);
-
     // ── Helpers ───────────────────────────────────────────────────────────────
     const markCompleted = useCallback((step: number) => {
         setCompletedSteps(prev => new Set([...prev, step]));
@@ -90,19 +90,65 @@ export default function StoreSetupWizard() {
     // ── Step handlers ─────────────────────────────────────────────────────────
 
     // Step 1
-    const handleStoreSubmit = (data: StoreFormData) => {
-        setStoreData(data);
-        markCompleted(1);
+    const applyCloneSource = async (sourceId: string, withItems: boolean) => {
+        const template = await getStoreTemplate(sourceId);
 
-        if (data.clone_from_id && cloneSource?.storage_spaces?.length) {
-            const cloned: WizardStorageSpace[] = cloneSource.storage_spaces.map((s: any) => ({
-                tempId:           crypto.randomUUID(),
-                name:             s.name,
-                temperature_type: s.temperature_type as 'frozen' | 'refrigerated' | 'dry',
-            }));
-            setStorageSpaces(cloned);
+        // Selection sets must hold the catalog's own id values (numbers at
+        // runtime) or the item picker won't show them as selected.
+        const catalog = items ?? (organizationId ? await getAllItems(organizationId) : []);
+        const catalogIds = new Map(catalog.map((it) => [String(it.id), it.id as unknown as string]));
+
+        const spaces: WizardStorageSpace[] = [];
+        const assignments: Record<string, ItemAssignmentData> = {};
+
+        for (const space of template) {
+            const tempId = crypto.randomUUID();
+            spaces.push({ tempId, name: space.name, temperature_type: space.temperature_type });
+            if (!withItems) continue;
+
+            const selected   = new Set<string>();
+            const quantities: Record<string, number> = {};
+            const overrides:  Record<string, number | null> = {};
+            for (const item of space.items) {
+                const id = catalogIds.get(item.itemId);
+                if (id === undefined) continue; // item no longer in the catalog
+                selected.add(id);
+                quantities[id] = 0;
+                overrides[id]  = item.minQuantityOverride;
+            }
+            assignments[tempId] = {
+                selectedItems:            selected,
+                itemQuantities:           quantities,
+                itemMinQuantityOverrides: overrides,
+            };
         }
 
+        setStorageSpaces(spaces);
+        setItemAssignments(assignments);
+        return template.length;
+    };
+
+    const handleStoreSubmit = async (data: StoreFormData) => {
+        const withItems = data.clone_items !== false;
+        const nextCloneKey = data.clone_from_id ? `${data.clone_from_id}:${withItems}` : null;
+
+        if (nextCloneKey && nextCloneKey !== clonedKey) {
+            setIsLoadingTemplate(true);
+            try {
+                const copied = await applyCloneSource(data.clone_from_id!, withItems);
+                if (copied === 0) toast('That store has no storage spaces to copy.');
+            } catch (error) {
+                console.error('Failed to load store layout', error);
+                toast.error("Couldn't load the layout from that store. Try again, or start fresh.");
+                return;
+            } finally {
+                setIsLoadingTemplate(false);
+            }
+        }
+        setClonedKey(nextCloneKey);
+
+        setStoreData(data);
+        markCompleted(1);
         goToStep(2);
     };
 
@@ -177,89 +223,51 @@ export default function StoreSetupWizard() {
 
     // ── Store creation (no invitation here) ───────────────────────────────────
     const handleSubmit = async () => {
-        if (!storeData || !organizationId || !userId) return;
+        if (!storeData) return;
+        if (!organizationId || !userId) {
+            toast.error('Your account is still loading — wait a moment and try again.');
+            return;
+        }
         setIsSubmitting(true);
 
         try {
-            // 1. Create the store location
-            const location = await createLocationMutation.mutateAsync({
-                organization_id: organizationId,
-                name:            storeData.name,
-                address:         storeData.address,
-                is_active:       storeData.is_active,
-                latitude:        storeData.latitude ?? null,
-                longitude:       storeData.longitude ?? null,
-            });
-
-            // 2. Create storage spaces in parallel
-            const storageResults = await Promise.all(
-                storageSpaces.map(space =>
-                    createStorageSpaceMutation.mutateAsync({
-                        location_id:      location.id,
+            const result = await createStoreMutation.mutateAsync({
+                organizationId,
+                store: {
+                    name:      storeData.name,
+                    address:   storeData.address,
+                    is_active: storeData.is_active,
+                    latitude:  storeData.latitude ?? null,
+                    longitude: storeData.longitude ?? null,
+                },
+                storageSpaces: storageSpaces.map(space => {
+                    const assignment = itemAssignments[space.tempId];
+                    return {
                         name:             space.name,
                         temperature_type: space.temperature_type,
-                    })
-                )
-            );
+                        items: assignment
+                            ? Array.from(assignment.selectedItems).map(itemId => ({
+                                itemId:              String(itemId),
+                                quantity:            assignment.itemQuantities[itemId] || 0,
+                                minQuantityOverride: assignment.itemMinQuantityOverrides[itemId] ?? null,
+                            }))
+                            : [],
+                    };
+                }),
+                defaultStorageItemIds: (items ?? []).map(item => String(item.id)),
+            });
 
-            // tempId → real DB id map
-            const idMap = new Map<string, string>();
-            storageSpaces.forEach((space, i) => idMap.set(space.tempId, storageResults[i].id));
-
-            // 3. Bulk assign items per storage space in parallel
-            const assignPromises: Promise<any>[] = [];
-            for (const [tempId, assignment] of Object.entries(itemAssignments)) {
-                if (assignment.selectedItems.size === 0) continue;
-                const realId = idMap.get(tempId);
-                if (!realId) continue;
-
-                const spaceItems = Array.from(assignment.selectedItems).map(itemId => ({
-                    itemId,
-                    quantity:            assignment.itemQuantities[itemId] || 0,
-                    minQuantityOverride: assignment.itemMinQuantityOverrides[itemId] ?? null,
-                }));
-
-                assignPromises.push(
-                    bulkAssignMutation.mutateAsync({
-                        locationId:     location.id,
-                        storageSpaceId: realId,
-                        items:          spaceItems,
-                    })
-                );
-            }
-            if (assignPromises.length > 0) await Promise.all(assignPromises);
-
-            // 4. Always create a Default Storage space and seed all catalog items (qty 0)
-            const defaultNameTaken = storageSpaces.some(
-                s => s.name.trim().toLowerCase() === 'default storage'
-            );
-
-            if (!defaultNameTaken) {
-                const defaultSpace = await createStorageSpaceMutation.mutateAsync({
-                    location_id:      location.id,
-                    name:             'Default Storage',
-                    temperature_type: 'refrigerated',
-                });
-
-                const allItems = (items ?? []).map(item => ({
-                    itemId:              String(item.id),
-                    quantity:            0,
-                    minQuantityOverride: null,
-                }));
-
-                if (allItems.length > 0) {
-                    await bulkAssignMutation.mutateAsync({
-                        locationId:     location.id,
-                        storageSpaceId: defaultSpace.id,
-                        items:          allItems,
-                    });
-                }
+            if (!result.ok) {
+                toast.error(result.error, { duration: 10000 });
+                return;
             }
 
-            setCreatedLocationId(location.id);
+            setCreatedLocationId(result.locationId);
             toast.success('Store created successfully!');
         } catch (error: any) {
-            toast.error(error.message || 'Failed to create store');
+            // Only reached if the request itself failed (network, deploy mismatch)
+            console.error('Store creation request failed', error);
+            toast.error('Could not reach the server to create the store. Check your connection and try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -316,6 +324,7 @@ export default function StoreSetupWizard() {
                             {storeData?.clone_from_id && storageSpaces.length > 0 && (
                                 <span className="ml-1 text-indigo-600 font-medium">
                                     Layout cloned from existing store — edit as needed.
+                                    {storeData.clone_items !== false && ' Items are pre-assigned on the next step.'}
                                 </span>
                             )}
                         </p>
@@ -458,8 +467,17 @@ export default function StoreSetupWizard() {
                                 )}
 
                                 {showFooterNext && (
-                                    <Button onClick={handleNext} disabled={isSubmitting}>
-                                        Next <ArrowRight className="w-4 h-4 ml-2" />
+                                    <Button onClick={handleNext} disabled={isSubmitting || isLoadingTemplate}>
+                                        {isLoadingTemplate ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                Copying layout…
+                                            </>
+                                        ) : (
+                                            <>
+                                                Next <ArrowRight className="w-4 h-4 ml-2" />
+                                            </>
+                                        )}
                                     </Button>
                                 )}
 

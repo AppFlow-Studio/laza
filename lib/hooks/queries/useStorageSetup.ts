@@ -3,6 +3,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createStorageSpace } from "@/lib/supabase/queries/locations";
 import { bulkAssignItemsToStorage } from "@/lib/supabase/queries/inventory";
+import { createStoreWithSetup } from "@/lib/supabase/queries/storeSetup";
+import type { CreateStoreWithSetupInput } from "@/lib/supabase/queries/storeSetup";
 import { useUser } from "@clerk/nextjs";
 import { useUserInfo } from "./useUserInfo";
 
@@ -54,6 +56,19 @@ export function useBulkAssignItems() {
                 queryKey: ["inventory", variables.locationId],
             });
             queryClient.invalidateQueries({ queryKey: ["inventory-logs"] });
+        },
+    });
+}
+
+export function useCreateStoreWithSetup() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (input: CreateStoreWithSetupInput) => createStoreWithSetup(input),
+        onSuccess: (result) => {
+            if (!result.ok) return;
+            queryClient.invalidateQueries({ queryKey: ["locations"] });
+            queryClient.invalidateQueries({ queryKey: ["location-details", result.locationId] });
+            queryClient.invalidateQueries({ queryKey: ["inventory", result.locationId] });
         },
     });
 }
