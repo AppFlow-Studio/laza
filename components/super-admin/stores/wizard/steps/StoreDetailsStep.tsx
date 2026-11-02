@@ -24,6 +24,8 @@ const storeSchema = z.object({
     }),
     is_active: z.boolean(),
     clone_from_id: z.string().nullable(),
+    // When cloning, also copy which items live in each storage space
+    clone_items: z.boolean().optional(),
     latitude: z.number().nullable().optional(),
     longitude: z.number().nullable().optional(),
 });
@@ -64,12 +66,14 @@ export default function StoreDetailsStep({
             },
             is_active: true,
             clone_from_id: null,
+            clone_items: true,
             latitude: null,
             longitude: null,
         },
     });
 
     const cloneFromId = watch("clone_from_id");
+    const cloneItems = watch("clone_items") ?? true;
     const latitude = watch("latitude");
     const longitude = watch("longitude");
 
@@ -368,8 +372,8 @@ export default function StoreDetailsStep({
                         </span>
                     </div>
                     <p className="text-xs text-gray-500">
-                        Copies storage spaces and item assignments from the
-                        selected store to save setup time.
+                        Copies storage spaces and the items in each one from
+                        the selected store. Quantities start at 0.
                     </p>
                     <div className="grid grid-cols-1 gap-2">
                         <button
@@ -415,6 +419,19 @@ export default function StoreDetailsStep({
                             );
                         })}
                     </div>
+                    {cloneFromId && (
+                        <label className="flex items-center gap-2 pt-1 text-sm text-gray-700 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={cloneItems}
+                                onChange={(e) =>
+                                    setValue("clone_items", e.target.checked)
+                                }
+                                className="h-4 w-4 rounded border-gray-300 text-indigo-600"
+                            />
+                            Also copy the items in each storage space
+                        </label>
+                    )}
                 </div>
             )}
         </form>
