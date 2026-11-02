@@ -4,8 +4,12 @@
 -- Paste into Supabase > SQL Editor > Run.
 -- =====================================================================
 with recursive
+-- Laza's organization: the Clerk org whose id starts with org_36ZVGtf3aRW.
+-- (There is an older org_35... also named "Laza Dessert Cafe"; it is not touched.)
+pick as (select 'org_36ZVGtf3aRW'::text as id_prefix),
 laza as (
-  select o.id, o.name from public.organizations o where o.name ilike '%laza%'
+  select o.id, o.name from public.organizations o, pick
+  where left(o.id, length(pick.id_prefix)) = pick.id_prefix
 ),
 org as (
   select id, name from laza where (select count(*) from laza) = 1
@@ -45,7 +49,7 @@ report as (
   from org
   union all
   select 1, 'PROBLEM: send Claude a screenshot',
-         'Expected 1 organization named like "Laza", found ' || (select count(*) from laza) || ': ' ||
+         'Expected 1 organization with id starting ' || (select id_prefix from pick) || ', found ' || (select count(*) from laza) || '. All organizations: ' ||
          coalesce((select string_agg(coalesce(name, '(no name)') || ' = ' || id, '; ') from public.organizations), 'none'),
          null
   where (select count(*) from laza) <> 1
@@ -63,11 +67,9 @@ report as (
   from counted
   where n > 0
   union all
-  select 5, 'Locations that will get the new items', 'they had the old items in their location catalog',
-         case when to_regclass('public.location_catalog') is null then 0 else
-         (xpath('/row/n/text()', query_to_xml(format(
-           'select count(distinct location_id) as n from public.location_catalog where item_id in (select id from public.items where organization_id = %L)',
-           org.id), false, true, '')))[1]::text::bigint end
+  select 5, 'Locations that will get the new items',
+         coalesce((select string_agg(l.name, ', ' order by l.name) from public.locations l where l.organization_id = org.id), 'none'),
+         (select count(*) from public.locations l where l.organization_id = org.id)
   from org
   union all
   select 6, 'New catalog to be added', '68 items in 7 categories', 68

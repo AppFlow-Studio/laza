@@ -13,9 +13,10 @@
 -- =====================================================================
 do $$
 declare
-  -- Leave NULL to use the organization whose name contains "Laza".
-  -- If the script says it can't pick one, put the right id here, e.g. 'org_abc123'.
-  v_org_id   text := null;
+  -- Laza's organization: the Clerk org whose id starts with org_36ZVGtf3aRW.
+  -- (There is an older org_35... also named "Laza Dessert Cafe"; it is not touched.)
+  v_org_prefix text := 'org_36ZVGtf3aRW';
+  v_org_id   text;
 
   v_backup   text := 'catalog_backup_' || to_char(clock_timestamp(), 'YYYYMMDD_HH24MISS');
   v_matches  int;
@@ -24,13 +25,11 @@ declare
   r          record;
 begin
   -- 1. Pick the organization -------------------------------------------
-  if v_org_id is null then
-    select count(*), min(id) into v_matches, v_org_id
-    from public.organizations where name ilike '%laza%';
-    if v_matches <> 1 then
-      raise exception 'Expected exactly 1 organization named like "Laza", found %. Set v_org_id at the top of this script. Organizations: %',
-        v_matches, (select string_agg(coalesce(name, '(no name)') || ' = ' || id, '; ') from public.organizations);
-    end if;
+  select count(*), min(id) into v_matches, v_org_id
+  from public.organizations where left(id, length(v_org_prefix)) = v_org_prefix;
+  if v_matches <> 1 then
+    raise exception 'Expected exactly 1 organization with id starting %, found %. Nothing was changed. Organizations: %',
+      v_org_prefix, v_matches, (select string_agg(coalesce(name, '(no name)') || ' = ' || id, '; ') from public.organizations);
   end if;
 
   -- 2. The items being cleared -----------------------------------------
@@ -79,21 +78,13 @@ begin
                    v_backup, r.nspname || '__' || r.relname, r.tbl::regclass, r.conds);
   end loop;
 
-  -- 5. Remember which locations had the old items in their catalog --------
-  drop table if exists pg_temp._laza_catalog_locations;
-  if to_regclass('public.location_catalog') is not null then
-    execute 'create temp table _laza_catalog_locations as
-             select distinct location_id from public.location_catalog
-             where item_id in (select id from pg_temp._laza_old_items)';
-  end if;
-
-  -- 6. Delete: deepest linked rows first, then the items themselves -------
+  -- 5. Delete: deepest linked rows first, then the items themselves -------
   for r in select tbl, cond from _laza_tree order by depth desc loop
     execute format('delete from %s where %s', r.tbl::regclass, r.cond);
   end loop;
   delete from public.items where id in (select id from pg_temp._laza_old_items);
 
-  -- 7. The 7 categories (sections A-G of the list) -------------------------
+  -- 6. The 7 categories (sections A-G of the list) -------------------------
   drop table if exists pg_temp._laza_new_categories;
   create temp table _laza_new_categories (section text primary key, name text, description text, category_id bigint);
   insert into _laza_new_categories (section, name, description) values
@@ -134,7 +125,7 @@ begin
     update _laza_new_categories set category_id = v_cat_id where section = r.section;
   end loop;
 
-  -- 8. The 68 new items (list number, section, name, Sysco item # as SKU) --
+  -- 7. The 68 new items (list number, section, name, Sysco item # as SKU) --
   drop table if exists pg_temp._laza_new_items;
   create temp table _laza_new_items (list_no int primary key, section text, name text, sku text);
   insert into _laza_new_items (list_no, section, name, sku) values
@@ -222,22 +213,22 @@ begin
   join _laza_new_categories c on c.section = n.section
   order by n.list_no;
 
-  -- 9. Give the new items to every location that had the old ones ---------
-  if to_regclass('pg_temp._laza_catalog_locations') is not null then
-    execute 'insert into public.location_catalog (location_id, item_id, assigned_at)
-             select l.location_id, i.id, now()
-             from pg_temp._laza_catalog_locations l
-             cross join public.items i
-             where i.organization_id = $1
-             on conflict do nothing' using v_org_id;
-  end if;
+  -- 8. Put every new item in every Laza location's catalog, the same way
+  --    the app does when a location is created (location admins can only
+  --    stock items that are in their location's catalog).
+  insert into public.location_catalog (location_id, item_id, assigned_at)
+  select l.id, i.id, now()
+  from public.locations l
+  join public.items i on i.organization_id = l.organization_id
+  where l.organization_id = v_org_id
+  on conflict do nothing;
 
   -- Values for the summary below.
   perform set_config('laza.catalog_org_id', v_org_id, false);
   perform set_config('laza.catalog_backup', v_backup, false);
   perform set_config('laza.catalog_removed', v_removed::text, false);
 
-  drop table if exists pg_temp._laza_old_items, pg_temp._laza_tree, pg_temp._laza_catalog_locations,
+  drop table if exists pg_temp._laza_old_items, pg_temp._laza_tree,
                        pg_temp._laza_new_categories, pg_temp._laza_new_items;
 end $$;
 
