@@ -2,7 +2,7 @@
 
 import { createServerSupabaseClient } from '../server';
 import { ItemLocation, InventoryLog, Alert } from '../types';
-import { checkUpdateAllowed, createOverrideLog } from './updateLimits';
+import { createOverrideLog } from './updateLimits';
 
 export async function getInventoryByLocation(locationId: string) {
     const supabase = await createServerSupabaseClient();
@@ -61,16 +61,6 @@ export async function updateQuantity({
 }) {
     const supabase = createServerSupabaseClient();
     console.log('updateQuantity', itemId, locationId, storageSpaceId, userId, actionType, notes, minQuantityOverride, isOverride, overrideReason, overrideAdminId, organizationId)
-    // Check update limits (unless this is an admin override)
-    if (!isOverride) {
-        const limitCheck = await checkUpdateAllowed(itemId, locationId, storageSpaceId, userId);
-        if (!limitCheck.allowed) {
-            throw new Error(
-                `Update limit reached. You have used ${limitCheck.currentCount}/${limitCheck.limit} updates for this item today. Please contact an admin to override.`
-            );
-        }
-    }
-
     // Get current quantity
     console.log(itemId, locationId, storageSpaceId)
     const { data: current } = await supabase
@@ -410,28 +400,6 @@ export async function bulkUpdateInventory(
     organizationId?: string
 ) {
     const supabase = await createServerSupabaseClient();
-
-    // Check limits for each item (unless override)
-    const limitErrors: string[] = [];
-    if (!isOverride) {
-        for (const itemLoc of itemLocations) {
-            const limitCheck = await checkUpdateAllowed(
-                itemLoc.itemId,
-                itemLoc.locationId,
-                itemLoc.storageSpaceId,
-                userId
-            );
-            if (!limitCheck.allowed) {
-                limitErrors.push(
-                    `Item ${itemLoc.itemId}: Update limit reached (${limitCheck.currentCount}/${limitCheck.limit} updates used)`
-                );
-            }
-        }
-
-        if (limitErrors.length > 0) {
-            throw new Error(`Update limits exceeded:\n${limitErrors.join('\n')}`);
-        }
-    }
 
     // Process each item location update
     const updates = [];

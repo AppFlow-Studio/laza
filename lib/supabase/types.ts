@@ -833,6 +833,7 @@ export type Database = {
           longitude: number | null
           name: string | null
           organization_id: string | null
+          require_update_approval: boolean
         }
         Insert: {
           address?: string | null
@@ -845,6 +846,7 @@ export type Database = {
           longitude?: number | null
           name?: string | null
           organization_id?: string | null
+          require_update_approval?: boolean
         }
         Update: {
           address?: string | null
@@ -857,6 +859,7 @@ export type Database = {
           longitude?: number | null
           name?: string | null
           organization_id?: string | null
+          require_update_approval?: boolean
         }
         Relationships: [
           {
