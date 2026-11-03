@@ -5,6 +5,7 @@ import {
     getAllLocations,
     getLocationById,
     getLocationWithDetails,
+    getLocationRequiresUpdateApproval,
     createLocation,
     updateLocation,
     deleteLocation,
@@ -40,6 +41,14 @@ export function useLocationWithDetails(id: string | null) {
     });
 }
 
+export function useLocationRequiresUpdateApproval(locationId: string | null) {
+    return useQuery({
+        queryKey: ['location-requires-approval', locationId],
+        queryFn: () => getLocationRequiresUpdateApproval(locationId!),
+        enabled: !!locationId,
+    });
+}
+
 export function useCreateLocation() {
     const queryClient = useQueryClient();
     return useMutation({
@@ -58,6 +67,7 @@ export function useUpdateLocation() {
             queryClient.invalidateQueries({ queryKey: ['locations'] });
             queryClient.invalidateQueries({ queryKey: ['location', variables.id] });
             queryClient.invalidateQueries({ queryKey: ['location-details', variables.id] });
+            queryClient.invalidateQueries({ queryKey: ['location-requires-approval', variables.id] });
         },
     });
 }

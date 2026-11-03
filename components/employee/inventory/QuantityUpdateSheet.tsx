@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Sheet } from 'react-modal-sheet';
 import { useUser, useOrganization } from '@clerk/nextjs';
-import { useCheckUpdateAllowed } from '@/lib/hooks/queries/useUpdateLimits';
 import { useCreateInventoryUpdateRequest } from '@/lib/hooks/queries/useInventoryUpdateRequests';
+import { useUpdateQuantity } from '@/lib/hooks/queries/useInventory';
+import { useLocationRequiresUpdateApproval } from '@/lib/hooks/queries/useLocations';
 import { notifyAdminOfAdjustment } from '@/lib/supabase/actions/inventoryAdjustmentEmailAction';
 import { Button } from '@/components/ui/button';
-import { Minus, Plus, X, ChevronRight, AlertCircle } from 'lucide-react';
+import { Minus, Plus, X, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
@@ -53,14 +54,9 @@ export default function QuantityUpdateSheet({
     const { user } = useUser();
     const { organization } = useOrganization();
     const requestMutation = useCreateInventoryUpdateRequest();
-
-    // Check update limits
-    const { data: limitCheck, isLoading: limitCheckLoading } = useCheckUpdateAllowed(
-        item?.id || null,
-        locationId || null,
-        storageSpaceId || null,
-        user?.id || null
-    );
+    const updateMutation = useUpdateQuantity();
+    const { data: requiresApproval, isLoading: approvalSettingLoading } = useLocationRequiresUpdateApproval(locationId || null);
+    const isSubmitting = requestMutation.isPending || updateMutation.isPending;
 
     // Track original quantity (never changes)
 
@@ -157,20 +153,25 @@ export default function QuantityUpdateSheet({
             return;
         }
 
-        // Check if update is allowed
-        if (limitCheck && !limitCheck.allowed) {
-            toast.error(
-                limitCheck.reason === 'limit_reached'
-                    ? `Update limit reached. This item has been updated ${limitCheck.currentCount}/${limitCheck.limit} updates for this item today. Please contact an admin to override.`
-                    : 'Update not allowed. Please contact an admin.'
-            );
-            return;
-        }
-
         try {
             const noteText = reason !== 'correction'
                 ? `Reason: ${reasonOptions.find(r => r.value === reason)?.label}`
                 : null;
+
+            if (!requiresApproval) {
+                await updateMutation.mutateAsync({
+                    itemId:         String(item.id),
+                    locationId,
+                    storageSpaceId: storageSpaceId || null,
+                    newQuantity:    numericQuantity,
+                    userId:         user?.id ?? "",
+                    actionType,
+                    notes:          noteText ?? undefined,
+                });
+                toast.success("Quantity updated");
+                onSuccess();
+                return;
+            }
 
             const requestId = await requestMutation.mutateAsync({
                 orgId:            organization?.id ?? "",
@@ -189,7 +190,7 @@ export default function QuantityUpdateSheet({
             toast.success("Update submitted for admin approval");
             onSuccess();
         } catch (error: any) {
-            toast.error(error.message || 'Failed to submit update request');
+            toast.error(error.message || 'Failed to update quantity');
         }
     };
 
@@ -205,7 +206,7 @@ export default function QuantityUpdateSheet({
                                 <Button
                                     variant="secondary"
                                     onClick={onClose}
-                                    disabled={requestMutation.isPending}
+                                    disabled={isSubmitting}
                                     className="text-zinc-600"
                                 >
                                     <X className="w-5 h-5" /> Cancel
@@ -213,15 +214,14 @@ export default function QuantityUpdateSheet({
                                 <Button
                                     onClick={handleSave}
                                     disabled={
-                                        requestMutation.isPending ||
+                                        isSubmitting ||
+                                        approvalSettingLoading ||
                                         quantityChange === 0 ||
-                                        numericQuantity < 0 ||
-                                        (limitCheck && !limitCheck.allowed) ||
-                                        limitCheckLoading
+                                        numericQuantity < 0
                                     }
                                     className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {requestMutation.isPending ? 'Submitting…' : 'Submit for Approval'}
+                                    {isSubmitting ? 'Saving…' : requiresApproval ? 'Submit for Approval' : 'Save'}
                                 </Button>
                             </div>
 
@@ -241,51 +241,6 @@ export default function QuantityUpdateSheet({
                                     📍 {storageSpaceName}
                                 </div>
 
-                                {/* Update Limit Status */}
-                                {!limitCheckLoading && limitCheck && (
-                                    <div className={cn(
-                                        "p-3 rounded-lg border-2",
-                                        limitCheck.allowed
-                                            ? limitCheck.remaining !== undefined && limitCheck.remaining <= 1
-                                                ? "bg-amber-50 border-amber-200"
-                                                : "bg-blue-50 border-blue-200"
-                                            : "bg-red-50 border-red-200"
-                                    )}>
-                                        {limitCheck.allowed ? (
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex-1">
-                                                    <p className="text-sm font-medium text-zinc-900">
-                                                        Update Limit Status
-                                                    </p>
-                                                    <p className="text-xs text-zinc-600 mt-0.5">
-                                                        {limitCheck.remaining !== undefined && limitCheck.limit !== undefined
-                                                            ? `${limitCheck.remaining} of ${limitCheck.limit} updates remaining today`
-                                                            : 'No limit configured'}
-                                                    </p>
-                                                </div>
-                                                {limitCheck.remaining !== undefined && limitCheck.remaining <= 1 && (
-                                                    <AlertCircle className="w-5 h-5 text-amber-600" />
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-start gap-2">
-                                                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                                                <div className="flex-1">
-                                                    <p className="text-sm font-semibold text-red-900">
-                                                        Update Limit Reached
-                                                    </p>
-                                                    <p className="text-xs text-red-700 mt-1">
-                                                        There was {limitCheck.currentCount}/{limitCheck.limit} updates for this item today.
-                                                    </p>
-                                                    <p className="text-xs text-red-600 mt-1">
-                                                        Please contact an admin to override this limit.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
                                 {/* Available Quantity Section */}
                                 <div >
                                     <p className="text-sm text-zinc-600 mb-2">Available</p>
@@ -296,7 +251,7 @@ export default function QuantityUpdateSheet({
                                         <motion.button
                                             whileTap={{ scale: 0.9 }}
                                             onClick={handleDecrement}
-                                            disabled={requestMutation.isPending}
+                                            disabled={isSubmitting}
                                             className={cn(
                                                 "w-12 h-12 rounded-full border-2 border-zinc-300",
                                                 "bg-white flex items-center justify-center",
@@ -315,7 +270,7 @@ export default function QuantityUpdateSheet({
                                                 setShowKeypad(true);
                                                 setIsFirstInput(true);
                                             }}
-                                            disabled={requestMutation.isPending}
+                                            disabled={isSubmitting}
                                             className={cn(
                                                 "w-1/2 h-20 bg-white border-2 rounded-xl",
                                                 "flex flex-col items-center justify-center gap-1",
@@ -354,7 +309,7 @@ export default function QuantityUpdateSheet({
                                         <motion.button
                                             whileTap={{ scale: 0.9 }}
                                             onClick={handleIncrement}
-                                            disabled={requestMutation.isPending}
+                                            disabled={isSubmitting}
                                             className={cn(
                                                 "w-16 h-12 rounded-xl border-2 border-blue-300",
                                                 "bg-blue-50 flex items-center justify-center",

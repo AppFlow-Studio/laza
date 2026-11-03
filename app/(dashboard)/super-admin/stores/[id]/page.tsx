@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { LocationNotificationPreferences } from "@/components/location-notification-preferences";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -445,6 +446,30 @@ export default function SuperAdminStoreDetailPage() {
                 {/* ── Employees tab ── */}
                 {activeTab === "employees" && (
                     <div className="flex flex-col gap-3">
+                        <div className="flex items-start justify-between gap-4 p-4 bg-white border border-zinc-200 rounded-xl">
+                            <div>
+                                <Label htmlFor="require-update-approval" className="text-sm font-semibold text-zinc-900">
+                                    Require approval for employee updates
+                                </Label>
+                                <p className="text-xs text-zinc-500 mt-1">
+                                    When on, quantity changes by employees are sent to admins for approval instead of applying immediately.
+                                </p>
+                            </div>
+                            <Switch
+                                id="require-update-approval"
+                                checked={location.require_update_approval === true}
+                                disabled={updateLocation.isPending}
+                                onCheckedChange={(checked) =>
+                                    updateLocation.mutate(
+                                        { id: locationId, updates: { require_update_approval: checked } },
+                                        {
+                                            onSuccess: () => toast.success(checked ? "Employee updates now require approval" : "Employee updates apply immediately"),
+                                            onError: (e: any) => toast.error(e?.message || "Failed to update setting"),
+                                        }
+                                    )
+                                }
+                            />
+                        </div>
                         <div className="mb-4">
                             <SearchBar
                                 placeholder="Search employees by name or email…"

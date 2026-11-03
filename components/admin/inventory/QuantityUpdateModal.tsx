@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 import { useUserInfo } from '@/lib/hooks/queries/useUserInfo';
 import { User2, Clock } from 'lucide-react';
 import { useCreateInventoryUpdateRequest, usePendingRequestForItem } from "@/lib/hooks/queries/useInventoryUpdateRequests";
+import { useLocationRequiresUpdateApproval } from "@/lib/hooks/queries/useLocations";
 import { useOrganization } from "@clerk/nextjs";
 
 const quantitySchema = z.object({
@@ -53,6 +54,8 @@ export default function QuantityUpdateModal({
 
     // Check if acting user is employee (role = 'employee' in users table)
     const isEmployee = userInfo?.role === "employee";
+    const { data: requiresApproval } = useLocationRequiresUpdateApproval(locationId);
+    const needsApproval = isEmployee && requiresApproval === true;
 
     const { data: pendingRequests } = usePendingRequestForItem(
         itemId ? Number(itemId) : undefined,
@@ -83,7 +86,7 @@ export default function QuantityUpdateModal({
 
     const onSubmit = async (data: QuantityFormData) => {
         try {
-            if (isEmployee) {
+            if (needsApproval) {
                 await requestMutation.mutateAsync({
                     orgId:            organization?.id ?? "",
                     locationId:       locationId,
@@ -242,7 +245,7 @@ export default function QuantityUpdateModal({
             >
                 {(updateMutation.isPending || requestMutation.isPending)
                     ? "Saving…"
-                    : isEmployee
+                    : needsApproval
                     ? "Submit for Approval"
                     : "Update Quantity"}
             </Button>

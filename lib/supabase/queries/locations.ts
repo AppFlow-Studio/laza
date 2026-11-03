@@ -126,6 +126,29 @@ export async function getLocationById(id: string) {
     return data as Location;
 }
 
+/**
+ * Whether employee quantity updates at this store must go through admin
+ * approval. Readable by any signed-in user (employees need it), and returns
+ * only the flag. Missing column / null is treated as "no approval".
+ */
+export async function getLocationRequiresUpdateApproval(locationId: string): Promise<boolean> {
+    const { auth } = await import('@clerk/nextjs/server');
+    const { createServiceRoleClient } = await import('../server');
+
+    const { userId } = await auth();
+    if (!userId) throw new Error('Unauthorized');
+
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+        .from('locations')
+        .select('*')
+        .eq('id', locationId)
+        .single();
+
+    if (error) throw error;
+    return (data as { require_update_approval?: boolean | null })?.require_update_approval === true;
+}
+
 export async function getLocationWithDetails(id: string) {
     const { auth } = await import('@clerk/nextjs/server');
     const { createServiceRoleClient } = await import('../server');
