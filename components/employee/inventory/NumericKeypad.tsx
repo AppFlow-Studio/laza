@@ -51,7 +51,7 @@ export default function NumericKeypad({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/50 z-[9999]"
+                        className="fixed inset-0 bg-black/50 z-[9999] touch-manipulation"
                     />
                     {/* Keypad */}
                     <motion.div
@@ -59,7 +59,7 @@ export default function NumericKeypad({
                         animate={{ y: 0 }}
                         exit={{ y: '100%' }}
                         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                        className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-[9999] pb-safe"
+                        className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-[9999] pb-safe touch-manipulation select-none"
                     >
                         {/* Header */}
                         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200">

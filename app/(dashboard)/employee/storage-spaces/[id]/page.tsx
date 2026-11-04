@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Package } from 'lucide-react';
 import { useStorageSpace, useStorageSpaceItems } from '@/lib/hooks/queries/useEmployee';
 import { useEmployeeLocation } from '@/lib/hooks/queries/useEmployee';
@@ -15,6 +16,7 @@ import QuantityUpdateSheet from '@/components/employee/inventory/QuantityUpdateS
 export default function StorageSpaceDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const queryClient = useQueryClient();
     const storageSpaceId = params.id as string;
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -92,9 +94,16 @@ export default function StorageSpaceDetailPage() {
         setIsUpdateSheetOpen(true);
     };
 
-    const handleUpdateSuccess = () => {
+    // Keep selectedItem after closing so the sheet can animate out; it is
+    // replaced on the next tap.
+    const handleUpdateSuccess = (newQuantity?: number) => {
         setIsUpdateSheetOpen(false);
-        setSelectedItem(null);
+        // Show the saved number right away instead of waiting on the refetch
+        if (newQuantity !== undefined && selectedItem) {
+            queryClient.setQueryData(['employee-items', storageSpaceId], (old: any[] | undefined) =>
+                old?.map(row => row.id === selectedItem.id ? { ...row, current_quantity: newQuantity } : row)
+            );
+        }
         refetchItems();
     };
 
@@ -274,10 +283,7 @@ export default function StorageSpaceDetailPage() {
                     storageSpaceId={storageSpaceId}
                     storageSpaceName={storageSpace?.name || ''}
                     isOpen={isUpdateSheetOpen}
-                    onClose={() => {
-                        setIsUpdateSheetOpen(false);
-                        setSelectedItem(null);
-                    }}
+                    onClose={() => setIsUpdateSheetOpen(false)}
                     onSuccess={handleUpdateSuccess}
                 />
             )}

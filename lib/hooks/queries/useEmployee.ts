@@ -22,6 +22,10 @@ export function useEmployeeLocation() {
         queryFn: () => getEmployeeLocation(user?.id || ''),
         enabled: !!user?.id,
         staleTime: 5 * 60 * 1000, // 5 minutes
+        // A fresh invitee's location assignment is written by the Clerk webhook;
+        // retry steadily for ~10s before showing "No Location Assigned".
+        retry: 6,
+        retryDelay: 1500,
     });
 }
 

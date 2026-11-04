@@ -4,6 +4,13 @@ import { createServerSupabaseClient } from '../server';
 import { clerkClient } from '@clerk/nextjs/server';
 import { User, OrgInvite } from '../types';
 
+// Where the invite email's link lands. /sign-up consumes Clerk's __clerk_ticket,
+// then /auth-redirect activates the org — no hosted portal, no manual refresh.
+function invitationRedirectUrl() {
+    const base = process.env.NEXT_PUBLIC_INVITATION_ACCEPT_REDIRECT_URL || 'https://lazadessert.cafe';
+    return new URL('/sign-up', base).toString();
+}
+
 interface CreateInvitationInput {
     organizationId: string;
     email: string;
@@ -53,6 +60,7 @@ export async function createInvitation(input: CreateInvitationInput) {
             organizationId: input.organizationId,
             emailAddress: input.email,
             role: clerkRole,
+            redirectUrl: invitationRedirectUrl(),
             publicMetadata: {
                 organizationId: input.organizationId,
                 role: input.role,
@@ -269,6 +277,7 @@ export async function resendInvitation(invitationId: string) {
             organizationId: invite.organization_id,
             emailAddress: invite.email,
             role: clerkRole,
+            redirectUrl: invitationRedirectUrl(),
             publicMetadata: {
                 organizationId: invite.organization_id,
                 role: invite.role,

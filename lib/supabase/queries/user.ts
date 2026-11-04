@@ -17,12 +17,14 @@ export async function getUserById(id: string | null) {
             user_location_assignments(location_id)
         `)
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
     if (error) {
         console.error('getUserById error', error);
         throw error;
     }
+    // Brand-new users: the Clerk webhook may not have written the row yet
+    if (!data) return null;
 
     // Derive assigned_location_id from the junction table (first row for employees)
     // so existing consumers keep working without changes.

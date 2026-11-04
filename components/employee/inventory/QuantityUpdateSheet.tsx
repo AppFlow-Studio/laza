@@ -23,8 +23,14 @@ interface QuantityUpdateSheetProps {
     storageSpaceName: string;
     isOpen: boolean;
     onClose: () => void;
-    onSuccess: () => void;
+    /** newQuantity is set when the change was applied directly (no approval step) */
+    onSuccess: (newQuantity?: number) => void;
 }
+
+const MAX_QUANTITY_LENGTH = 8;
+
+// Show decimals only when the value has them (2 → "2", 2.5 → "2.5")
+const formatQty = (n: number) => String(Math.round(n * 100) / 100);
 
 const reasonOptions = [
     { value: 'correction', label: 'Correction (default)' },
@@ -90,9 +96,11 @@ export default function QuantityUpdateSheet({
         }
     }, [showReasonDropdown, showActionDropdown]);
 
-    // Reset when sheet opens
+    // Reset only when the sheet opens — not when a background refetch changes
+    // currentQuantity mid-edit, which used to wipe what the employee typed.
+    const wasOpen = useRef(false);
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && !wasOpen.current) {
             setQuantity(currentQuantity.toString());
             setOriginalQuantity(currentQuantity);
             setReason('correction');
@@ -100,19 +108,22 @@ export default function QuantityUpdateSheet({
             setShowKeypad(false);
             setIsFirstInput(true);
         }
+        wasOpen.current = isOpen;
     }, [isOpen, currentQuantity]);
 
     const numericQuantity = parseFloat(quantity) || 0;
     const quantityChange = numericQuantity - originalQuantity;
 
+    // Functional updates throughout: fast taps on mobile can land before a
+    // re-render, and reading `quantity` from the closure dropped digits.
     const handleIncrement = () => {
-        const newValue = numericQuantity + 1;
-        setQuantity(newValue.toString());
+        setIsFirstInput(false);
+        setQuantity(q => formatQty((parseFloat(q) || 0) + 1));
     };
 
     const handleDecrement = () => {
-        const newValue = Math.max(0, numericQuantity - 1);
-        setQuantity(newValue.toString());
+        setIsFirstInput(false);
+        setQuantity(q => formatQty(Math.max(0, (parseFloat(q) || 0) - 1)));
     };
 
     const handleKeypadInput = (char: string) => {
@@ -123,19 +134,19 @@ export default function QuantityUpdateSheet({
             return;
         }
 
-        if (quantity === '0' && char !== '.') {
-            setQuantity(char);
-        } else {
-            setQuantity(quantity + char);
-        }
+        setQuantity(q => {
+            if (char === '.' && q.includes('.')) return q;
+            if (q.length >= MAX_QUANTITY_LENGTH) return q;
+            // Cap at 2 decimal places
+            if (q.includes('.') && q.split('.')[1].length >= 2) return q;
+            if (q === '0' && char !== '.') return char;
+            return q + char;
+        });
     };
 
     const handleKeypadBackspace = () => {
-        if (quantity.length > 1) {
-            setQuantity(quantity.slice(0, -1));
-        } else {
-            setQuantity('0');
-        }
+        setIsFirstInput(false);
+        setQuantity(q => (q.length > 1 ? q.slice(0, -1) : '0'));
     };
 
     const handleKeypadEnter = () => {
@@ -169,7 +180,7 @@ export default function QuantityUpdateSheet({
                     notes:          noteText ?? undefined,
                 });
                 toast.success("Quantity updated");
-                onSuccess();
+                onSuccess(numericQuantity);
                 return;
             }
 
@@ -245,8 +256,8 @@ export default function QuantityUpdateSheet({
                                 <div >
                                     <p className="text-sm text-zinc-600 mb-2">Available</p>
 
-                                    {/* Quantity Adjustment Controls */}
-                                    <div className="flex items-center gap-3 mb-2 mx-auto justify-center">
+                                    {/* Quantity Adjustment Controls — touch-manipulation so rapid +/- taps don't zoom */}
+                                    <div className="flex items-center gap-3 mb-2 mx-auto justify-center touch-manipulation select-none">
                                         {/* Minus Button */}
                                         <motion.button
                                             whileTap={{ scale: 0.9 }}
@@ -285,14 +296,14 @@ export default function QuantityUpdateSheet({
                                             {/* Show original with strikethrough when changed */}
                                             {quantityChange !== 0 && (
                                                 <span className="text-sm text-zinc-400 line-through">
-                                                    {originalQuantity.toFixed(0)}
+                                                    {formatQty(originalQuantity)}
                                                 </span>
                                             )}
                                             <span className={cn(
                                                 "text-3xl font-bold",
                                                 quantityChange !== 0 ? "text-blue-600" : "text-zinc-900"
                                             )}>
-                                                {numericQuantity.toFixed(0)}
+                                                {formatQty(numericQuantity)}
                                             </span>
                                             {/* Show change indicator */}
                                             {quantityChange !== 0 && (
@@ -300,7 +311,7 @@ export default function QuantityUpdateSheet({
                                                     "text-xs font-medium",
                                                     quantityChange > 0 ? "text-green-600" : "text-red-600"
                                                 )}>
-                                                    {quantityChange > 0 ? `+${quantityChange.toFixed(0)}` : quantityChange.toFixed(0)}
+                                                    {quantityChange > 0 ? `+${formatQty(quantityChange)}` : formatQty(quantityChange)}
                                                 </span>
                                             )}
                                         </motion.button>
